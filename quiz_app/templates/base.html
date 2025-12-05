@@ -1,0 +1,978 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+  <!--begin::Head-->
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>
+      {% block title %}SIS{% endblock title %} | School Information System
+    </title>
+    <!--begin::Primary Meta Tags-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="title" content="School Information System" />
+    <meta name="author" content="SchoolApp" />
+    <meta
+      name="description"
+      content="School Information System - Complete management solution for schools."
+    />
+    <meta
+      name="keywords"
+      content="school, management, information system, student, teacher, admin, education"
+    />
+    <!-- Browser compatibility meta tags -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="msapplication-TileColor" content="#27ddf5" />
+    <meta name="msapplication-config" content="none" />
+    <!-- Add theme color for mobile browsers -->
+    <meta name="theme-color" content="#27ddf5" />
+    <!-- Add apple touch icon -->
+    <link rel="apple-touch-icon" href="{% static 'favicon.ico' %}" />
+    <!--end::Primary Meta Tags-->
+
+    <!-- Import the centralized styles -->
+    {% include 'partials/_styles.html' %}
+    <!-- Theme flash prevention -->
+    <style>
+      /* Hide content until theme is fully loaded */
+      .app-wrapper {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        animation: showContent 0.3s ease 0.1s forwards;
+      }
+
+      .app-wrapper.theme-loaded {
+        opacity: 1;
+        animation: none;
+      }
+
+      /* Fallback: show content after 100ms if theme manager doesn't load */
+      @keyframes showContent {
+        to {
+          opacity: 1;
+        }
+      }
+    </style>
+    <!-- Additional styles for scrollable sidebar -->
+    <style>
+      /* Custom styles for the scrollable sidebar */
+      .sidebar-wrapper {
+        height: calc(100vh - 4rem);
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      /* Hide default scrollbar for webkit browsers */
+      .sidebar-wrapper::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .sidebar-wrapper::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+      }
+
+      .sidebar-wrapper::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+      }
+
+      /* Ensure the sidebar content is properly spaced */
+      .nav.sidebar-menu {
+        padding-bottom: 2rem;
+      }
+
+      /* Sub-menu indentation using AdminLTE's nav-indent */
+      .sidebar-menu.nav-indent .nav-treeview {
+        padding-left: 0.5rem !important;
+        margin-left: 0.25rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .sidebar-menu.nav-indent .nav-treeview .nav-item {
+        margin-left: 0.25rem;
+      }
+
+      .sidebar-menu.nav-indent .nav-treeview .nav-link {
+        padding-left: 0.5rem !important;
+        font-size: 1rem;
+        opacity: 0.9;
+        transition: all 0.3s ease;
+      }
+
+      .sidebar-menu.nav-indent .nav-treeview .nav-link:hover {
+        opacity: 1;
+        background-color: rgba(255, 255, 255, 0.05);
+        transform: translateX(2px);
+      }
+
+      .sidebar-menu.nav-indent .nav-treeview .nav-link.active {
+        opacity: 1;
+        background-color: rgba(255, 255, 255, 0.15);
+        font-weight: 600;
+      }
+
+      .sidebar-menu.nav-indent .nav-treeview .nav-link i {
+        font-size: 0.9rem;
+        margin-right: 0.5rem;
+      }
+
+      /* Treeview arrow rotation */
+      .nav-arrow {
+        transition: transform 0.3s ease;
+        display: inline-block;
+      }
+
+      .nav-item.menu-open .nav-arrow {
+        transform: rotate(90deg);
+      }
+
+      /* Ensure treeview is hidden by default */
+      .nav-treeview {
+        display: none;
+      }
+
+      .nav-item.menu-open .nav-treeview {
+        display: block;
+      }
+
+      /* Improve mobile experience */
+      @media (max-width: 768px) {
+        .navbar-badge {
+          position: absolute;
+          top: 5px;
+          right: 5px;
+          font-size: 0.6rem;
+        }
+
+        .user-menu .dropdown-menu {
+          width: 250px;
+          max-width: 90vw;
+        }
+
+        .app-content .container-fluid {
+          padding-left: 0.5rem;
+          padding-right: 0.5rem;
+        }
+      }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+  </head>
+  <!--end::Head-->
+  <!--begin::Body-->
+
+  <body
+    class="layout-fixed sidebar-expand-lg sidebar-mini sidebar-collapse bg-body-secondary"
+  >
+    <!--begin::App Wrapper-->
+    <div class="app-wrapper">
+      <!--begin::Header-->
+      <nav
+        class="app-header navbar navbar-expand bg-primary-subtle"
+        data-bs-theme="dark"
+        aria-label="Main navigation"
+      >
+        <!--begin::Container-->
+        <div class="container-fluid">
+          <!--begin::Start Navbar Links-->
+
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a
+                class="nav-link"
+                data-lte-toggle="sidebar"
+                href="#"
+                role="button"
+                aria-label="Toggle sidebar"
+              >
+                <i class="bi bi-list" aria-hidden="true"></i>
+                <span class="visually-hidden">Toggle sidebar</span>
+              </a>
+            </li>
+            <li class="nav-item d-none d-md-block">
+              <a href="" class="nav-link">Home</a>
+            </li>
+          </ul>
+          <!--end::Start Navbar Links-->
+          <!--begin::End Navbar links-->
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item dropdown">
+              <button
+                class="btn btn-link nav-link py-2 px-0 px-lg-2 dropdown-toggle d-flex align-items-center"
+                id="bd-theme"
+                type="button"
+                aria-expanded="false"
+                data-bs-toggle="dropdown"
+                data-bs-display="static"
+              >
+                <span class="theme-icon-active">
+                  <i class="my-1"></i>
+                </span>
+                <span class="d-lg-none ms-2" id="bd-theme-text"
+                  >Toggle theme</span
+                >
+              </button>
+              <ul
+                class="dropdown-menu dropdown-menu-end"
+                aria-labelledby="bd-theme-text"
+                style="--bs-dropdown-min-width: 8rem"
+              >
+                <li>
+                  <button
+                    type="button"
+                    class="dropdown-item d-flex align-items-center active"
+                    data-bs-theme-value="light"
+                    aria-pressed="false"
+                  >
+                    <i class="bi bi-sun-fill me-2"></i>
+                    Light
+                    <i class="bi bi-check-lg ms-auto d-none"></i>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    class="dropdown-item d-flex align-items-center"
+                    data-bs-theme-value="dark"
+                    aria-pressed="false"
+                  >
+                    <i class="bi bi-moon-fill me-2"></i>
+                    Dark
+                    <i class="bi bi-check-lg ms-auto d-none"></i>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    class="dropdown-item d-flex align-items-center"
+                    data-bs-theme-value="auto"
+                    aria-pressed="true"
+                  >
+                    <i class="bi bi-circle-fill-half-stroke me-2"></i>
+                    Auto
+                    <i class="bi bi-check-lg ms-auto d-none"></i>
+                  </button>
+                </li>
+              </ul>
+            </li>
+          </ul>
+          <!--end::End Navbar links-->
+          <!--begin::End Navbar Links-->
+          <ul class="navbar-nav ms-auto">
+            <!-- Theme Switcher Dropdown -->
+            <li class="nav-item dropdown">
+              <a
+                class="nav-link"
+                data-bs-toggle="dropdown"
+                href="#"
+                aria-label="Theme Switcher"
+                aria-expanded="false"
+              >
+                <i class="bi bi-palette-fill"></i>
+                <span class="theme-indicator"></span>
+              </a>
+              <div class="dropdown-menu dropdown-menu-end">
+                <span class="dropdown-header">Select Theme</span>
+                <a href="#" class="dropdown-item" data-theme="academic">
+                  <i class="bi bi-mortarboard me-2"></i> Academic Pro
+                  <small class="text-muted d-block"
+                    >Professional educational theme</small
+                  >
+                </a>
+                <a href="#" class="dropdown-item" data-theme="green">
+                  <i class="bi bi-palette-fill me-2"></i> Green Vibrant
+                  <small class="text-muted d-block"
+                    >Fresh, energetic green theme</small
+                  >
+                </a>
+                <a href="#" class="dropdown-item" data-theme="purple">
+                  <i class="bi bi-palette2 me-2"></i> Purple Vibrant
+                  <small class="text-muted d-block"
+                    >Elegant, vibrant purple theme</small
+                  >
+                </a>
+                <a href="#" class="dropdown-item" data-theme="red">
+                  <i class="bi bi-palette me-2"></i> Red Vibrant
+                  <small class="text-muted d-block"
+                    >Bold, energetic red theme</small
+                  >
+                </a>
+              </div>
+            </li>
+            <!--begin::Navbar Search-->
+
+            <!--end::Navbar Search-->
+            <!--begin::Messages Dropdown Menu-->
+
+            <!--end::Messages Dropdown Menu-->
+            <!--begin::Notifications Dropdown Menu-->
+
+            <!--end::Notifications Dropdown Menu-->
+            <!--begin::Session Timer-->
+            <li class="nav-item">
+              <a
+                class="nav-link"
+                href="#"
+                id="session-timer-display"
+                aria-label="Session time remaining"
+              >
+                <i class="bi bi-clock"></i>
+                <span
+                  >Session:
+                  <span id="session-time-remaining">--:--:--</span></span
+                >
+              </a>
+            </li>
+            <!--end::Session Timer-->
+            <!--begin::Fullscreen Toggle-->
+            <li class="nav-item">
+              <a
+                class="nav-link"
+                href="#"
+                data-lte-toggle="fullscreen"
+                aria-label="Toggle fullscreen"
+              >
+                <i
+                  data-lte-icon="maximize"
+                  class="bi bi-arrows-fullscreen"
+                  aria-hidden="true"
+                ></i>
+                <i
+                  data-lte-icon="minimize"
+                  class="bi bi-fullscreen-exit"
+                  style="display: none"
+                  aria-hidden="true"
+                ></i>
+                <span class="visually-hidden">Toggle fullscreen</span>
+              </a>
+            </li>
+            <!--end::Fullscreen Toggle-->
+            <!--begin::User Menu Dropdown-->
+            <li class="nav-item dropdown user-menu">
+              <a
+                href="#"
+                class="nav-link dropdown-toggle"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                aria-label="User menu"
+              >
+                <img
+                  src="{% static 'admin/dist/assets/img/default-avatar.png' %}"
+                  class="user-image rounded-circle shadow"
+                  alt="User profile picture"
+                  width="32"
+                  height="32"
+                />
+                <span class="d-none d-md-inline"
+                  >{{ request.user.full_name }}</span
+                >
+              </a>
+              <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-end">
+                <!--begin::User Image-->
+                <li class="user-header text-bg-primary">
+                  <img
+                    src="{% static 'admin/dist/assets/img/default-avatar.png' %}"
+                    class="rounded-circle shadow"
+                    alt="User profile picture"
+                    width="96"
+                    height="96"
+                  />
+                  <p>
+                    {{ request.user.full_name }}
+                    <small>{{ request.user.get_role_display }}</small>
+                  </p>
+                </li>
+                <!--end::User Image-->
+                <!--begin::Menu Body-->
+                <li class="user-body">
+                  <!--begin::Row-->
+                  <div class="row"></div>
+                  <!--end::Row-->
+                </li>
+                <!--end::Menu Body-->
+                <!--begin::Menu Footer-->
+                <li class="user-footer">
+                  <a
+                    href="{% if request.user.role == 'teacher' %}{% url 'quiz_app:teacher_profile' %}{% elif request.user.role == 'student' %}{% url 'quiz_app:student_profile' %}{% else %}#{% endif %}"
+                    class="btn btn-default btn-flat"
+                    >Profile</a
+                  >
+                  <a
+                    href="{% url 'quiz_app:logout' %}"
+                    class="btn btn-default btn-flat float-end"
+                    >Sign out</a
+                  >
+                </li>
+                <!--end::Menu Footer-->
+              </ul>
+            </li>
+            <!--end::User Menu Dropdown-->
+          </ul>
+          <!--end::End Navbar Links-->
+        </div>
+        <!--end::Container-->
+      </nav>
+      <!--end::Header-->
+      <!--begin::Sidebar-->
+      <aside
+        class="app-sidebar bg-primary-subtle bg-gradient"
+        data-bs-theme="dark"
+        aria-label="Main sidebar"
+      >
+        <!--begin::Sidebar Brand-->
+        <div class="sidebar-brand">
+          <!--begin::Brand Link-->
+          <a href="" class="brand-link">
+            <!--begin::Brand Image-->
+            <img
+              src="{% static 'admin/dist/assets/img/AdminLTELogo.png' %}"
+              alt="System Logo"
+              class="brand-image opacity-75 shadow"
+              width="36"
+              height="36"
+            />
+            <!--end::Brand Image-->
+            <!--begin::Brand Text-->
+            <span class="brand-text fw-light">
+              {% if user.is_authenticated and user.is_superadmin %} SUPERADMIN
+              PORTAL {% else %} SCHOOL SYSTEM {% endif %}
+            </span>
+            <!--end::Brand Text-->
+          </a>
+          <!--end::Brand Link-->
+        </div>
+        <!--end::Sidebar Brand-->
+        <!--begin::Sidebar Wrapper-->
+        <div class="sidebar-wrapper">
+          <nav class="mt-2" aria-label="Sidebar navigation">
+            <ul
+              class="nav sidebar-menu flex-column nav-indent"
+              role="menu"
+              data-accordion="false"
+            >
+              {% include 'partials/_menu_items.html' %}
+            </ul>
+          </nav>
+        </div>
+        <!--end::Sidebar Wrapper-->
+      </aside>
+      <!--end::Sidebar-->
+      <!--begin::App Main-->
+      <main class="app-main">
+        <!--begin::App Content Header-->
+        <div class="app-content-header">
+          <div class="container-fluid">
+            <div class="row">
+              <div class="col-sm-6">
+                <h1 class="mb-0">
+                  {% block page_title %}Dashboard{% endblock page_title %}
+                </h1>
+              </div>
+              <div class="col-sm-6">
+                <nav aria-label="breadcrumb">
+                  <ol class="breadcrumb float-sm-end">
+                    {% block breadcrumb %}
+                    <li class="breadcrumb-item active" aria-current="page">
+                      Dashboard
+                    </li>
+                    {% endblock breadcrumb %}
+                  </ol>
+                </nav>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!--end::App Content Header-->
+
+        <!--begin::App Content-->
+        <div class="app-content">
+          <div class="container-fluid">
+            <!-- Flash Messages -->
+            {% if messages %}
+            <div class="messages" aria-live="polite">
+              {% for message in messages %}
+              <div
+                class="alert alert-{{ message.tags }} alert-dismissible fade show"
+                role="alert"
+              >
+                {{ message }}
+                <button
+                  type="button"
+                  class="btn-close"
+                  data-bs-dismiss="alert"
+                  aria-label="Close"
+                ></button>
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- Hidden messages for SweetAlert processing -->
+            <div id="django-messages" style="display: none">
+              {% for message in messages %}
+              <div
+                class="django-message"
+                data-message-type="{{ message.tags }}"
+              >
+                {{ message }}
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %} {% block content %}
+            <!-- Content goes here -->
+            {% endblock content %}
+          </div>
+        </div>
+        <!--end::App Content-->
+      </main>
+      <!--end::App Main-->
+      <!--begin::Footer-->
+      <footer class="app-footer">
+        <!--begin::To the end-->
+        <div class="float-end d-none d-sm-inline">School Management System</div>
+        <!--end::To the end-->
+        <!--begin::Copyright-->
+        <strong>
+          Copyright &copy; {% now "Y" %}&nbsp;
+          <a href="#" class="text-decoration-none">Cissey-Tech</a>.
+        </strong>
+        All rights reserved.
+        <!--end::Copyright-->
+      </footer>
+      <!--end::Footer-->
+    </div>
+    <!--end::App Wrapper-->
+    <!--begin::Script-->
+    <!-- Browser compatibility polyfills -->
+    <script>
+      // Polyfill for older browsers (Edge compatibility)
+      if (!window.Promise) {
+        document.write(
+          '<script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"><\/script>'
+        );
+      }
+
+      // Polyfill for Object.assign
+      if (typeof Object.assign != "function") {
+        Object.assign = function (target) {
+          "use strict";
+          if (target == null) {
+            throw new TypeError("Cannot convert undefined or null to object");
+          }
+          var to = Object(target);
+          for (var index = 1; index < arguments.length; index++) {
+            var nextSource = arguments[index];
+            if (nextSource != null) {
+              for (var nextKey in nextSource) {
+                if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+                  to[nextKey] = nextSource[nextKey];
+                }
+              }
+            }
+          }
+          return to;
+        };
+      }
+
+      // Polyfill for Array.from
+      if (!Array.from) {
+        Array.from = function (arrayLike) {
+          return Array.prototype.slice.call(arrayLike);
+        };
+      }
+
+      // Polyfill for String.includes
+      if (!String.prototype.includes) {
+        String.prototype.includes = function (search, start) {
+          if (typeof start !== "number") {
+            start = 0;
+          }
+          if (start + search.length > this.length) {
+            return false;
+          } else {
+            return this.indexOf(search, start) !== -1;
+          }
+        };
+      }
+    </script>
+
+    <!-- jQuery first (local) -->
+    <script src="{% static 'vendor/jquery/3.7.1/jquery-3.7.1.min.js' %}"></script>
+
+    <!-- Bootstrap and its dependencies (local) -->
+    <script src="{% static 'vendor/popperjs/2.11.8/umd/popper.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js' %}"></script>
+
+    <!-- DataTables (local) -->
+    <script src="{% static 'vendor/datatables/1.13.7/js/jquery.dataTables.min.js' %}"></script>
+    <script src="{% static 'vendor/datatables/1.13.7/js/dataTables.bootstrap5.min.js' %}"></script>
+
+    <!-- Other plugins (local) -->
+    <script src="{% static 'vendor/overlayscrollbars/2.10.1/browser/overlayscrollbars.browser.es6.min.js' %}"></script>
+    <script src="{% static 'admin/dist/js/adminlte.js' %}"></script>
+
+    <!-- Sweet Alert for better notifications (local) -->
+    <script src="{% static 'vendor/sweetalert2/11.7.32/dist/sweetalert2.all.min.js' %}"></script>
+
+    <!-- Active Menu State Handler -->
+    <script src="{% static 'js/active-menu.js' %}"></script>
+
+    <!-- Sidebar Menu Treeview Handler -->
+    <script src="{% static 'js/sidebar-menu.js' %}"></script>
+
+    <!-- Initialize SweetAlert notifications from session -->
+    <script>
+      {% if sweet_alert %}
+          document.addEventListener('DOMContentLoaded', function () {
+            Swal.fire({
+              title: "{% if sweet_alert.title %}{{ sweet_alert.title|escapejs }}{% else %}Notification{% endif %}",
+              text: "{% if sweet_alert.text %}{{ sweet_alert.text|escapejs }}{% else %}{% endif %}",
+              icon: "{% if sweet_alert.icon %}{{ sweet_alert.icon|escapejs }}{% else %}info{% endif %}",
+              confirmButtonText: 'OK'
+            });
+          });
+      {% endif %}
+    </script>
+
+    <!-- Process Django Messages with SweetAlert -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Check if we have URL parameters for notifications (for promotion page)
+        const urlParamsContainer = document.getElementById("url-params");
+        if (urlParamsContainer) {
+          const successParam = urlParamsContainer
+            .querySelector("[data-success]")
+            ?.getAttribute("data-success");
+          const warningParam = urlParamsContainer
+            .querySelector("[data-warning]")
+            ?.getAttribute("data-warning");
+          const actionParam = urlParamsContainer
+            .querySelector("[data-action]")
+            ?.getAttribute("data-action");
+
+          if (successParam === "true") {
+            const action = actionParam || "operation";
+            let message = "Operation completed successfully!";
+
+            if (action === "promote") {
+              message = "Students promoted successfully!";
+            } else if (action === "demote") {
+              message = "Students demoted successfully!";
+            } else if (action === "graduate") {
+              message = "Students graduated successfully!";
+            }
+
+            Swal.fire({
+              title: "Success!",
+              text: message,
+              icon: "success",
+              confirmButtonText: "OK",
+              confirmButtonColor: "#28a745",
+              timer: 3000,
+              timerProgressBar: true,
+              showConfirmButton: false,
+            });
+
+            // Clean up URL parameters
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+            return; // Don't process Django messages if we have URL parameters
+          }
+
+          if (warningParam === "true") {
+            Swal.fire({
+              title: "Notice",
+              text: "Operation completed with warnings. Please review the results.",
+              icon: "warning",
+              confirmButtonText: "OK",
+              confirmButtonColor: "#ffc107",
+              timer: 4000,
+              timerProgressBar: true,
+              showConfirmButton: true,
+            });
+
+            // Clean up URL parameters
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+            return; // Don't process Django messages if we have URL parameters
+          }
+        }
+
+        // Process Django messages if no URL parameters
+        const messagesContainer = document.getElementById("django-messages");
+        if (messagesContainer) {
+          const messages =
+            messagesContainer.querySelectorAll(".django-message");
+
+          messages.forEach(function (messageDiv) {
+            const message = messageDiv.textContent.trim();
+            const messageType = messageDiv.getAttribute("data-message-type");
+
+            let icon = "info";
+            let title = "Information";
+            let confirmButtonColor = "#3085d6";
+            let timer = null;
+            let showConfirmButton = true;
+
+            if (messageType === "success") {
+              icon = "success";
+              title = "Success!";
+              confirmButtonColor = "#28a745";
+            } else if (messageType === "error") {
+              icon = "error";
+              title = "Error";
+              confirmButtonColor = "#dc3545";
+            } else if (messageType === "warning") {
+              icon = "warning";
+              title = "Notice";
+              confirmButtonColor = "#ffc107";
+              // Make warnings less intrusive - auto-dismiss after 5 seconds
+              timer = 5000;
+              showConfirmButton = false;
+            }
+
+            const swalOptions = {
+              title: title,
+              text: message,
+              icon: icon,
+              confirmButtonText: "OK",
+              confirmButtonColor: confirmButtonColor,
+              allowOutsideClick: false,
+              allowEscapeKey: true,
+              showCloseButton: true,
+            };
+
+            // Add timer for warnings
+            if (timer) {
+              swalOptions.timer = timer;
+              swalOptions.timerProgressBar = true;
+              swalOptions.showConfirmButton = showConfirmButton;
+            }
+
+            Swal.fire(swalOptions);
+          });
+        }
+      });
+    </script>
+
+    <!-- Advanced Theme Manager -->
+    <script src="{% static 'js/theme-manager.js' %}"></script>
+
+    <!-- Session Timer Script -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Initialize session timer countdown
+        let sessionExpirySeconds = {{ session_expiry_seconds }};
+        const timerDisplay = document.getElementById('session-time-remaining');
+        let sessionWarningShown = false;
+        let sessionDangerShown = false;
+
+        function updateSessionTimer() {
+          if (sessionExpirySeconds > 0) {
+            sessionExpirySeconds -= 1;
+
+            // Calculate hours, minutes, and seconds
+            const hours = Math.floor(sessionExpirySeconds / 3600);
+            const minutes = Math.floor((sessionExpirySeconds % 3600) / 60);
+            const seconds = sessionExpirySeconds % 60;
+
+            // Format the time display
+            timerDisplay.innerHTML =
+              (hours < 10 ? '0' + hours : hours) + ':' +
+              (minutes < 10 ? '0' + minutes : minutes) + ':' +
+              (seconds < 10 ? '0' + seconds : seconds);
+
+            // Warning when 5 minutes or less remaining
+            if (sessionExpirySeconds <= 300 && !sessionWarningShown) {
+              timerDisplay.style.color = '#ff9800'; // Orange warning color
+              sessionWarningShown = true;
+            }
+
+            // Danger when 1 minute or less remaining
+            if (sessionExpirySeconds <= 60 && !sessionDangerShown) {
+              timerDisplay.style.color = '#f44336'; // Red danger color
+              sessionDangerShown = true;
+
+              // Show warning at 60 seconds
+              Swal.fire({
+                title: 'Session Expiring',
+                text: 'Your session will expire in 1 minute. Do you want to extend it?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Extend Session',
+                cancelButtonText: 'Let it expire',
+                confirmButtonColor: '#27ddf5',
+                cancelButtonColor: '#dc3545'
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  extendSession();
+                }
+              });
+            }
+          } else {
+            // Session expired
+            timerDisplay.innerHTML = '00:00:00';
+            clearInterval(timerInterval);
+
+            Swal.fire({
+              title: 'Session Expired',
+              text: 'Your session has expired. You will be redirected to the login page.',
+              icon: 'info',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#27ddf5'
+            }).then(() => {
+              window.location.href = "{% url 'quiz_app:login' %}";
+            });
+          }
+        }
+
+        function extendSession() {
+          // Extend session by making a request to the server
+          fetch("{% url 'quiz_app:extend_session' %}", {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': getCsrfToken(),
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              // Reset timer to full duration
+              sessionExpirySeconds = {{ session_cookie_age }};
+              timerDisplay.style.color = ''; // Reset color
+              sessionWarningShown = false;
+              sessionDangerShown = false;
+
+              // Show success message
+              Swal.fire({
+                title: 'Session Extended',
+                text: 'Your session has been extended successfully.',
+                icon: 'success',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#27ddf5'
+              });
+            }
+          })
+          .catch(error => {
+            console.error('Error extending session:', error);
+            Swal.fire({
+              title: 'Error',
+              text: 'There was a problem extending your session. Please refresh the page.',
+              icon: 'error',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#27ddf5'
+            });
+          });
+        }
+
+        // Update timer immediately and then every second
+        updateSessionTimer();
+        const timerInterval = setInterval(updateSessionTimer, 1000);
+
+        // Add click handler to session timer display to allow manual extension
+        document.getElementById('session-timer-display').addEventListener('click', function(e) {
+          e.preventDefault();
+          extendSession();
+        });
+      });
+    </script>
+
+    <!-- Function to get CSRF token -->
+    <script>
+      function getCsrfToken() {
+        return (
+          document.querySelector("[name=csrfmiddlewaretoken]")?.value ||
+          document.cookie
+            .split("; ")
+            .find((row) => row.startsWith("csrftoken="))
+            ?.split("=")[1]
+        );
+      }
+    </script>
+    <!--<script>
+// Color Mode Toggler
+(() => {
+  "use strict";
+
+  const storedTheme = localStorage.getItem("theme");
+
+  const getPreferredTheme = () => {
+    if (storedTheme) {
+      return storedTheme;
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  };
+
+  const setTheme = function (theme) {
+    if (
+      theme === "auto" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    ) {
+      document.documentElement.setAttribute("data-bs-theme", "dark");
+    } else {
+      document.documentElement.setAttribute("data-bs-theme", theme);
+    }
+  };
+
+  setTheme(getPreferredTheme());
+
+  const showActiveTheme = (theme, focus = false) => {
+    const themeSwitcher = document.querySelector("#bd-theme");
+
+    if (!themeSwitcher) {
+      return;
+    }
+
+    const themeSwitcherText = document.querySelector("#bd-theme-text");
+    const activeThemeIcon = document.querySelector(".theme-icon-active i");
+    const btnToActive = document.querySelector(
+      `[data-bs-theme-value="${theme}"]`
+    );
+    const svgOfActiveBtn = btnToActive.querySelector("i").getAttribute("class");
+
+    for (const element of document.querySelectorAll("[data-bs-theme-value]")) {
+      element.classList.remove("active");
+      element.setAttribute("aria-pressed", "false");
+    }
+
+    btnToActive.classList.add("active");
+    btnToActive.setAttribute("aria-pressed", "true");
+    activeThemeIcon.setAttribute("class", svgOfActiveBtn);
+    const themeSwitcherLabel = `${themeSwitcherText.textContent} (${btnToActive.dataset.bsThemeValue})`;
+    themeSwitcher.setAttribute("aria-label", themeSwitcherLabel);
+
+    if (focus) {
+      themeSwitcher.focus();
+    }
+  };
+
+  window
+    .matchMedia("(prefers-color-scheme: dark)")
+    .addEventListener("change", () => {
+      if (storedTheme !== "light" || storedTheme !== "dark") {
+        setTheme(getPreferredTheme());
+      }
+    });
+
+  window.addEventListener("DOMContentLoaded", () => {
+    showActiveTheme(getPreferredTheme());
+
+    for (const toggle of document.querySelectorAll("[data-bs-theme-value]")) {
+      toggle.addEventListener("click", () => {
+        const theme = toggle.getAttribute("data-bs-theme-value");
+        localStorage.setItem("theme", theme);
+        setTheme(theme);
+        showActiveTheme(theme, true);
+      });
+    }
+  });
+})();
+</script>-->
+    {% block extra_js %}{% endblock %}
+    <!--end::Script-->
+  </body>
+  <!--end::Body-->
+</html>

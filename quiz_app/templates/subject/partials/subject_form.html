@@ -1,0 +1,78 @@
+<div class="modal fade" id="subjectFormModal" tabindex="-1" aria-labelledby="subjectFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="subjectFormModalLabel">
+          {% if subject %}Edit Subject{% else %}Add New Subject{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="subjectForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="subject_name" class="form-label">Subject Name <span class="text-danger">*</span></label>
+            <input
+              type="text"
+              class="form-control"
+              id="subject_name"
+              name="subject_name"
+              value="{% if subject %}{{ subject.subject_name }}{% endif %}"
+              placeholder="e.g., Mathematics"
+              required
+            />
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="learning_area" class="form-label">Learning Area</label>
+                <select class="form-select" id="learning_area" name="learning_area">
+                  <option value="">Select Learning Area</option>
+                  {% for area in learning_areas %}
+                  <option value="{{ area.id }}" {% if subject and subject.learning_area and subject.learning_area.id == area.id %}selected{% endif %}>
+                    {{ area.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">Optional</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="department" class="form-label">Department</label>
+                <select class="form-select" id="department" name="department">
+                  <option value="">Select Department</option>
+                  {% for dept in departments %}
+                  <option value="{{ dept.id }}" {% if subject and subject.department and subject.department.id == dept.id %}selected{% endif %}>
+                    {{ dept.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">Optional</small>
+              </div>
+            </div>
+          </div>
+          
+          {% if subject %}
+          <div class="alert alert-info">
+            <strong>Subject Code:</strong> {{ subject.subject_code }}
+            <br><small class="text-muted">Subject code is auto-generated and cannot be changed.</small>
+          </div>
+          {% else %}
+          <div class="alert alert-info">
+            <small><i class="bi bi-info-circle me-1"></i>Subject code will be automatically generated upon creation.</small>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if subject %}Update{% else %}Create{% endif %} Subject
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

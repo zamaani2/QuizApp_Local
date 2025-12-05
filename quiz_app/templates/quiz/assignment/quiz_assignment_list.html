@@ -1,0 +1,192 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Quiz Class
+Assignments - {{ quiz.title }}{% endblock title %} {% block page_title %}
+<div class="d-flex justify-content-between align-items-center">
+  <span>Quiz Class Assignments</span>
+  <div>
+    <a
+      href="{% url 'quiz_app:quiz_detail' quiz.id %}"
+      class="btn btn-secondary btn-sm"
+    >
+      <i class="bi bi-arrow-left me-1"></i>Back to Quiz
+    </a>
+  </div>
+</div>
+{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_list' %}">Quizzes</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_detail' quiz.id %}"
+    >{{ quiz.title|truncatewords:5 }}</a
+  >
+</li>
+<li class="breadcrumb-item active" aria-current="page">Class Assignments</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-12">
+    <!-- Quiz Info Card -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2"></i>Quiz Information
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Quiz Title:</strong> {{ quiz.title }}</p>
+            <p class="mb-1">
+              <strong>Subject:</strong> {{ quiz.subject.subject_name }}
+            </p>
+            <p class="mb-1">
+              <strong>Status:</strong>
+              {% if quiz.status == 'published' %}
+              <span class="badge bg-success">Published</span>
+              {% elif quiz.status == 'draft' %}
+              <span class="badge bg-warning">Draft</span>
+              {% else %}
+              <span class="badge bg-secondary">Archived</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="col-md-6">
+            <p class="mb-1">
+              <strong>Total Questions:</strong> {{ quiz.get_question_count }}
+            </p>
+            <p class="mb-1">
+              <strong>Total Marks:</strong> {{ quiz.total_marks }}
+            </p>
+            <p class="mb-1">
+              <strong>Assigned Classes:</strong> {{ assigned_classes.count }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assigned Classes Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-people me-2"></i>Assigned Classes ({{ assigned_classes.count }})
+          </h5>
+          <div class="card-tools">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm me-1"
+              id="assignClassesBtn"
+              data-modal-url="{% url 'quiz_app:quiz_assignment_create' quiz.id %}"
+              data-modal-title="Assign Classes to Quiz"
+            >
+              <i class="bi bi-plus-circle me-1"></i>Assign Classes
+            </button>
+            {% if assigned_classes.count > 0 %}
+            <button
+              type="button"
+              class="btn btn-danger btn-sm"
+              id="bulkUnassignBtn"
+              data-modal-url="{% url 'quiz_app:quiz_assignment_bulk_delete' quiz.id %}"
+              disabled
+            >
+              <i class="bi bi-trash me-1"></i>Unassign Selected
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if assigned_classes %}
+        <div class="table-responsive">
+          <table class="table table-hover" id="assignedClassesTable">
+            <thead>
+              <tr>
+                <th width="50">
+                  <input
+                    type="checkbox"
+                    id="selectAllClasses"
+                    class="form-check-input"
+                    title="Select all classes"
+                  />
+                </th>
+                <th>Class Name</th>
+                <th>Form</th>
+                <th>Learning Area</th>
+                <th>Student Count</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for class_obj in assigned_classes %}
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    class="form-check-input class-checkbox"
+                    value="{{ class_obj.id }}"
+                    data-class-id="{{ class_obj.id }}"
+                    data-class-name="{{ class_obj.name }}"
+                  />
+                </td>
+                <td>
+                  <strong>{{ class_obj.name }}</strong>
+                </td>
+                <td>
+                  {% if class_obj.form %}
+                  <span class="badge bg-info">{{ class_obj.form.name }}</span>
+                  {% else %}
+                  <span class="text-muted">N/A</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if class_obj.learning_area %} {{ class_obj.learning_area.name }} {% else %}
+                  <span class="text-muted">N/A</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-secondary"
+                    >{{ class_obj.get_current_student_count|default:0 }}</span
+                  >
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger unassign-class-btn"
+                    data-quiz-id="{{ quiz.id }}"
+                    data-class-id="{{ class_obj.id }}"
+                    data-class-name="{{ class_obj.name }}"
+                  >
+                    <i class="bi bi-x-circle me-1"></i>Unassign
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>No classes assigned to this quiz
+          yet.
+          <a
+            href="#"
+            id="assignClassesLink"
+            data-modal-url="{% url 'quiz_app:quiz_assignment_create' quiz.id %}"
+            >Assign classes now</a
+          >.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modals Container -->
+<div id="quizAssignmentModalsContainer"></div>
+
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/quiz_assignment_management.js' %}"></script>
+{% endblock extra_js %}

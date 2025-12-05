@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Superadmin - School Administrators{% endblock title %}
+
+{% block page_title %}School Administrators Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:superadmin_dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">School Administrators</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-gradient-purple">
+        <h3 class="card-title text-white">
+          <i class="bi bi-shield-check me-2"></i>All School Administrators
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-light btn-sm"
+            id="addAdminBtn"
+            data-modal-url="{% url 'quiz_app:superadmin_admin_create' %}"
+            data-modal-title="Add New School Administrator"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Administrator
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name, username, email, school..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-3">
+            <select class="form-select" id="schoolFilter">
+              <option value="">All Schools</option>
+              {% for school in schools %}
+              <option value="{{ school.id }}" {% if school_filter == school.id|stringformat:"s" %}selected{% endif %}>
+                {{ school.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="activeFilter">
+              <option value="">All Status</option>
+              <option value="true" {% if active_filter == 'true' %}selected{% endif %}>Active</option>
+              <option value="false" {% if active_filter == 'false' %}selected{% endif %}>Inactive</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Administrators Table -->
+        <table id="adminsTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Full Name</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>School</th>
+              <th>Status</th>
+              <th>Last Login</th>
+              <th width="200">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for admin in admins %}
+            <tr data-admin-id="{{ admin.id }}">
+              <td><strong>{{ admin.full_name }}</strong></td>
+              <td>{{ admin.username }}</td>
+              <td>{{ admin.email }}</td>
+              <td>
+                {% if admin.school %}
+                <span class="badge bg-info">{{ admin.school.name }}</span>
+                {% else %}
+                <span class="text-muted">No school assigned</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if admin.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if admin.last_login %}
+                {{ admin.last_login|date:"M d, Y H:i" }}
+                {% else %}
+                <span class="text-muted">Never</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <a
+                    href="{% url 'quiz_app:superadmin_admin_detail' admin.id %}"
+                    class="btn btn-sm btn-info"
+                    title="View Details"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-admin-btn"
+                    data-modal-url="{% url 'quiz_app:superadmin_admin_edit' admin.id %}"
+                    data-modal-title="Edit Administrator"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-admin-btn"
+                    data-admin-id="{{ admin.id }}"
+                    data-admin-name="{{ admin.full_name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="text-center">No administrators found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="adminModalsContainer"></div>
+
+<style>
+.bg-gradient-purple {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+}
+</style>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/user_management.js' %}"></script>
+<script>
+  // Handle admin form modals
+  $(document).on('click', '#addAdminBtn, .edit-admin-btn', function() {
+    const url = $(this).data('modal-url');
+    const title = $(this).data('modal-title');
+    
+    $.ajax({
+      url: url,
+      method: 'GET',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      success: function(response) {
+        if (response.html) {
+          const modalHtml = `
+            <div class="modal fade" id="adminFormModal" tabindex="-1">
+              <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                  ${response.html}
+                </div>
+              </div>
+            </div>
+          `;
+          $('#adminModalsContainer').html(modalHtml);
+          const modal = new bootstrap.Modal(document.getElementById('adminFormModal'));
+          modal.show();
+        } else if (response.error) {
+          alert(response.error);
+        }
+      },
+      error: function(xhr) {
+        let errorMsg = 'Error loading form';
+        if (xhr.responseJSON && xhr.responseJSON.error) {
+          errorMsg = xhr.responseJSON.error;
+        }
+        alert(errorMsg);
+      }
+    });
+  });
+
+  // Handle delete
+  $(document).on('click', '.delete-admin-btn', function() {
+    const adminId = $(this).data('admin-id');
+    const adminName = $(this).data('admin-name');
+    const deleteUrl = "{% url 'quiz_app:superadmin_admin_delete' 0 %}".replace('0', adminId);
+    
+    if (confirm(`Are you sure you want to delete administrator "${adminName}"? This action cannot be undone.`)) {
+      $.ajax({
+        url: deleteUrl,
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+          if (response.success) {
+            location.reload();
+          } else {
+            alert(response.error || 'Error deleting administrator');
+          }
+        },
+        error: function() {
+          alert('Error deleting administrator');
+        }
+      });
+    }
+  });
+</script>
+{% endblock extra_js %}
+

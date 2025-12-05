@@ -1,0 +1,126 @@
+<div
+  class="modal fade"
+  id="bulkImportModal"
+  tabindex="-1"
+  aria-labelledby="bulkImportModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bulkImportModalLabel">
+          <i class="bi bi-upload me-2"></i>Import Questions
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <form method="POST" enctype="multipart/form-data" id="importForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <!-- File Upload -->
+          <div class="mb-3">
+            <label for="importFile" class="form-label"
+              >Select File <span class="text-danger">*</span></label
+            >
+            <input
+              type="file"
+              name="import_file"
+              id="importFile"
+              class="form-control"
+              accept=".csv,.xlsx,.xls"
+              required
+            />
+            <small class="text-muted"
+              >Supported formats: CSV, Excel (.xlsx, .xls)</small
+            >
+          </div>
+
+          <!-- Download Template -->
+          <div class="mb-3">
+            <label class="form-label">Download Template</label>
+            <div class="d-flex gap-2">
+              <a
+                href="{% url 'quiz_app:question_import_template' quiz.id 'csv' %}"
+                class="btn btn-outline-primary btn-sm"
+                download
+              >
+                <i class="bi bi-download me-1"></i>Download CSV Template
+              </a>
+              <a
+                href="{% url 'quiz_app:question_import_template' quiz.id 'xlsx' %}"
+                class="btn btn-outline-success btn-sm"
+                download
+              >
+                <i class="bi bi-download me-1"></i>Download Excel Template
+              </a>
+            </div>
+            <small class="text-muted d-block mt-1"
+              >Download a template file with example questions and format
+              requirements</small
+            >
+          </div>
+
+          <!-- Format Instructions -->
+          <div class="alert alert-info">
+            <h6 class="alert-heading">
+              <i class="bi bi-info-circle me-2"></i>File Format Requirements
+            </h6>
+            <div class="small">
+              <p class="mb-2">
+                <strong>Required Column:</strong> <code>question_text</code>
+              </p>
+              <p class="mb-2">
+                <strong>Optional Columns:</strong>
+              </p>
+              <ul class="mb-2 ms-3">
+                <li>
+                  <code>question_type</code> - multiple_choice, true_false,
+                  short_answer, fill_blank, essay (default: multiple_choice)
+                </li>
+                <li>
+                  <code>marks</code> - Points for correct answer (default: 1)
+                </li>
+                <li>
+                  <code>difficulty</code> - easy, medium, hard (default: medium)
+                </li>
+                <li>
+                  <code>correct_answer</code> - For multiple_choice: choice
+                  index (1, 2, 3...) or "1,2" for multiple correct. For
+                  true_false: "true" or "false"
+                </li>
+                <li>
+                  <code>choice1</code> to <code>choice10</code> - Answer choices
+                  for multiple_choice questions
+                </li>
+                <li>
+                  <code>explanation</code> - Explanation shown after answering
+                </li>
+              </ul>
+              <p class="mb-0">
+                <strong>Tip:</strong> CSV is simpler and easier to edit. Excel
+                provides better formatting but requires Microsoft Excel or
+                similar software.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-upload me-1"></i>Import Questions
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,84 @@
+<div class="modal fade" id="enrollmentFormModal" tabindex="-1" aria-labelledby="enrollmentFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="enrollmentFormModalLabel">
+          {% if enrollment %}Edit Enrollment{% else %}Assign Student to Class{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="enrollmentForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="student" class="form-label">Student <span class="text-danger">*</span></label>
+                <select class="form-select" id="student" name="student" required>
+                  <option value="">Select Student</option>
+                  {% for student in students %}
+                  <option value="{{ student.id }}" {% if enrollment and enrollment.student.id == student.id %}selected{% endif %}>
+                    {{ student.full_name }} ({{ student.admission_number }})
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="assigned_class" class="form-label">Class <span class="text-danger">*</span></label>
+                <select class="form-select" id="assigned_class" name="assigned_class" required>
+                  <option value="">Select Class</option>
+                  {% for class_obj in classes %}
+                  <option value="{{ class_obj.id }}" {% if enrollment and enrollment.assigned_class.id == class_obj.id %}selected{% endif %}>
+                    {{ class_obj.name }} ({{ class_obj.academic_year.name }})
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+          {% if enrollment %}
+          <div class="row">
+            <div class="col-md-12">
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="is_active"
+                  name="is_active"
+                  {% if enrollment.is_active %}checked{% endif %}
+                />
+                <label class="form-check-label" for="is_active">
+                  Active
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="row mt-2">
+            <div class="col-md-12">
+              <div class="alert alert-info">
+                <strong>Date Assigned:</strong> {{ enrollment.date_assigned|date:"M d, Y" }}
+                {% if enrollment.assigned_by %}
+                <br><strong>Assigned By:</strong> {{ enrollment.assigned_by.full_name }}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Note:</strong> If the student already has an active class assignment, it will be deactivated and replaced with the new assignment.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if enrollment %}Update{% else %}Assign{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Students{% endblock title %}
+
+{% block page_title %}My Students{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">My Students</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-people me-2"></i>Students in My Classes
+        </h3>
+        <div class="card-tools">
+          <span class="badge bg-info">
+            <i class="bi bi-info-circle me-1"></i>View Only - Students in classes you teach
+          </span>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name, admission number, email..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="formFilter">
+              <option value="">All Forms</option>
+              {% for form in forms %}
+              <option value="{{ form.id }}" {% if form_filter == form.id|stringformat:"s" %}selected{% endif %}>
+                {{ form.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="genderFilter">
+              <option value="">All Genders</option>
+              <option value="M" {% if gender_filter == 'M' %}selected{% endif %}>Male</option>
+              <option value="F" {% if gender_filter == 'F' %}selected{% endif %}>Female</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="classFilter">
+              <option value="">All Classes</option>
+              {% for class_obj in classes %}
+              <option value="{{ class_obj.id }}" {% if class_filter == class_obj.id|stringformat:"s" %}selected{% endif %}>
+                {{ class_obj.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-secondary w-100" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Students Table -->
+        <div class="table-responsive">
+          <table id="studentsTable" class="table table-bordered table-striped table-hover">
+            <thead>
+              <tr>
+                <th>Admission Number</th>
+                <th>Full Name</th>
+                <th>Class</th>
+                <th>Form</th>
+                <th>Gender</th>
+                <th>Email</th>
+                <th>Parent Contact</th>
+                <th width="100">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for student in students %}
+              <tr data-student-id="{{ student.id }}">
+                <td>
+                  <strong>{{ student.admission_number }}</strong>
+                </td>
+                <td>
+                  <div class="d-flex align-items-center">
+                    {% if student.profile_picture %}
+                    <img
+                      src="{{ student.profile_picture.url }}"
+                      alt="{{ student.full_name }}"
+                      class="rounded-circle me-2"
+                      width="40"
+                      height="40"
+                    />
+                    {% else %}
+                    <img
+                      src="{% static 'img/no_user_img.png' %}"
+                      alt="{{ student.full_name }}"
+                      class="rounded-circle me-2"
+                      width="40"
+                      height="40"
+                    />
+                    {% endif %}
+                    <div>
+                      <strong>{{ student.full_name }}</strong>
+                    </div>
+                  </div>
+                </td>
+                {% with current_class=student.get_current_class %}
+                <td data-class-id="{% if current_class %}{{ current_class.id }}{% else %}0{% endif %}" data-class-name="{% if current_class %}{{ current_class.name }}{% else %}{% endif %}">
+                  {% if current_class %}
+                    <span class="badge bg-primary">{{ current_class.name }}</span>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td data-form-id="{% if current_class and current_class.form %}{{ current_class.form.id }}{% else %}0{% endif %}" data-form-name="{% if current_class and current_class.form %}{{ current_class.form.name }}{% else %}{% endif %}">
+                  {% if current_class and current_class.form %}
+                    <span class="badge bg-secondary">{{ current_class.form.name }}</span>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                {% endwith %}
+                <td>
+                  {% if student.gender == 'M' %}
+                  <span class="badge bg-primary">Male</span>
+                  {% else %}
+                  <span class="badge bg-danger">Female</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if student.email %}
+                    <a href="mailto:{{ student.email }}">{{ student.email }}</a>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if student.parent_contact %}
+                    <a href="tel:{{ student.parent_contact }}">{{ student.parent_contact }}</a>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a
+                    href="{% url 'quiz_app:student_detail' student.id %}"
+                    class="btn btn-sm btn-info"
+                    title="View Details"
+                  >
+                    <i class="bi bi-eye"></i> View
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="8" class="text-center py-4">
+                  <div class="text-muted">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mt-2">No students found in your classes.</p>
+                    <small>If you have class assignments, students will appear here once they are enrolled.</small>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+  $(document).ready(function() {
+    // Initialize DataTable
+    var table = $('#studentsTable').DataTable({
+      "responsive": true,
+      "lengthChange": true,
+      "autoWidth": false,
+      "pageLength": 25,
+      "order": [[1, 'asc']], // Sort by name
+      "columnDefs": [
+        { "orderable": false, "targets": 7 } // Disable sorting on Actions column
+      ]
+    });
+
+    // Search functionality
+    $('#searchInput').on('keyup', function() {
+      table.search(this.value).draw();
+    });
+
+    // Custom filter function using data attributes
+    var customFilter = function(settings, data, dataIndex) {
+      // Only apply to our table
+      var tableId = $(settings.nTable).attr('id');
+      if (tableId !== 'studentsTable') {
+        return true;
+      }
+      
+      var classFilter = $('#classFilter').val();
+      var formFilter = $('#formFilter').val();
+      var genderFilter = $('#genderFilter').val();
+      
+      // Get the row element
+      var api = new $.fn.dataTable.Api(settings);
+      var row = api.row(dataIndex).node();
+      
+      // Filter by class using data attribute
+      if (classFilter) {
+        var classCell = $(row).find('td').eq(2); // Class column (0-indexed)
+        var classId = String(classCell.attr('data-class-id') || '0');
+        if (classId !== String(classFilter)) {
+          return false;
+        }
+      }
+      
+      // Filter by form using data attribute
+      if (formFilter) {
+        var formCell = $(row).find('td').eq(3); // Form column (0-indexed)
+        var formId = String(formCell.attr('data-form-id') || '0');
+        if (formId !== String(formFilter)) {
+          return false;
+        }
+      }
+      
+      // Filter by gender - search text content
+      if (genderFilter) {
+        var genderText = genderFilter === 'M' ? 'Male' : 'Female';
+        var genderCell = $(row).find('td').eq(4); // Gender column (0-indexed)
+        var cellText = genderCell.text().trim();
+        if (cellText !== genderText) {
+          return false;
+        }
+      }
+      
+      return true;
+    };
+    
+    // Add the custom filter
+    $.fn.dataTable.ext.search.push(customFilter);
+
+    // Filter by form
+    $('#formFilter').on('change', function() {
+      table.draw();
+    });
+
+    // Filter by gender
+    $('#genderFilter').on('change', function() {
+      table.draw();
+    });
+
+    // Filter by class
+    $('#classFilter').on('change', function() {
+      table.draw();
+    });
+
+    // Clear filters
+    $('#clearFiltersBtn').on('click', function() {
+      $('#searchInput').val('');
+      $('#formFilter').val('');
+      $('#genderFilter').val('');
+      $('#classFilter').val('');
+      table.search('').columns().search('').draw();
+    });
+  });
+</script>
+{% endblock extra_js %}
+

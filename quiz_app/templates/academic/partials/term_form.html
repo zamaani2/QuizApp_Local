@@ -1,0 +1,90 @@
+<div class="modal fade" id="termFormModal" tabindex="-1" aria-labelledby="termFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="termFormModalLabel">
+          {% if term %}Edit Term{% else %}Add New Term{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="termForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="academic_year" class="form-label">Academic Year <span class="text-danger">*</span></label>
+            <select class="form-select" id="academic_year" name="academic_year" required>
+              <option value="">Select Academic Year</option>
+              {% for ay in academic_years %}
+              <option value="{{ ay.id }}" {% if term and term.academic_year.id == ay.id %}selected{% endif %}>
+                {{ ay.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label for="term_number" class="form-label">Term <span class="text-danger">*</span></label>
+            <select class="form-select" id="term_number" name="term_number" required>
+              <option value="">Select Term</option>
+              <option value="1" {% if term and term.term_number == 1 %}selected{% endif %}>First Term</option>
+              <option value="2" {% if term and term.term_number == 2 %}selected{% endif %}>Second Term</option>
+              <option value="3" {% if term and term.term_number == 3 %}selected{% endif %}>Third Term</option>
+            </select>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="start_date" class="form-label">Start Date <span class="text-danger">*</span></label>
+                <input
+                  type="date"
+                  class="form-control"
+                  id="start_date"
+                  name="start_date"
+                  value="{% if term %}{{ term.start_date|date:'Y-m-d' }}{% endif %}"
+                  required
+                />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="end_date" class="form-label">End Date <span class="text-danger">*</span></label>
+                <input
+                  type="date"
+                  class="form-control"
+                  id="end_date"
+                  name="end_date"
+                  value="{% if term %}{{ term.end_date|date:'Y-m-d' }}{% endif %}"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="is_current"
+                name="is_current"
+                {% if term and term.is_current %}checked{% endif %}
+              />
+              <label class="form-check-label" for="is_current">
+                Set as Current Term
+              </label>
+            </div>
+            <small class="text-muted">Only one term can be current at a time.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if term %}Update{% else %}Create{% endif %} Term
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

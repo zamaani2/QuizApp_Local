@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Superadmin - School Management{% endblock title %}
+
+{% block page_title %}School Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:superadmin_dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Schools</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-gradient-purple">
+        <h3 class="card-title text-white">
+          <i class="bi bi-building me-2"></i>All Schools - System Management
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-light btn-sm"
+            id="addSchoolBtn"
+            data-modal-url="{% url 'quiz_app:superadmin_school_create' %}"
+            data-modal-title="Add New School"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add School
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name, code, address..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="activeFilter">
+              <option value="">All Status</option>
+              <option value="true" {% if active_filter == 'true' %}selected{% endif %}>Active</option>
+              <option value="false" {% if active_filter == 'false' %}selected{% endif %}>Inactive</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Schools Table -->
+        <table id="schoolsTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Short Name</th>
+              <th>School Code</th>
+              <th>Address</th>
+              <th>Phone</th>
+              <th>Current Academic Year</th>
+              <th>Status</th>
+              <th width="200">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for school in schools %}
+            <tr data-school-id="{{ school.id }}">
+              <td><strong>{{ school.name }}</strong></td>
+              <td>{{ school.short_name }}</td>
+              <td>{{ school.school_code|default:"-" }}</td>
+              <td>{{ school.address|truncatewords:5 }}</td>
+              <td>{{ school.phone_number }}</td>
+              <td>{{ school.current_academic_year.name|default:"Not set" }}</td>
+              <td>
+                {% if school.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <a
+                    href="{% url 'quiz_app:superadmin_school_detail' school.id %}"
+                    class="btn btn-sm btn-info"
+                    title="View Details"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-school-btn"
+                    data-modal-url="{% url 'quiz_app:superadmin_school_edit' school.id %}"
+                    data-modal-title="Edit School"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-school-btn"
+                    data-school-id="{{ school.id }}"
+                    data-school-name="{{ school.name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center">No schools found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="schoolModalsContainer"></div>
+
+<style>
+.bg-gradient-purple {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+}
+</style>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/school_management.js' %}"></script>
+<script>
+  // Update delete URL for superadmin
+  $(document).on('click', '.delete-school-btn', function() {
+    const schoolId = $(this).data('school-id');
+    const schoolName = $(this).data('school-name');
+    const deleteUrl = "{% url 'quiz_app:superadmin_school_delete' 0 %}".replace('0', schoolId);
+    
+    if (confirm(`Are you sure you want to delete "${schoolName}"? This action cannot be undone.`)) {
+      $.ajax({
+        url: deleteUrl,
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+          if (response.success) {
+            location.reload();
+          } else {
+            alert(response.error || 'Error deleting school');
+          }
+        },
+        error: function() {
+          alert('Error deleting school');
+        }
+      });
+    }
+  });
+</script>
+{% endblock extra_js %}
+
+
+
+

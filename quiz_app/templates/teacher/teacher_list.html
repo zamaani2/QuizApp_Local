@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Teacher Management{% endblock title %}
+
+{% block page_title %}Teacher Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Teachers</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-person-badge me-2"></i>All Teachers
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addTeacherBtn"
+            data-modal-url="{% url 'quiz_app:teacher_create' %}"
+            data-modal-title="Add New Teacher"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Teacher
+          </button>
+          <button
+            type="button"
+            class="btn btn-success btn-sm"
+            id="importTeachersBtn"
+            data-modal-url="{% url 'quiz_app:teacher_bulk_import' %}"
+            data-modal-title="Bulk Import Teachers"
+          >
+            <i class="bi bi-upload me-1"></i>Import CSV
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger btn-sm"
+            id="bulkDeleteBtn"
+            data-modal-url="{% url 'quiz_app:teacher_bulk_delete' %}"
+            data-modal-title="Bulk Delete Teachers"
+            disabled
+          >
+            <i class="bi bi-trash me-1"></i>Delete Selected
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name, staff ID, email..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="departmentFilter">
+              <option value="">All Departments</option>
+              {% for dept in departments %}
+              <option value="{{ dept.id }}" {% if department_filter == dept.id|stringformat:"s" %}selected{% endif %}>
+                {{ dept.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="genderFilter">
+              <option value="">All Genders</option>
+              <option value="M" {% if gender_filter == 'M' %}selected{% endif %}>Male</option>
+              <option value="F" {% if gender_filter == 'F' %}selected{% endif %}>Female</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Teachers Table -->
+        <table id="teachersTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th width="30">
+                <input type="checkbox" id="selectAll" />
+              </th>
+              <th>Staff ID</th>
+              <th>Full Name</th>
+              <th>Department</th>
+              <th>Gender</th>
+              <th>Email</th>
+              <th>Contact Number</th>
+              <th width="150">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for teacher in teachers %}
+            <tr data-teacher-id="{{ teacher.id }}">
+              <td>
+                <input type="checkbox" class="teacher-checkbox" value="{{ teacher.id }}" />
+              </td>
+              <td>{{ teacher.staff_id }}</td>
+              <td>
+                {% if teacher.profile_picture %}
+                <img
+                  src="{{ teacher.profile_picture.url }}"
+                  alt="{{ teacher.full_name }}"
+                  class="rounded-circle me-2"
+                  width="32"
+                  height="32"
+                />
+                {% else %}
+                <img
+                  src="{% static 'img/no_user_img.png' %}"
+                  alt="{{ teacher.full_name }}"
+                  class="rounded-circle me-2"
+                  width="32"
+                  height="32"
+                />
+                {% endif %}
+                {{ teacher.full_name }}
+              </td>
+              <td>{{ teacher.department.name|default:"-" }}</td>
+              <td>
+                {% if teacher.gender == 'M' %}
+                <span class="badge bg-primary">Male</span>
+                {% elif teacher.gender == 'F' %}
+                <span class="badge bg-danger">Female</span>
+                {% else %}
+                <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>{{ teacher.email|default:"-" }}</td>
+              <td>{{ teacher.contact_number }}</td>
+              <td>
+                <div class="btn-group" role="group">
+                  <a
+                    href="{% url 'quiz_app:teacher_detail' teacher.id %}"
+                    class="btn btn-sm btn-info"
+                    title="View Details"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-teacher-btn"
+                    data-modal-url="{% url 'quiz_app:teacher_edit' teacher.id %}"
+                    data-modal-title="Edit Teacher"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-teacher-btn"
+                    data-teacher-id="{{ teacher.id }}"
+                    data-teacher-name="{{ teacher.full_name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="teacherModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/teacher_management.js' %}"></script>
+{% endblock extra_js %}
+

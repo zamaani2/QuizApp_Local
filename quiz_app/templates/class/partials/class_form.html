@@ -1,0 +1,108 @@
+<div class="modal fade" id="classFormModal" tabindex="-1" aria-labelledby="classFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="classFormModalLabel">
+          {% if class_obj %}Edit Class{% else %}Add New Class{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="classForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="name" class="form-label">Class Name <span class="text-danger">*</span></label>
+            <input
+              type="text"
+              class="form-control"
+              id="name"
+              name="name"
+              value="{% if class_obj %}{{ class_obj.name }}{% endif %}"
+              placeholder="e.g., 1Science, 2Art1"
+              required
+            />
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="academic_year" class="form-label">Academic Year <span class="text-danger">*</span></label>
+                <select class="form-select" id="academic_year" name="academic_year" required>
+                  <option value="">Select Academic Year</option>
+                  {% for ay in academic_years %}
+                  <option value="{{ ay.id }}" {% if class_obj and class_obj.academic_year.id == ay.id %}selected{% endif %}>
+                    {{ ay.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="maximum_students" class="form-label">Maximum Students <span class="text-danger">*</span></label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="maximum_students"
+                  name="maximum_students"
+                  value="{% if class_obj %}{{ class_obj.maximum_students }}{% else %}40{% endif %}"
+                  min="1"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="form" class="form-label">Form</label>
+                <select class="form-select" id="form" name="form">
+                  <option value="">Select Form</option>
+                  {% for form in forms %}
+                  <option value="{{ form.id }}" {% if class_obj and class_obj.form and class_obj.form.id == form.id %}selected{% endif %}>
+                    {{ form.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">Optional</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="learning_area" class="form-label">Learning Area</label>
+                <select class="form-select" id="learning_area" name="learning_area">
+                  <option value="">Select Learning Area</option>
+                  {% for area in learning_areas %}
+                  <option value="{{ area.id }}" {% if class_obj and class_obj.learning_area and class_obj.learning_area.id == area.id %}selected{% endif %}>
+                    {{ area.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">Optional</small>
+              </div>
+            </div>
+          </div>
+          
+          {% if class_obj %}
+          <div class="alert alert-info">
+            <strong>Class ID:</strong> {{ class_obj.class_id }}
+            <br><small class="text-muted">Class ID is auto-generated and cannot be changed.</small>
+          </div>
+          {% else %}
+          <div class="alert alert-info">
+            <small><i class="bi bi-info-circle me-1"></i>Class ID will be automatically generated upon creation.</small>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if class_obj %}Update{% else %}Create{% endif %} Class
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

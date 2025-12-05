@@ -1,0 +1,361 @@
+{% load static %} {% if request.user.is_authenticated %} {% if request.user.role == 'superadmin' %}
+<!-- Superadmin Menu Items -->
+{% include 'partials/_superadmin_menu_items.html' %} {% elif request.user.role == 'admin' %}
+<!-- Admin Menu Items -->
+
+<!-- Dashboard -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:admin_dashboard' %}" class="nav-link">
+    <i class="nav-icon bi bi-speedometer2"></i>
+    <p>Dashboard</p>
+  </a>
+</li>
+
+<!-- Main Operations Section -->
+<li class="nav-header">MAIN OPERATIONS</li>
+
+<!-- Quizzes -->
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-question-circle"></i>
+    <p>
+      Quizzes
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:quiz_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>All Quizzes</p>
+      </a>
+    </li>
+    <li class="nav-item">
+  
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:quiz_assignment_overview' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Class Assignments</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:quiz_grading_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Grading</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:quiz_results_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Results</p>
+      </a>
+    </li>
+  </ul>
+</li>
+
+<!-- Students -->
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-people"></i>
+    <p>
+      Students
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:student_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>All Students</p>
+      </a>
+    </li>
+  
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:enrollment_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Class Enrollments</p>
+      </a>
+    </li>
+   
+  </ul>
+</li>
+
+<!-- Teachers -->
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-person-badge"></i>
+    <p>
+      Teachers
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:teacher_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>All Teachers</p>
+      </a>
+    </li>
+    
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:assignment_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Subject Assignments</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a
+        href="#"
+        class="nav-link"
+        id="bulkAssignMenuBtn"
+        data-modal-url="{% url 'quiz_app:assignment_bulk_create' %}"
+        data-modal-title="Bulk Assign Subjects"
+      >
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Bulk Assign</p>
+      </a>
+    </li>
+  </ul>
+</li>
+
+<!-- Academic Structure Section -->
+<li class="nav-header" style="margin-top: 1rem">ACADEMIC STRUCTURE</li>
+
+<!-- Classes -->
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-building"></i>
+    <p>
+      Classes
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:class_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>All Classes</p>
+      </a>
+    </li>
+
+  </ul>
+</li>
+
+<!-- Subjects -->
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-book"></i>
+    <p>
+      Subjects
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:subject_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>All Subjects</p>
+      </a>
+    </li>
+ 
+  </ul>
+</li>
+
+<!-- Academic Period Section -->
+<li
+  class="nav-header"
+  style="
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  "
+>
+  ACADEMIC PERIOD
+</li>
+
+<!-- School Information -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:school_detail' %}" class="nav-link">
+    <i class="nav-icon bi bi-building"></i>
+    <p>School Information</p>
+  </a>
+</li>
+
+<!-- Academic Years -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:academic_year_list' %}" class="nav-link">
+    <i class="nav-icon bi bi-calendar-range"></i>
+    <p>Academic Years</p>
+  </a>
+</li>
+
+<!-- Terms -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:term_list' %}" class="nav-link">
+    <i class="nav-icon bi bi-calendar3"></i>
+    <p>Terms</p>
+  </a>
+</li>
+
+<!-- User Management -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:user_list' %}" class="nav-link">
+    <i class="nav-icon bi bi-people-fill"></i>
+    <p>User Management</p>
+  </a>
+</li>
+
+<!-- Configuration Section -->
+<li
+  class="nav-header"
+  style="
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  "
+>
+  CONFIGURATION
+</li>
+
+<!-- Settings -->
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-gear"></i>
+    <p>
+      Settings
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:form_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Forms</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:learning_area_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Learning Areas</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:department_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Departments</p>
+      </a>
+    </li>
+  </ul>
+</li>
+
+{% elif request.user.role == 'teacher' %}
+<!-- Teacher Menu Items -->
+
+<!-- Dashboard -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:teacher_dashboard' %}" class="nav-link">
+    <i class="nav-icon bi bi-speedometer2"></i>
+    <p>Dashboard</p>
+  </a>
+</li>
+
+<!-- Main Work Section -->
+<li class="nav-header">MY WORK</li>
+
+<!-- My Quizzes -->
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-question-circle"></i>
+    <p>
+      My Quizzes
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:quiz_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>All Quizzes</p>
+      </a>
+    </li>
+    
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:quiz_assignment_overview' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Class Assignments</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:quiz_grading_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Grading</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:quiz_results_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Results</p>
+      </a>
+    </li>
+  </ul>
+</li>
+
+<!-- My Students -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:student_list' %}" class="nav-link">
+    <i class="nav-icon bi bi-people"></i>
+    <p>My Students</p>
+  </a>
+</li>
+
+<!-- Information Section -->
+<li
+  class="nav-header"
+  style="
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  "
+>
+  INFORMATION
+</li>
+
+<!-- School Information -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:school_detail' %}" class="nav-link">
+    <i class="nav-icon bi bi-building"></i>
+    <p>School Information</p>
+  </a>
+</li>
+
+{% elif request.user.role == 'student' %}
+<!-- Student Menu Items -->
+
+<!-- Dashboard -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:dashboard' %}" class="nav-link">
+    <i class="nav-icon bi bi-speedometer2"></i>
+    <p>Dashboard</p>
+  </a>
+</li>
+
+<!-- Quizzes Section -->
+<li class="nav-header">QUIZZES</li>
+
+<!-- Available Quizzes -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:student_quiz_list' %}" class="nav-link">
+    <i class="nav-icon bi bi-question-circle"></i>
+    <p>Available Quizzes</p>
+  </a>
+</li>
+
+<!-- My Results -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:student_quiz_attempts' %}" class="nav-link">
+    <i class="nav-icon bi bi-clipboard-check"></i>
+    <p>My Results</p>
+  </a>
+</li>
+
+{% endif %} {% endif %}

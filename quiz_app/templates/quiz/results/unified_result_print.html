@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      Quiz Result{% if is_bulk %}s{% endif %} - {% if is_bulk %}{{ quiz.title }}{% else %}{{ attempt.student.full_name }}{% endif %}
+    </title>
+    <style>
+      @page {
+        size: A4;
+        margin: 0.5cm;
+      }
+      @media print {
+        .no-print {
+          display: none;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        .page-break {
+          page-break-after: always;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 12pt;
+        margin: 0;
+        padding: 8px;
+        line-height: 1.3;
+      }
+      .header {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #000;
+        position: relative;
+      }
+      .school-logo {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
+        margin: 0 15px;
+      }
+      .school-info {
+        text-align: center;
+        flex: 1;
+      }
+      .school-name {
+        font-size: 16pt;
+        font-weight: bold;
+        margin: 0 0 2px 0;
+      }
+      .school-details {
+        font-size: 12pt;
+        color: #333;
+        margin: 0;
+        line-height: 1.2;
+      }
+      .report-title {
+        position: absolute;
+        bottom: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 14pt;
+        font-weight: bold;
+        background: white;
+        padding: 0 15px;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 20px;
+        margin-bottom: 8px;
+        font-size: 12pt;
+      }
+      .info-item {
+        display: flex;
+      }
+      .info-label {
+        font-weight: bold;
+        min-width: 80px;
+        margin-right: 5px;
+      }
+      .info-value {
+        flex: 1;
+      }
+      .performance-stats-row {
+        display: flex;
+        gap: 6px;
+        margin: 8px 0;
+      }
+      .performance-box {
+        flex: 1;
+        background: linear-gradient(135deg, #6f42c1 0%, #8b5cf6 100%);
+        color: white;
+        padding: 6px;
+        border-radius: 4px;
+        text-align: center;
+        border: 2px solid #6f42c1;
+      }
+      .performance-box .percentage {
+        font-size: 20pt;
+        font-weight: bold;
+        margin: 0;
+      }
+      .performance-box .marks {
+        font-size: 10pt;
+        margin: 2px 0 0 0;
+      }
+      .performance-box .time {
+        font-size: 9pt;
+        margin: 2px 0 0 0;
+        opacity: 0.9;
+      }
+      .summary-box {
+        flex: 1;
+        padding: 6px;
+        text-align: center;
+        border-radius: 4px;
+        font-size: 11pt;
+      }
+      .summary-box.correct {
+        background-color: #d4edda;
+        border: 2px solid #28a745;
+        color: #155724;
+      }
+      .summary-box.wrong {
+        background-color: #f8d7da;
+        border: 2px solid #dc3545;
+        color: #721c24;
+      }
+      .summary-box.unanswered {
+        background-color: #e2e3e5;
+        border: 2px solid #6c757d;
+        color: #383d41;
+      }
+      .summary-box .number {
+        font-size: 20pt;
+        font-weight: bold;
+        margin: 0;
+      }
+      .summary-box .label {
+        font-size: 10pt;
+        margin: 2px 0 0 0;
+        text-transform: uppercase;
+        font-weight: bold;
+      }
+      .questions-section {
+        margin-top: 10px;
+      }
+      .section-title {
+        font-size: 14pt;
+        font-weight: bold;
+        margin: 0 0 6px 0;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #000;
+      }
+      .question-item {
+        margin-bottom: 8px;
+        padding: 6px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+        page-break-inside: avoid;
+        font-size: 12pt;
+      }
+      .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        padding-bottom: 3px;
+        border-bottom: 1px solid #eee;
+      }
+      .question-number {
+        font-weight: bold;
+        font-size: 12pt;
+      }
+      .question-meta {
+        font-size: 12pt;
+        color: #666;
+      }
+      .question-text {
+        font-weight: bold;
+        margin: 4px 0;
+        font-size: 12pt;
+      }
+      .answer-box {
+        margin: 4px 0;
+        padding: 5px;
+        border-radius: 3px;
+        font-size: 12pt;
+      }
+      .answer-box.student {
+        border-left: 3px solid;
+      }
+      .answer-box.correct {
+        background-color: #d4edda;
+        border-left-color: #28a745;
+      }
+      .answer-box.incorrect {
+        background-color: #f8d7da;
+        border-left-color: #dc3545;
+      }
+      .answer-box.unanswered {
+        background-color: #fff3cd;
+        border-left-color: #ffc107;
+      }
+      .answer-label {
+        font-weight: bold;
+        font-size: 12pt;
+        margin-bottom: 2px;
+      }
+      .answer-content {
+        margin: 0;
+        font-size: 12pt;
+      }
+      .marks-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 4px;
+        padding: 3px 5px;
+        background-color: #f5f5f5;
+        border-radius: 2px;
+        font-size: 12pt;
+      }
+      .explanation {
+        margin-top: 4px;
+        padding: 4px;
+        background-color: #f9f9f9;
+        border-left: 2px solid #6c757d;
+        font-size: 12pt;
+        font-style: italic;
+      }
+      .print-button {
+        text-align: center;
+        margin-bottom: 10px;
+      }
+      .print-button button {
+        padding: 8px 16px;
+        font-size: 12px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 0 5px;
+      }
+      .print-button button:hover {
+        background-color: #0056b3;
+      }
+      .attempt-separator {
+        page-break-before: always;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 3px solid #000;
+      }
+      .attempt-separator:first-child {
+        page-break-before: auto;
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Print Button -->
+    <div class="print-button no-print">
+      <button onclick="window.print()">Print</button>
+      <button onclick="window.close()" style="background-color: #6c757d">
+        Close
+      </button>
+    </div>
+
+    {% for attempt_data in attempts %}
+    <div class="attempt-separator">
+      <!-- Header -->
+      <div class="header">
+        {% if school_info and school_info.logo %}
+        <img
+          src="{{ school_info.logo.url }}"
+          alt="School Logo"
+          class="school-logo"
+        />
+        {% else %}
+        <div class="school-logo"></div>
+        {% endif %}
+        <div class="school-info">
+          {% if school_info %}
+          <h1 class="school-name">
+            {{ school_info.name|default:"SCHOOL NAME" }}
+          </h1>
+          <p class="school-details">
+            {% if school_info.address %}{{ school_info.address }}{% if school_info.phone_number or school_info.email %}<br />{% endif %}{% endif %}{% if school_info.phone_number or school_info.email %}Tel:
+            {{ school_info.phone_number|default:"0000000" }} | Email: {{ school_info.email|default:"N/A" }}{% endif %}
+          </p>
+          {% else %}
+          <h1 class="school-name">SCHOOL NAME</h1>
+          <p class="school-details">
+            School Address<br />Tel: 0000000 | Email: N/A
+          </p>
+          {% endif %}
+        </div>
+        {% if school_info and school_info.logo %}
+        <img
+          src="{{ school_info.logo.url }}"
+          alt="School Logo"
+          class="school-logo"
+        />
+        {% else %}
+        <div class="school-logo"></div>
+        {% endif %}
+        <div class="report-title">QUIZ RESULT REPORT</div>
+      </div>
+
+      <!-- Student & Quiz Information -->
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">STUDENT:</span>
+          <span class="info-value"
+            >{{ attempt_data.attempt.student.full_name }}</span
+          >
+        </div>
+        <div class="info-item">
+          <span class="info-label">ADMISSION NO:</span>
+          <span class="info-value"
+            >{{ attempt_data.attempt.student.admission_number }}</span
+          >
+        </div>
+        <div class="info-item">
+          <span class="info-label">QUIZ:</span>
+          <span class="info-value">{{ attempt_data.quiz.title }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">SUBJECT:</span>
+          <span class="info-value"
+            >{{ attempt_data.quiz.subject.subject_name }}</span
+          >
+        </div>
+        <div class="info-item">
+          <span class="info-label">TEACHER:</span>
+          <span class="info-value"
+            >{{ attempt_data.quiz.teacher.full_name }}</span
+          >
+        </div>
+        {% if attempt_data.attempt.academic_year %}
+        <div class="info-item">
+          <span class="info-label">YEAR:</span>
+          <span class="info-value"
+            >{{ attempt_data.attempt.academic_year.name }}</span
+          >
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Performance Summary and Statistics -->
+      <div class="performance-stats-row">
+        <div class="performance-box">
+          <p class="percentage">
+            {{ attempt_data.attempt.percentage|floatformat:1 }}%
+          </p>
+          <p class="marks">
+            {{ attempt_data.attempt.score|floatformat:1 }}/{{ attempt_data.quiz.total_marks }} marks
+          </p>
+          {% if attempt_data.attempt.time_taken %}
+          <p class="time">
+            {{ attempt_data.attempt.get_duration_minutes|floatformat:2 }} min
+          </p>
+          {% endif %}
+        </div>
+        <div class="summary-box correct">
+          <p class="number">{{ attempt_data.attempt.correct_answers }}</p>
+          <p class="label">CORRECT</p>
+        </div>
+        <div class="summary-box wrong">
+          <p class="number">{{ attempt_data.attempt.wrong_answers }}</p>
+          <p class="label">WRONG</p>
+        </div>
+        <div class="summary-box unanswered">
+          <p class="number">{{ attempt_data.attempt.unanswered }}</p>
+          <p class="label">UNANSWERED</p>
+        </div>
+      </div>
+
+      <!-- Questions and Answers -->
+      <div class="questions-section">
+        <h3 class="section-title">Questions and Answers</h3>
+        {% for question in attempt_data.all_questions %}
+        <div class="question-item">
+          <div class="question-header">
+            <span class="question-number">Question {{ question.order }}</span>
+            <span class="question-meta"
+              >{{ question.marks }} mark{{ question.marks|pluralize }}, {{ question.get_question_type_display }}</span
+            >
+          </div>
+          <div class="question-text">{{ question.question_text }}</div>
+
+          {% if question.id in attempt_data.answered_question_ids %} {% for response in attempt_data.responses %} {% if response.question.id == question.id %} {% with response=response %}
+
+          <!-- Student Answer -->
+          <div
+            class="answer-box student {% if response.is_correct %}correct{% else %}incorrect{% endif %}"
+          >
+            <div class="answer-label">ANSWER:</div>
+            <div class="answer-content">
+              {% if question.question_type == 'multiple_choice' or question.question_type == 'true_false' %} {% if response.selected_choice %} {{ response.selected_choice.choice_text }} {% else %}
+              <em>No answer selected</em>
+              {% endif %} {% elif question.question_type == 'multiple_select' %}
+              {% if response.selected_choices.exists %} {% for choice in response.selected_choices.all %} {{ choice.choice_text }}{% if not forloop.last %}, {% endif %} {% endfor %} {% else %}
+              <em>No answer selected</em>
+              {% endif %} {% else %} {% if response.text_answer %} {{ response.text_answer|truncatewords:50 }} {% else %}
+              <em>No answer provided</em>
+              {% endif %} {% endif %}
+            </div>
+          </div>
+
+          <!-- Marks -->
+          <div class="marks-info">
+            <span
+              ><strong>Marks:</strong> {{ response.marks_awarded|floatformat:1 }}/{{ question.marks }}</span
+            >
+            <span
+              ><strong>Status:</strong> {% if response.is_correct %}Correct{% else %}Incorrect{% endif %}</span
+            >
+          </div>
+
+          <!-- Correct Answer (if incorrect) -->
+          {% if not response.is_correct %} {% if question.question_type == 'multiple_choice' or question.question_type == 'true_false' or question.question_type == 'multiple_select' %}
+          <div class="answer-box correct" style="margin-top: 4px">
+            <div class="answer-label">CORRECT ANSWER:</div>
+            <div class="answer-content">
+              {% for choice in question.answer_choices.all %} {% if choice.is_correct %} {{ choice.choice_text }}{% if not forloop.last %}, {% endif %} {% endif %} {% endfor %}
+            </div>
+          </div>
+          {% elif question.correct_answer_text %}
+          <div class="answer-box correct" style="margin-top: 4px">
+            <div class="answer-label">CORRECT ANSWER:</div>
+            <div class="answer-content">{{ question.correct_answer_text }}</div>
+          </div>
+          {% endif %} {% endif %}
+
+          <!-- Explanation -->
+          {% if question.explanation %}
+          <div class="explanation">
+            <strong>EXPLANATION:</strong> {{ question.explanation|truncatewords:30 }}
+          </div>
+          {% endif %} {% endwith %} {% endif %} {% endfor %} {% else %}
+          <!-- Unanswered Question -->
+          <div class="answer-box unanswered">
+            <div class="answer-label">STUDENT ANSWER:</div>
+            <div class="answer-content">
+              <em>This question was not answered.</em>
+            </div>
+          </div>
+          <div class="marks-info">
+            <span><strong>Marks:</strong> 0/{{ question.marks }}</span>
+            <span><strong>Status:</strong> Unanswered</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Footer -->
+      <div
+        style="
+          margin-top: 10px;
+          text-align: center;
+          font-size: 12pt;
+          color: #666;
+          border-top: 1px solid #ddd;
+          padding-top: 5px;
+        "
+      >
+        <p>
+          Generated on {{ attempt_data.attempt.submitted_at|date:"M d, Y h:i A"|default:"N/A"}}
+        </p>
+      </div>
+    </div>
+    {% endfor %}
+  </body>
+</html>

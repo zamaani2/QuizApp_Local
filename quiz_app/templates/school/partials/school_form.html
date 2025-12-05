@@ -1,0 +1,353 @@
+<div class="modal fade" id="schoolFormModal" tabindex="-1" aria-labelledby="schoolFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="schoolFormModalLabel">
+          {% if school %}Edit School Information{% else %}Add New School{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="schoolForm" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          <ul class="nav nav-tabs" id="schoolFormTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab">
+                Basic Information
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="visual-tab" data-bs-toggle="tab" data-bs-target="#visual" type="button" role="tab">
+                Visual Elements
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="vision-tab" data-bs-toggle="tab" data-bs-target="#vision" type="button" role="tab">
+                Vision & Mission
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="reports-tab" data-bs-toggle="tab" data-bs-target="#reports" type="button" role="tab">
+                Report Settings
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="academic-tab" data-bs-toggle="tab" data-bs-target="#academic" type="button" role="tab">
+                Academic Settings
+              </button>
+            </li>
+          </ul>
+          
+          <div class="tab-content mt-3" id="schoolFormTabContent">
+            <!-- Basic Information Tab -->
+            <div class="tab-pane fade show active" id="basic" role="tabpanel">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="name" class="form-label">School Name <span class="text-danger">*</span></label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="name"
+                      name="name"
+                      value="{% if school %}{{ school.name }}{% endif %}"
+                      required
+                    />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="short_name" class="form-label">Short Name <span class="text-danger">*</span></label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="short_name"
+                      name="short_name"
+                      value="{% if school %}{{ school.short_name }}{% endif %}"
+                      maxlength="20"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="school_code" class="form-label">School Code</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="school_code"
+                      name="school_code"
+                      value="{% if school %}{{ school.school_code }}{% endif %}"
+                      maxlength="20"
+                    />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="phone_number" class="form-label">Phone Number <span class="text-danger">*</span></label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="phone_number"
+                      name="phone_number"
+                      value="{% if school %}{{ school.phone_number }}{% endif %}"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input
+                      type="email"
+                      class="form-control"
+                      id="email"
+                      name="email"
+                      value="{% if school %}{{ school.email }}{% endif %}"
+                    />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="website" class="form-label">Website</label>
+                    <input
+                      type="url"
+                      class="form-control"
+                      id="website"
+                      name="website"
+                      value="{% if school %}{{ school.website }}{% endif %}"
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="mb-3">
+                    <label for="address" class="form-label">Address <span class="text-danger">*</span></label>
+                    <textarea
+                      class="form-control"
+                      id="address"
+                      name="address"
+                      rows="3"
+                      required
+                    >{% if school %}{{ school.address }}{% endif %}</textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="postal_code" class="form-label">Postal Code</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="postal_code"
+                      name="postal_code"
+                      value="{% if school %}{{ school.postal_code }}{% endif %}"
+                      maxlength="20"
+                    />
+                  </div>
+                </div>
+                {% if school %}
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <div class="form-check form-switch">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="is_active"
+                        name="is_active"
+                        {% if school.is_active %}checked{% endif %}
+                      />
+                      <label class="form-check-label" for="is_active">
+                        Active
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            
+            <!-- Visual Elements Tab -->
+            <div class="tab-pane fade" id="visual" role="tabpanel">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="logo" class="form-label">School Logo</label>
+                    <input
+                      type="file"
+                      class="form-control"
+                      id="logo"
+                      name="logo"
+                      accept="image/*"
+                    />
+                    {% if school and school.logo %}
+                    <small class="text-muted">Current: <a href="{{ school.logo.url }}" target="_blank">View Logo</a></small>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="school_stamp" class="form-label">School Stamp</label>
+                    <input
+                      type="file"
+                      class="form-control"
+                      id="school_stamp"
+                      name="school_stamp"
+                      accept="image/*"
+                    />
+                    {% if school and school.school_stamp %}
+                    <small class="text-muted">Current: <a href="{{ school.school_stamp.url }}" target="_blank">View Stamp</a></small>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Vision & Mission Tab -->
+            <div class="tab-pane fade" id="vision" role="tabpanel">
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="mb-3">
+                    <label for="motto" class="form-label">Motto</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="motto"
+                      name="motto"
+                      value="{% if school %}{{ school.motto }}{% endif %}"
+                      maxlength="200"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="mb-3">
+                    <label for="vision" class="form-label">Vision</label>
+                    <textarea
+                      class="form-control"
+                      id="vision"
+                      name="vision"
+                      rows="5"
+                    >{% if school %}{{ school.vision }}{% endif %}</textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="mb-3">
+                    <label for="mission" class="form-label">Mission</label>
+                    <textarea
+                      class="form-control"
+                      id="mission"
+                      name="mission"
+                      rows="5"
+                    >{% if school %}{{ school.mission }}{% endif %}</textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Report Settings Tab -->
+            <div class="tab-pane fade" id="reports" role="tabpanel">
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="mb-3">
+                    <label for="report_header" class="form-label">Report Header</label>
+                    <textarea
+                      class="form-control"
+                      id="report_header"
+                      name="report_header"
+                      rows="4"
+                    >{% if school %}{{ school.report_header }}{% endif %}</textarea>
+                    <small class="text-muted">Custom header text for reports</small>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="mb-3">
+                    <label for="report_footer" class="form-label">Report Footer</label>
+                    <textarea
+                      class="form-control"
+                      id="report_footer"
+                      name="report_footer"
+                      rows="4"
+                    >{% if school %}{{ school.report_footer }}{% endif %}</textarea>
+                    <small class="text-muted">Custom footer text for reports</small>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-12">
+                  <div class="mb-3">
+                    <label for="grading_system_description" class="form-label">Grading System Description</label>
+                    <textarea
+                      class="form-control"
+                      id="grading_system_description"
+                      name="grading_system_description"
+                      rows="6"
+                    >{% if school %}{{ school.grading_system_description }}{% endif %}</textarea>
+                    <small class="text-muted">Description of the grading system to appear on reports</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Academic Settings Tab -->
+            <div class="tab-pane fade" id="academic" role="tabpanel">
+              {% if school %}
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="current_academic_year" class="form-label">Current Academic Year</label>
+                    <select class="form-select" id="current_academic_year" name="current_academic_year">
+                      <option value="">Select Academic Year</option>
+                      {% for ay in academic_years %}
+                      <option value="{{ ay.id }}" {% if school.current_academic_year and school.current_academic_year.id == ay.id %}selected{% endif %}>
+                        {{ ay.name }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="current_term" class="form-label">Current Term</label>
+                    <select class="form-select" id="current_term" name="current_term">
+                      <option value="">Select Term</option>
+                      {% for term in terms %}
+                      <option value="{{ term.id }}" {% if school.current_term and school.current_term.id == term.id %}selected{% endif %}>
+                        {{ term.name }} ({{ term.academic_year.name }})
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              {% else %}
+              <div class="alert alert-info">
+                Academic settings can be configured after the school is created.
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if school %}Update{% else %}Create{% endif %} School
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

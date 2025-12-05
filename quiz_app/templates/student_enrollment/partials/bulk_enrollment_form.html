@@ -1,0 +1,103 @@
+<div
+  class="modal fade"
+  id="bulkEnrollmentFormModal"
+  tabindex="-1"
+  aria-labelledby="bulkEnrollmentFormModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bulkEnrollmentFormModalLabel">
+          Bulk Assign Students to Class
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <form id="bulkEnrollmentForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Bulk Assignment:</strong> Select multiple students and a
+            class. All selected students will be assigned to the chosen class.
+            If any student already has an active class assignment, it will be
+            deactivated.
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="bulk_class" class="form-label"
+                  >Class <span class="text-danger">*</span></label
+                >
+                <select
+                  class="form-select"
+                  id="bulk_class"
+                  name="bulk_class"
+                  required
+                >
+                  <option value="">Select Class</option>
+                  {% for class_obj in classes %}
+                  <option value="{{ class_obj.id }}">
+                    {{ class_obj.name }} ({{ class_obj.academic_year.name }})
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3">
+                <label for="bulk_students" class="form-label"
+                  >Students <span class="text-danger">*</span></label
+                >
+                <select
+                  class="form-select"
+                  id="bulk_students"
+                  name="bulk_students"
+                  multiple
+                  size="10"
+                  required
+                >
+                  {% for student in students %}
+                  <option value="{{ student.id }}">
+                    {{ student.full_name }} ({{ student.admission_number }})
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted"
+                  >Hold Ctrl/Cmd to select multiple students</small
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Note:</strong> Students who are already assigned to the
+            selected class will be skipped.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-list-check me-1"></i>Assign Students
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

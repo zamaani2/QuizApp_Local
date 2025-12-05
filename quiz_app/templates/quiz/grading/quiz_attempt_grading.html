@@ -1,0 +1,211 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Grade Attempt - {{ attempt.student.full_name }}{% endblock title %} {% block page_title %}
+<div class="d-flex justify-content-between align-items-center">
+  <span>Grade Attempt - {{ attempt.student.full_name }}</span>
+  <div>
+    <a
+      href="{% url 'quiz_app:quiz_grading_list' %}"
+      class="btn btn-secondary btn-sm"
+    >
+      <i class="bi bi-arrow-left me-1"></i>Back to Grading
+    </a>
+  </div>
+</div>
+{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_grading_list' %}">Quiz Grading</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">
+  {{ attempt.student.full_name }}
+</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-md-4">
+    <!-- Attempt Info Card -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2"></i>Attempt Information
+        </h5>
+      </div>
+      <div class="card-body">
+        <p class="mb-1">
+          <strong>Student:</strong> {{ attempt.student.full_name }}
+        </p>
+        <p class="mb-1">
+          <strong>Admission No:</strong> {{ attempt.student.admission_number }}
+        </p>
+        <p class="mb-1"><strong>Quiz:</strong> {{ attempt.quiz.title }}</p>
+        <p class="mb-1">
+          <strong>Subject:</strong> {{ attempt.quiz.subject.subject_name }}
+        </p>
+        <p class="mb-1">
+          <strong>Attempt #:</strong> {{ attempt.attempt_number }}
+        </p>
+        <hr />
+        <p class="mb-1">
+          <strong>Score:</strong>
+          <strong>{{ attempt.score|floatformat:1 }}</strong> / {{ attempt.quiz.total_marks }}
+        </p>
+        <p class="mb-1">
+          <strong>Percentage:</strong> {{ attempt.percentage|floatformat:1 }}%
+        </p>
+        <p class="mb-1">
+          <strong>Correct:</strong> {{ attempt.correct_answers }} / {{ attempt.total_questions }}
+        </p>
+        <hr />
+        <p class="mb-1">
+          <strong>Started:</strong> {{ attempt.started_at|date:"M d, Y H:i" }}
+        </p>
+        <p class="mb-1">
+          <strong>Submitted:</strong> {{ attempt.submitted_at|date:"M d, Y H:i"
+          }}
+        </p>
+        {% if attempt.time_taken %}
+        <p class="mb-1">
+          <strong>Time Taken:</strong> {{ attempt.time_taken }}
+        </p>
+        {% endif %}
+        <hr />
+        {% if ungraded_essay_count > 0 %}
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <strong>{{ ungraded_essay_count }}</strong> essay question(s) need
+          grading
+        </div>
+        {% else %}
+        <div class="alert alert-success">
+          <i class="bi bi-check-circle me-2"></i>
+          All questions have been graded
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <!-- Responses Card -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-question-circle me-2"></i>Student Responses
+        </h5>
+      </div>
+      <div class="card-body">
+        {% if essay_responses %}
+        <h6 class="mb-3">
+          <i class="bi bi-pencil me-2"></i>Essay Questions ({{ essay_responses.count }})
+        </h6>
+        {% for response in essay_responses %}
+        <div
+          class="card mb-3 {% if not response.is_graded %}border-warning{% endif %}"
+        >
+          <div
+            class="card-header d-flex justify-content-between align-items-center"
+          >
+            <div>
+              <strong>Question {{ response.question.order }}</strong>
+              <span class="badge bg-info ms-2"
+                >{{ response.question.marks }} marks</span
+              >
+              {% if not response.is_graded %}
+              <span class="badge bg-warning ms-2">Needs Grading</span>
+              {% else %}
+              <span class="badge bg-success ms-2">Graded</span>
+              {% endif %}
+            </div>
+            <button
+              type="button"
+              class="btn btn-sm btn-primary grade-response-btn"
+              data-response-id="{{ response.id }}"
+              data-modal-url="{% url 'quiz_app:quiz_response_grade' response.id %}"
+            >
+              <i class="bi bi-pencil me-1"></i>{% if response.is_graded %}Re-grade{% else %}Grade{% endif %}
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="mb-2">
+              <strong>Question:</strong>
+              <p>{{ response.question.question_text|linebreaks }}</p>
+            </div>
+            <div class="mb-2">
+              <strong>Student Answer:</strong>
+              <div class="p-3 bg-light rounded">
+                {{ response.text_answer|linebreaks|default:"No answer provided" }}
+              </div>
+            </div>
+            {% if response.is_graded %}
+            <div class="row mt-2">
+              <div class="col-md-6">
+                <strong>Marks Awarded:</strong>
+                <span class="badge bg-success"
+                  >{{ response.marks_awarded|floatformat:1 }} / {{ response.question.marks }}</span
+                >
+              </div>
+              <div class="col-md-6">
+                <strong>Graded by:</strong> {{ response.graded_by.get_full_name|default:response.graded_by.username }}<br />
+                <small class="text-muted"
+                  >{{ response.graded_at|date:"M d, Y H:i" }}</small
+                >
+              </div>
+            </div>
+            {% if response.grading_notes %}
+            <div class="mt-2">
+              <strong>Grading Notes:</strong>
+              <p class="mb-0">{{ response.grading_notes|linebreaks }}</p>
+            </div>
+            {% endif %} {% endif %}
+          </div>
+        </div>
+        {% endfor %} {% endif %} {% if other_responses %}
+        <hr class="my-4" />
+        <h6 class="mb-3">
+          <i class="bi bi-check-circle me-2"></i>Auto-graded Questions ({{ other_responses.count }})
+        </h6>
+        {% for response in other_responses %}
+        <div class="card mb-2">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <div class="flex-grow-1">
+                <strong>Question {{ response.question.order }}</strong>
+                <span class="badge bg-info ms-2"
+                  >{{ response.question.marks }} marks</span
+                >
+                <span
+                  class="badge {% if response.is_correct %}bg-success{% else %}bg-danger{% endif %} ms-2"
+                >
+                  {% if response.is_correct %}Correct{% else %}Incorrect{% endif %}
+                </span>
+                <p class="mb-1 mt-2">
+                  <small
+                    >{{ response.question.question_text|truncatewords:20 }}</small
+                  >
+                </p>
+                <p class="mb-0">
+                  <small>
+                    <strong>Answer:</strong>
+                    {% if response.text_answer %} {{ response.text_answer|truncatewords:10 }} {% elif response.selected_choice %} {{ response.selected_choice.choice_text|truncatewords:10 }} {% else %} No answer {% endif %}
+                  </small>
+                </p>
+              </div>
+              <div class="text-end">
+                <strong
+                  >{{ response.marks_awarded|floatformat:1 }} / {{ response.question.marks }}</strong
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %} {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modals Container -->
+<div id="gradingModalsContainer"></div>
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/quiz_grading.js' %}"></script>
+{% endblock extra_js %}

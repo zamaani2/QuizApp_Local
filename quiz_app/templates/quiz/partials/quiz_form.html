@@ -1,0 +1,423 @@
+<div class="modal fade" id="quizFormModal" tabindex="-1" aria-labelledby="quizFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="quizFormModalLabel">
+          {% if quiz %}Edit Quiz{% else %}Create New Quiz{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="quizForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <!-- Basic Information -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-info-circle me-2"></i>Basic Information
+              </h6>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-8">
+              <div class="mb-3">
+                <label for="title" class="form-label">Quiz Title <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="title"
+                  name="title"
+                  value="{% if quiz %}{{ quiz.title }}{% endif %}"
+                  required
+                  placeholder="e.g., Mathematics Midterm Exam"
+                />
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="difficulty" class="form-label">Difficulty</label>
+                <select class="form-select" id="difficulty" name="difficulty">
+                  <option value="easy" {% if quiz and quiz.difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                  <option value="medium" {% if quiz and quiz.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                  <option value="hard" {% if quiz and quiz.difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3">
+                <label for="description" class="form-label">Description</label>
+                <textarea
+                  class="form-control"
+                  id="description"
+                  name="description"
+                  rows="2"
+                  placeholder="Brief description of the quiz"
+                >{% if quiz %}{{ quiz.description }}{% endif %}</textarea>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3">
+                <label for="instructions" class="form-label">Instructions for Students</label>
+                <textarea
+                  class="form-control"
+                  id="instructions"
+                  name="instructions"
+                  rows="3"
+                  placeholder="Instructions that will be shown to students before taking the quiz"
+                >{% if quiz %}{{ quiz.instructions }}{% endif %}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subject and Category -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-book me-2"></i>Subject & Category
+              </h6>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="subject" class="form-label">Subject <span class="text-danger">*</span></label>
+                <select class="form-select" id="subject" name="subject" required>
+                  <option value="">Select Subject</option>
+                  {% for subject in subjects %}
+                  <option value="{{ subject.id }}" {% if quiz and quiz.subject.id == subject.id %}selected{% endif %}>
+                    {{ subject.subject_name }} ({{ subject.subject_code }})
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="category" class="form-label">Category</label>
+                <select class="form-select" id="category" name="category">
+                  <option value="">No Category</option>
+                  {% for category in categories %}
+                  <option value="{{ category.id }}" {% if quiz and quiz.category and quiz.category.id == category.id %}selected{% endif %}>
+                    {{ category.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+          {% if is_admin and teachers %}
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="teacher" class="form-label">Teacher <span class="text-danger">*</span></label>
+                <select class="form-select" id="teacher" name="teacher" required>
+                  <option value="">Select Teacher</option>
+                  {% for teacher in teachers %}
+                  <option value="{{ teacher.id }}" {% if quiz and quiz.teacher.id == teacher.id %}selected{% endif %}>
+                    {{ teacher.full_name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">Select the teacher who will own this quiz</small>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Academic Year and Term -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-calendar me-2"></i>Academic Period
+              </h6>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="academic_year" class="form-label">Academic Year</label>
+                <select class="form-select" id="academic_year" name="academic_year">
+                  <option value="">Select Academic Year</option>
+                  {% for ay in academic_years %}
+                  <option value="{{ ay.id }}" {% if quiz and quiz.academic_year and quiz.academic_year.id == ay.id %}selected{% elif not quiz and current_academic_year and current_academic_year.id == ay.id %}selected{% endif %}>
+                    {{ ay.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="term" class="form-label">Term</label>
+                <select class="form-select" id="term" name="term">
+                  <option value="">Select Term</option>
+                  {% if quiz and quiz.academic_year %}
+                    {% for term in terms %}
+                    <option value="{{ term.id }}" {% if quiz and quiz.term and quiz.term.id == term.id %}selected{% endif %}>
+                      {{ term.name }}
+                    </option>
+                    {% endfor %}
+                  {% elif not quiz and current_term %}
+                    <option value="{{ current_term.id }}" selected>{{ current_term.name }}</option>
+                  {% endif %}
+                </select>
+                <small class="text-muted">Select academic year first to load terms</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Classes Assignment -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-people me-2"></i>Assigned Classes
+              </h6>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3">
+                <label for="classes" class="form-label">Select Classes</label>
+                <select class="form-select" id="classes" name="classes" multiple size="5">
+                  {% for class_obj in classes %}
+                  <option value="{{ class_obj.id }}" {% if quiz and class_obj in quiz.classes.all %}selected{% endif %}>
+                    {{ class_obj.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted">Hold Ctrl/Cmd to select multiple classes</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quiz Settings -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-gear me-2"></i>Quiz Settings
+              </h6>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-3">
+              <div class="mb-3">
+                <label for="time_limit" class="form-label">Time Limit (minutes)</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="time_limit"
+                  name="time_limit"
+                  value="{% if quiz %}{{ quiz.time_limit }}{% else %}60{% endif %}"
+                  min="0"
+                  placeholder="0 for unlimited"
+                />
+                <small class="text-muted">0 = Unlimited time</small>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mb-3">
+                <label for="passing_marks" class="form-label">Passing Marks</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="passing_marks"
+                  name="passing_marks"
+                  value="{% if quiz %}{{ quiz.passing_marks }}{% else %}0{% endif %}"
+                  min="0"
+                />
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mb-3">
+                <label for="max_attempts" class="form-label">Max Attempts</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="max_attempts"
+                  name="max_attempts"
+                  value="{% if quiz %}{{ quiz.max_attempts }}{% else %}1{% endif %}"
+                  min="1"
+                />
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="mb-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status" required>
+                  <option value="draft" {% if not quiz or quiz.status == 'draft' %}selected{% endif %}>Draft</option>
+                  <option value="published" {% if quiz and quiz.status == 'published' %}selected{% endif %}>Published</option>
+                  <option value="archived" {% if quiz and quiz.status == 'archived' %}selected{% endif %}>Archived</option>
+                </select>
+                <small class="text-muted">Select the status for this quiz</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Availability -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-clock me-2"></i>Availability
+              </h6>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="available_from" class="form-label">Available From</label>
+                <input
+                  type="datetime-local"
+                  class="form-control"
+                  id="available_from"
+                  name="available_from"
+                  value="{% if quiz and quiz.available_from %}{{ quiz.available_from|date:'Y-m-d\TH:i' }}{% endif %}"
+                />
+                <small class="text-muted">Leave empty for immediate availability</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="available_until" class="form-label">Available Until</label>
+                <input
+                  type="datetime-local"
+                  class="form-control"
+                  id="available_until"
+                  name="available_until"
+                  value="{% if quiz and quiz.available_until %}{{ quiz.available_until|date:'Y-m-d\TH:i' }}{% endif %}"
+                />
+                <small class="text-muted">Leave empty for no expiry</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quiz Behavior -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2 mb-3">
+                <i class="bi bi-shuffle me-2"></i>Quiz Behavior
+              </h6>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-check form-switch mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="randomize_questions"
+                  name="randomize_questions"
+                  {% if quiz and quiz.randomize_questions %}checked{% endif %}
+                />
+                <label class="form-check-label" for="randomize_questions">
+                  Randomize Question Order
+                </label>
+              </div>
+              <div class="form-check form-switch mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="randomize_answers"
+                  name="randomize_answers"
+                  {% if quiz and quiz.randomize_answers %}checked{% endif %}
+                />
+                <label class="form-check-label" for="randomize_answers">
+                  Randomize Answer Choices
+                </label>
+              </div>
+              <div class="form-check form-switch mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="show_results_immediately"
+                  name="show_results_immediately"
+                  {% if quiz and quiz.show_results_immediately %}checked{% endif %}
+                />
+                <label class="form-check-label" for="show_results_immediately">
+                  Show Results Immediately
+                </label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="show_correct_answers"
+                  name="show_correct_answers"
+                  {% if quiz and quiz.show_correct_answers %}checked{% endif %}
+                />
+                <label class="form-check-label" for="show_correct_answers">
+                  Show Correct Answers
+                </label>
+              </div>
+              <div class="form-check form-switch mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="allow_review"
+                  name="allow_review"
+                  {% if quiz and quiz.allow_review %}checked{% endif %}
+                />
+                <label class="form-check-label" for="allow_review">
+                  Allow Review After Submission
+                </label>
+              </div>
+              <div class="form-check form-switch mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="require_password"
+                  name="require_password"
+                  {% if quiz and quiz.require_password %}checked{% endif %}
+                />
+                <label class="form-check-label" for="require_password">
+                  Require Password
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="row" id="passwordField" style="display: {% if quiz and quiz.require_password %}block{% else %}none{% endif %};">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="quiz_password" class="form-label">Quiz Password</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="quiz_password"
+                  name="quiz_password"
+                  value="{% if quiz and quiz.quiz_password %}{{ quiz.quiz_password }}{% endif %}"
+                  placeholder="Enter password for quiz access"
+                />
+              </div>
+            </div>
+          </div>
+
+          {% if quiz %}
+          <div class="row mt-3">
+            <div class="col-md-12">
+              <div class="alert alert-info">
+                <strong>Quiz ID:</strong> {{ quiz.quiz_id }}
+                <br><strong>Created:</strong> {{ quiz.created_at|date:"M d, Y H:i" }}
+                <br><strong>Last Updated:</strong> {{ quiz.updated_at|date:"M d, Y H:i" }}
+                <br><strong>Total Questions:</strong> {{ quiz.get_question_count }}
+                <br><strong>Total Marks:</strong> {{ quiz.total_marks }}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if quiz %}Update{% else %}Create{% endif %} Quiz
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

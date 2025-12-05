@@ -1,0 +1,189 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Student Details -
+{{ student.full_name }}{% endblock title %} {% block page_title %}Student
+Details{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:student_list' %}">Students</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">
+  {{ student.full_name }}
+</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-md-4">
+    <div class="card card-primary card-outline">
+      <div class="card-body box-profile">
+        <div class="text-center">
+          {% if student.profile_picture %}
+          <img
+            class="profile-user-img img-fluid img-circle"
+            src="{{ student.profile_picture.url }}"
+            alt="{{ student.full_name }}"
+          />
+          {% else %}
+          <img
+            class="profile-user-img img-fluid img-circle"
+            src="{% static 'img/no_user_img.png' %}"
+            alt="{{ student.full_name }}"
+          />
+          {% endif %}
+          <h3 class="profile-username text-center">{{ student.full_name }}</h3>
+          <p class="text-muted text-center">{{ student.admission_number }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-primary">
+      <div class="card-header">
+        <h3 class="card-title">About</h3>
+      </div>
+      <div class="card-body">
+        <strong><i class="bi bi-gender-ambiguous me-1"></i> Gender</strong>
+        <p class="text-muted">
+          {% if student.gender == 'M' %}
+          <span class="badge bg-primary">Male</span>
+          {% else %}
+          <span class="badge bg-danger">Female</span>
+          {% endif %}
+        </p>
+        <hr />
+        <strong><i class="bi bi-calendar-event me-1"></i> Date of Birth</strong>
+        <p class="text-muted">{{ student.date_of_birth|date:"F d, Y" }}</p>
+        <hr />
+        <strong><i class="bi bi-telephone me-1"></i> Parent Contact</strong>
+        <p class="text-muted">{{ student.parent_contact }}</p>
+        <hr />
+        <strong><i class="bi bi-envelope me-1"></i> Email</strong>
+        <p class="text-muted">{{ student.email|default:"Not provided" }}</p>
+        <hr />
+        <strong
+          ><i class="bi bi-calendar-check me-1"></i> Admission Date</strong
+        >
+        <p class="text-muted">{{ student.admission_date|date:"F d, Y" }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header p-2">
+        <ul class="nav nav-pills">
+          <li class="nav-item">
+            <a class="nav-link active" href="#academic" data-bs-toggle="tab"
+              >Academic Information</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#class" data-bs-toggle="tab"
+              >Class Assignment</a
+            >
+          </li>
+        </ul>
+      </div>
+      <div class="card-body">
+        <div class="tab-content">
+          <div class="active tab-pane" id="academic">
+            <div class="row">
+              <div class="col-md-6">
+                <strong><i class="bi bi-book me-1"></i> Form</strong>
+                <p class="text-muted">
+                  {{ student.form.name|default:"Not assigned" }}
+                </p>
+              </div>
+              <div class="col-md-6">
+                <strong
+                  ><i class="bi bi-mortarboard me-1"></i> Learning Area</strong
+                >
+                <p class="text-muted">
+                  {{ student.learning_area.name|default:"Not assigned" }}
+                </p>
+              </div>
+            </div>
+            <hr />
+            <div class="row">
+              <div class="col-md-6">
+                <strong><i class="bi bi-building me-1"></i> School</strong>
+                <p class="text-muted">
+                  {{ student.school.name|default:"Not assigned" }}
+                </p>
+              </div>
+              <div class="col-md-6">
+                <strong
+                  ><i class="bi bi-hash me-1"></i> Admission Number</strong
+                >
+                <p class="text-muted">{{ student.admission_number }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane" id="class">
+            {% if student.get_current_class %}
+            <div class="alert alert-info">
+              <strong>Current Class:</strong> {{ student.get_current_class.name
+              }}
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+              <strong>No Active Class Assignment</strong>
+            </div>
+            {% endif %}
+
+            <h5>Class History</h5>
+            <div class="table-responsive">
+              <table class="table table-bordered">
+                <thead>
+                  <tr>
+                    <th>Class</th>
+                    <th>Date Assigned</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for class_assignment in student.get_class_history %}
+                  <tr>
+                    <td>{{ class_assignment.assigned_class.name }}</td>
+                    <td>{{ class_assignment.date_assigned|date:"F d, Y" }}</td>
+                    <td>
+                      {% if class_assignment.is_active %}
+                      <span class="badge bg-success">Active</span>
+                      {% else %}
+                      <span class="badge bg-secondary">Inactive</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="3" class="text-center">
+                      No class history available.
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="{% url 'quiz_app:student_list' %}" class="btn btn-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Back to List
+        </a>
+        <button
+          type="button"
+          class="btn btn-warning edit-student-btn"
+          data-modal-url="{% url 'quiz_app:student_edit' student.id %}"
+          data-modal-title="Edit Student"
+        >
+          <i class="bi bi-pencil me-1"></i>Edit Student
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="studentModalsContainer"></div>
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/student_management.js' %}"></script>
+{% endblock extra_js %}

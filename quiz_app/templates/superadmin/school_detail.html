@@ -1,0 +1,201 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Superadmin - School
+Information - {{ school.name }}{% endblock title %} {% block page_title %}School
+Information{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:superadmin_dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:superadmin_school_list' %}">Schools</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">{{ school.name }}</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="card card-primary card-outline">
+      <div class="card-header bg-gradient-purple">
+        <h3 class="card-title text-white">
+          <i class="bi bi-building me-2"></i>School Information
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-light btn-sm"
+            id="editSchoolBtn"
+            data-modal-url="{% url 'quiz_app:superadmin_school_edit' school.id %}"
+            data-modal-title="Edit School Information"
+          >
+            <i class="bi bi-pencil me-1"></i>Edit Information
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- School Basic Information -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <h5 class="text-primary">
+              <i class="bi bi-info-circle me-2"></i>Basic Information
+            </h5>
+            <hr />
+            <table class="table table-borderless">
+              <tr>
+                <th width="40%">School Name:</th>
+                <td><strong>{{ school.name }}</strong></td>
+              </tr>
+              <tr>
+                <th>Short Name:</th>
+                <td>{{ school.short_name }}</td>
+              </tr>
+              <tr>
+                <th>School Code:</th>
+                <td>{{ school.school_code|default:"Not set" }}</td>
+              </tr>
+              <tr>
+                <th>Status:</th>
+                <td>
+                  {% if school.is_active %}
+                  <span class="badge bg-success">Active</span>
+                  {% else %}
+                  <span class="badge bg-secondary">Inactive</span>
+                  {% endif %}
+                </td>
+              </tr>
+            </table>
+          </div>
+          <div class="col-md-6">
+            <h5 class="text-primary">
+              <i class="bi bi-telephone me-2"></i>Contact Information
+            </h5>
+            <hr />
+            <table class="table table-borderless">
+              <tr>
+                <th width="40%">Address:</th>
+                <td>{{ school.address }}</td>
+              </tr>
+              <tr>
+                <th>Postal Code:</th>
+                <td>{{ school.postal_code|default:"Not set" }}</td>
+              </tr>
+              <tr>
+                <th>Phone Number:</th>
+                <td>{{ school.phone_number }}</td>
+              </tr>
+              <tr>
+                <th>Email:</th>
+                <td>{{ school.email|default:"Not set" }}</td>
+              </tr>
+              <tr>
+                <th>Website:</th>
+                <td>
+                  {% if school.website %}
+                  <a href="{{ school.website }}" target="_blank"
+                    >{{ school.website }}</a
+                  >
+                  {% else %} Not set {% endif %}
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- Academic Information -->
+        <div class="row mb-4">
+          <div class="col-md-12">
+            <h5 class="text-primary">
+              <i class="bi bi-calendar me-2"></i>Academic Information
+            </h5>
+            <hr />
+            <table class="table table-borderless">
+              <tr>
+                <th width="20%">Current Academic Year:</th>
+                <td>
+                  {{ school.current_academic_year.name|default:"Not set" }}
+                </td>
+              </tr>
+              <tr>
+                <th>Current Term:</th>
+                <td>{{ school.current_term.name|default:"Not set" }}</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- Vision & Mission -->
+        {% if school.motto or school.vision or school.mission %}
+        <div class="row mb-4">
+          <div class="col-md-12">
+            <h5 class="text-primary">
+              <i class="bi bi-lightbulb me-2"></i>Vision & Mission
+            </h5>
+            <hr />
+            {% if school.motto %}
+            <div class="mb-3">
+              <strong>Motto:</strong>
+              <p class="mb-0">{{ school.motto }}</p>
+            </div>
+            {% endif %} {% if school.vision %}
+            <div class="mb-3">
+              <strong>Vision:</strong>
+              <p class="mb-0">{{ school.vision }}</p>
+            </div>
+            {% endif %} {% if school.mission %}
+            <div class="mb-3">
+              <strong>Mission:</strong>
+              <p class="mb-0">{{ school.mission }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Metadata -->
+        <div class="row">
+          <div class="col-md-12">
+            <h5 class="text-primary">
+              <i class="bi bi-clock-history me-2"></i>Metadata
+            </h5>
+            <hr />
+            <table class="table table-borderless">
+              <tr>
+                <th width="20%">Created:</th>
+                <td>{{ school.date_created|date:"F d, Y H:i" }}</td>
+              </tr>
+              <tr>
+                <th>Last Updated:</th>
+                <td>{{ school.last_updated|date:"F d, Y H:i" }}</td>
+              </tr>
+              {% if school.created_by %}
+              <tr>
+                <th>Created By:</th>
+                <td>{{ school.created_by.full_name }}</td>
+              </tr>
+              {% endif %}
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a
+          href="{% url 'quiz_app:superadmin_school_list' %}"
+          class="btn btn-secondary"
+        >
+          <i class="bi bi-arrow-left me-1"></i>Back to Schools List
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="schoolModalsContainer"></div>
+
+<style>
+  .bg-gradient-purple {
+    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  }
+</style>
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/school_management.js' %}"></script>
+{% endblock extra_js %}
+
+
+

@@ -1,0 +1,113 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Form Management{% endblock title %} {% block page_title %}Form Management{% endblock page_title %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Forms</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="bi bi-book me-2"></i>All Forms</h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addFormBtn"
+            data-modal-url="{% url 'quiz_app:form_create' %}"
+            data-modal-title="Add New Form"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Form
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name or description..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-3">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              id="clearFiltersBtn"
+            >
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Forms Table -->
+        <table
+          id="formsTable"
+          class="table table-bordered table-striped table-hover"
+        >
+          <thead>
+            <tr>
+              <th>Form Number</th>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Students Count</th>
+              <th width="150">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in forms %}
+            <tr data-form-id="{{ form.id }}">
+              <td>
+                <span class="badge bg-primary">{{ form.form_number }}</span>
+              </td>
+              <td><strong>{{ form.name }}</strong></td>
+              <td>{{ form.description|default:"-"|truncatewords:10 }}</td>
+              <td>
+                <span class="badge bg-info">{{ form.student_set.count }}</span>
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-form-btn"
+                    data-modal-url="{% url 'quiz_app:form_edit' form.id %}"
+                    data-modal-title="Edit Form"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-form-btn"
+                    data-form-id="{{ form.id }}"
+                    data-form-name="{{ form.name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-center">No forms found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="schoolStructureModalsContainer"></div>
+
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/school_structure_management.js' %}"></script>
+{% endblock extra_js %}

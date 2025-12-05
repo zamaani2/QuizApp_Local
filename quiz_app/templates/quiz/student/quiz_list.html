@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Available Quizzes{% endblock title %}
+
+{% block page_title %}Available Quizzes{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Available Quizzes</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <!-- Info Card -->
+    {% if current_class %}
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle me-2"></i>
+      <strong>Your Class:</strong> {{ current_class.name }}
+      {% if current_class.academic_year %}
+      <span class="ms-3">
+        <strong>Academic Year:</strong> {{ current_class.academic_year.name }}
+      </span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-question-circle me-2"></i>Available Quizzes
+        </h3>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search quizzes..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="subjectFilter">
+              <option value="">All Subjects</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" {% if subject_filter == subject.id|stringformat:"s" %}selected{% endif %}>
+                {{ subject.subject_name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="academicYearFilter">
+              <option value="">All Academic Years</option>
+              {% for ay in academic_years %}
+              <option value="{{ ay.id }}" {% if academic_year_filter == ay.id|stringformat:"s" %}selected{% endif %}>
+                {{ ay.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="termFilter">
+              <option value="">All Terms</option>
+              {% for term in terms %}
+              <option value="{{ term.id }}" {% if term_filter == term.id|stringformat:"s" %}selected{% endif %}>
+                {{ term.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+              <option value="">All Status</option>
+              <option value="available" {% if status_filter == 'available' %}selected{% endif %}>Available</option>
+              <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>In Progress</option>
+              <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+              <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Expired</option>
+            </select>
+          </div>
+          <div class="col-md-1">
+            <button type="button" class="btn btn-secondary btn-sm w-100" id="clearFiltersBtn">
+              <i class="bi bi-x-circle"></i> Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Quizzes Cards -->
+        <div id="quizzesContainer" class="row g-3">
+          {% for item in quizzes %}
+          {% with quiz=item.quiz %}
+          <div class="col-md-6 col-lg-4 quiz-card-item" data-quiz-id="{{ quiz.id }}" 
+               data-subject-id="{{ quiz.subject.id }}"
+               data-academic-year-id="{% if quiz.academic_year %}{{ quiz.academic_year.id }}{% endif %}"
+               data-term-id="{% if quiz.term %}{{ quiz.term.id }}{% endif %}"
+               data-status="{{ item.status }}">
+            <div class="card h-100 shadow-sm quiz-card" style="transition: transform 0.2s, box-shadow 0.2s;">
+              <div class="card-header bg-primary text-white py-2">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div class="flex-grow-1">
+                    <h6 class="mb-1 fw-bold">{{ quiz.title }}</h6>
+                    <small class="text-white-50">
+                      <i class="bi bi-book me-1"></i>{{ quiz.subject.subject_name }}
+                    </small>
+                  </div>
+                  <div>
+                    {% if item.status == 'available' %}
+                    <span class="badge bg-success">Available</span>
+                    {% elif item.status == 'in_progress' %}
+                    <span class="badge bg-warning">In Progress</span>
+                    {% elif item.status == 'completed' %}
+                    <span class="badge bg-info">Completed</span>
+                    {% elif item.status == 'expired' %}
+                    <span class="badge bg-danger">Expired</span>
+                    {% elif item.status == 'upcoming' %}
+                    <span class="badge bg-secondary">Upcoming</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Unavailable</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              <div class="card-body">
+                {% if quiz.description %}
+                <p class="text-muted small mb-3">{{ quiz.description|truncatewords:15 }}</p>
+                {% endif %}
+                
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-person text-primary me-2"></i>
+                      <small class="text-muted">{{ quiz.teacher.full_name }}</small>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-question-circle text-info me-2"></i>
+                      <small class="text-muted">{{ quiz.get_question_count }} Questions</small>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-star text-warning me-2"></i>
+                      <small class="text-muted">{{ quiz.total_marks }} Marks</small>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-clock text-secondary me-2"></i>
+                      <small class="text-muted">
+                        {% if quiz.time_limit > 0 %}
+                        {{ quiz.time_limit }} min
+                        {% else %}
+                        Unlimited
+                        {% endif %}
+                      </small>
+                    </div>
+                  </div>
+                </div>
+
+                <hr class="my-2">
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <small class="text-muted">
+                    <i class="bi bi-repeat me-1"></i>Attempts:
+                  </small>
+                  <span class="badge bg-secondary">
+                    {{ item.attempts_count }}/{{ quiz.max_attempts }}
+                  </span>
+                </div>
+
+                {% if item.best_percentage > 0 %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <small class="text-muted">
+                    <i class="bi bi-trophy me-1"></i>Best Score:
+                  </small>
+                  <div class="text-end">
+                    <span class="badge {% if item.best_percentage >= 70 %}bg-success{% elif item.best_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
+                      {{ item.best_percentage|floatformat:1 }}%
+                    </span>
+                    <br>
+                    <small class="text-muted">{{ item.best_score|floatformat:1 }}/{{ quiz.total_marks }}</small>
+                  </div>
+                </div>
+                {% endif %}
+              </div>
+              <div class="card-footer bg-transparent border-top">
+                <div class="d-grid gap-2">
+                  {% if item.status == 'available' and item.can_attempt %}
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm start-quiz-btn"
+                    data-quiz-id="{{ quiz.id }}"
+                    title="Start Quiz"
+                  >
+                    <i class="bi bi-play-circle me-1"></i>Start Quiz
+                  </button>
+                  {% elif item.status == 'in_progress' %}
+                  <a
+                    href="{% url 'quiz_app:student_quiz_resume' quiz.id %}"
+                    class="btn btn-warning btn-sm"
+                    title="Resume Quiz"
+                  >
+                    <i class="bi bi-arrow-clockwise me-1"></i>Resume Quiz
+                  </a>
+                  {% endif %}
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button
+                      type="button"
+                      class="btn btn-outline-info view-details-btn"
+                      data-quiz-id="{{ quiz.id }}"
+                      title="View Details"
+                    >
+                      <i class="bi bi-eye me-1"></i>Details
+                    </button>
+                    {% if item.attempts_count > 0 %}
+                    <button
+                      type="button"
+                      class="btn btn-outline-success view-results-btn"
+                      data-quiz-id="{{ quiz.id }}"
+                      title="View Results"
+                    >
+                      <i class="bi bi-clipboard-check me-1"></i>Results
+                    </button>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endwith %}
+          {% empty %}
+          <div class="col-12">
+            <div class="card">
+              <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                {% if current_class %}
+                <p class="mb-0">No quizzes available for your class at this time.</p>
+                {% else %}
+                <p class="mb-0">You are not assigned to any class. Please contact your administrator.</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .quiz-card {
+    border: 1px solid #dee2e6;
+  }
+  
+  .quiz-card:hover {
+    border-color: #0d6efd;
+  }
+  
+  .quiz-card .card-header {
+    border-bottom: 2px solid rgba(255,255,255,0.2);
+  }
+  
+  @media (max-width: 768px) {
+    .quiz-card-item {
+      margin-bottom: 1rem;
+    }
+  }
+</style>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/student_quiz_list.js' %}"></script>
+{% endblock extra_js %}
+

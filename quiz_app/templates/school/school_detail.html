@@ -1,0 +1,220 @@
+{% extends 'base.html' %} {% load static %} {% block title %}School Information
+- {{ school.name }}{% endblock title %} {% block page_title %}School
+Information{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+{% if user.role == 'superadmin' %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:school_list' %}">Schools</a>
+</li>
+{% endif %}
+<li class="breadcrumb-item active" aria-current="page">{{ school.name }}</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="card card-primary card-outline">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-building me-2"></i>School Information
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-warning btn-sm"
+            id="editSchoolBtn"
+            data-modal-url="{% if user.role == 'superadmin' %}{% url 'quiz_app:school_edit' school.id %}{% else %}{% url 'quiz_app:school_edit' %}{% endif %}"
+            data-modal-title="Edit School Information"
+          >
+            <i class="bi bi-pencil me-1"></i>Edit Information
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <h4>Basic Information</h4>
+            <dl class="row">
+              <dt class="col-sm-4">School Name:</dt>
+              <dd class="col-sm-8"><strong>{{ school.name }}</strong></dd>
+
+              <dt class="col-sm-4">Short Name:</dt>
+              <dd class="col-sm-8">{{ school.short_name }}</dd>
+
+              <dt class="col-sm-4">School Code:</dt>
+              <dd class="col-sm-8">
+                {{ school.school_code|default:"Not set" }}
+              </dd>
+
+              <dt class="col-sm-4">Address:</dt>
+              <dd class="col-sm-8">{{ school.address }}</dd>
+
+              <dt class="col-sm-4">Postal Code:</dt>
+              <dd class="col-sm-8">
+                {{ school.postal_code|default:"Not set" }}
+              </dd>
+
+              <dt class="col-sm-4">Phone Number:</dt>
+              <dd class="col-sm-8">{{ school.phone_number }}</dd>
+
+              <dt class="col-sm-4">Email:</dt>
+              <dd class="col-sm-8">{{ school.email|default:"Not set" }}</dd>
+
+              <dt class="col-sm-4">Website:</dt>
+              <dd class="col-sm-8">
+                {% if school.website %}
+                <a href="{{ school.website }}" target="_blank"
+                  >{{ school.website }}</a
+                >
+                {% else %} Not set {% endif %}
+              </dd>
+            </dl>
+          </div>
+
+          <div class="col-md-6">
+            <h4>Visual Elements</h4>
+            <div class="mb-3">
+              <strong>Logo:</strong><br />
+              {% if school.logo %}
+              <img
+                src="{{ school.logo.url }}"
+                alt="School Logo"
+                class="img-thumbnail"
+                style="max-height: 150px"
+              />
+              {% else %}
+              <span class="text-muted">No logo uploaded</span>
+              {% endif %}
+            </div>
+            <div class="mb-3">
+              <strong>School Stamp:</strong><br />
+              {% if school.school_stamp %}
+              <img
+                src="{{ school.school_stamp.url }}"
+                alt="School Stamp"
+                class="img-thumbnail"
+                style="max-height: 150px"
+              />
+              {% else %}
+              <span class="text-muted">No stamp uploaded</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <hr />
+
+        <div class="row">
+          <div class="col-md-12">
+            <h4>School Vision & Mission</h4>
+            <dl class="row">
+              <dt class="col-sm-2">Motto:</dt>
+              <dd class="col-sm-10">{{ school.motto|default:"Not set" }}</dd>
+
+              <dt class="col-sm-2">Vision:</dt>
+              <dd class="col-sm-10">
+                {{ school.vision|default:"Not set"|linebreaks }}
+              </dd>
+
+              <dt class="col-sm-2">Mission:</dt>
+              <dd class="col-sm-10">
+                {{ school.mission|default:"Not set"|linebreaks }}
+              </dd>
+            </dl>
+          </div>
+        </div>
+
+        <hr />
+
+        <div class="row">
+          <div class="col-md-6">
+            <h4>Academic Settings</h4>
+            <dl class="row">
+              <dt class="col-sm-5">Current Academic Year:</dt>
+              <dd class="col-sm-7">
+                {% if school.current_academic_year %}
+                <span class="badge bg-primary"
+                  >{{ school.current_academic_year.name }}</span
+                >
+                {% else %}
+                <span class="text-muted">Not set</span>
+                {% endif %}
+              </dd>
+
+              <dt class="col-sm-5">Current Term:</dt>
+              <dd class="col-sm-7">
+                {% if school.current_term %}
+                <span class="badge bg-info"
+                  >{{ school.current_term.name }}</span
+                >
+                {% else %}
+                <span class="text-muted">Not set</span>
+                {% endif %}
+              </dd>
+            </dl>
+          </div>
+
+          <div class="col-md-6">
+            <h4>Status</h4>
+            <dl class="row">
+              <dt class="col-sm-5">Active Status:</dt>
+              <dd class="col-sm-7">
+                {% if school.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </dd>
+
+              <dt class="col-sm-5">Date Created:</dt>
+              <dd class="col-sm-7">{{ school.date_created|date:"M d, Y" }}</dd>
+
+              <dt class="col-sm-5">Last Updated:</dt>
+              <dd class="col-sm-7">
+                {{ school.last_updated|date:"M d, Y H:i" }}
+              </dd>
+            </dl>
+          </div>
+        </div>
+
+        {% if school.report_header or school.report_footer or school.grading_system_description %}
+        <hr />
+        <div class="row">
+          <div class="col-md-12">
+            <h4>Report Settings</h4>
+            {% if school.report_header %}
+            <div class="mb-3">
+              <strong>Report Header:</strong>
+              <div class="border p-2 bg-light">
+                {{ school.report_header|linebreaks }}
+              </div>
+            </div>
+            {% endif %} {% if school.report_footer %}
+            <div class="mb-3">
+              <strong>Report Footer:</strong>
+              <div class="border p-2 bg-light">
+                {{ school.report_footer|linebreaks }}
+              </div>
+            </div>
+            {% endif %} {% if school.grading_system_description %}
+            <div class="mb-3">
+              <strong>Grading System Description:</strong>
+              <div class="border p-2 bg-light">
+                {{ school.grading_system_description|linebreaks }}
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="schoolModalsContainer"></div>
+
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/school_management.js' %}"></script>
+{% endblock extra_js %}

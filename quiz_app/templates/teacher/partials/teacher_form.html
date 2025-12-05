@@ -1,0 +1,115 @@
+<div class="modal fade" id="teacherFormModal" tabindex="-1" aria-labelledby="teacherFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="teacherFormModalLabel">
+          {% if teacher %}Edit Teacher{% else %}Add New Teacher{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="teacherForm" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="full_name" class="form-label">Full Name <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="full_name"
+                  name="full_name"
+                  value="{% if teacher %}{{ teacher.full_name }}{% endif %}"
+                  required
+                />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="gender" class="form-label">Gender</label>
+                <select class="form-select" id="gender" name="gender">
+                  <option value="">Select Gender</option>
+                  <option value="M" {% if teacher and teacher.gender == 'M' %}selected{% endif %}>Male</option>
+                  <option value="F" {% if teacher and teacher.gender == 'F' %}selected{% endif %}>Female</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="contact_number" class="form-label">Contact Number <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="contact_number"
+                  name="contact_number"
+                  value="{% if teacher %}{{ teacher.contact_number }}{% endif %}"
+                  required
+                />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input
+                  type="email"
+                  class="form-control"
+                  id="email"
+                  name="email"
+                  value="{% if teacher %}{{ teacher.email }}{% endif %}"
+                />
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="department" class="form-label">Department</label>
+                <select class="form-select" id="department" name="department">
+                  <option value="">Select Department</option>
+                  {% for dept in departments %}
+                  <option value="{{ dept.id }}" {% if teacher and teacher.department and teacher.department.id == dept.id %}selected{% endif %}>
+                    {{ dept.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="profile_picture" class="form-label">Profile Picture</label>
+                <input
+                  type="file"
+                  class="form-control"
+                  id="profile_picture"
+                  name="profile_picture"
+                  accept="image/*"
+                />
+                {% if teacher and teacher.profile_picture %}
+                <small class="text-muted">Current: {{ teacher.profile_picture.name }}</small>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% if teacher %}
+          <div class="row">
+            <div class="col-md-12">
+              <div class="alert alert-info">
+                <strong>Staff ID:</strong> {{ teacher.staff_id }}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if teacher %}Update{% else %}Create{% endif %} Teacher
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

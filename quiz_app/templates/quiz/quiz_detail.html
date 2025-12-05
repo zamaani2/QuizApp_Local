@@ -1,0 +1,411 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Quiz Details -
+{{quiz.title }}{% endblock title %} {% block page_title %}{{ quiz.title }}{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_list' %}">My Quizzes</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">{{ quiz.title }}</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <!-- Left Column: Questions Section (More Space) -->
+  <div class="col-lg-8 col-md-12">
+    <!-- Questions Section -->
+    <div class="card">
+      <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center">
+            <input
+              type="checkbox"
+              id="selectAllQuestions"
+              class="form-check-input me-2"
+              title="Select all questions"
+            />
+            <h3 class="card-title mb-0">
+              <i class="bi bi-question-circle me-2"></i>Questions
+              ({{questions.count }})
+            </h3>
+          </div>
+          <div class="card-tools">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm me-1"
+              id="addQuestionBtn"
+              data-modal-url="{% url 'quiz_app:question_create' quiz.id %}"
+              data-modal-title="Create New Question"
+            >
+              <i class="bi bi-plus-circle me-1"></i>Add Question
+            </button>
+            <button
+              type="button"
+              class="btn btn-success btn-sm me-1"
+              id="importQuestionsBtn"
+              data-modal-url="{% url 'quiz_app:question_bulk_import' quiz.id %}"
+            >
+              <i class="bi bi-upload me-1"></i>Import
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger btn-sm"
+              id="bulkDeleteQuestionsBtn"
+              data-modal-url="{% url 'quiz_app:question_bulk_delete' quiz.id %}"
+              disabled
+            >
+              <i class="bi bi-trash me-1"></i>Delete Selected
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if questions %}
+        <div class="list-group">
+          {% for question in questions %}
+          <div class="list-group-item">
+            <div class="d-flex align-items-start mb-2">
+              <input
+                type="checkbox"
+                class="form-check-input question-checkbox me-3 mt-1"
+                value="{{ question.id }}"
+                data-question-id="{{ question.id }}"
+                data-question-text="{{ question.question_text|truncatewords:15 }}"
+              />
+              <div class="flex-grow-1">
+                <div class="d-flex w-100 justify-content-between mb-2">
+                  <h6 class="mb-1">
+                    Question {{ question.order }}:
+                    {{question.get_question_type_display }}
+                    <span class="badge bg-secondary ms-2"
+                      >{{ question.marks }}
+                      mark{{question.marks|pluralize}}</span
+                    >
+                  </h6>
+                  <small class="text-muted"
+                    >{{ question.get_difficulty_display }}</small
+                  >
+                </div>
+                <p class="mb-2">{{ question.question_text }}</p>
+                {% if question.question_type == 'multiple_choice' or question.question_type == 'true_false' %}
+                <div class="ms-3">
+                  <strong>Answer Choices:</strong>
+                  <ul class="list-unstyled ms-3">
+                    {% for choice in question.answer_choices.all %}
+                    <li>
+                      {% if choice.is_correct %}
+                      <i class="bi bi-check-circle-fill text-success me-2"></i>
+                      {% else %}
+                      <i class="bi bi-circle me-2"></i>
+                      {% endif %} {{ choice.choice_text }}
+                    </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% elif question.correct_answer_text %}
+                <div class="ms-3">
+                  <strong>Correct Answer:</strong>
+                  {{question.correct_answer_text}}
+                </div>
+                {% endif %} {% if question.explanation %}
+                <div class="ms-3 mt-2">
+                  <small class="text-muted"
+                    ><strong>Explanation:</strong> {{
+                    question.explanation}}</small
+                  >
+                </div>
+                {% endif %}
+                <div class="mt-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary edit-question-btn me-1"
+                    data-modal-url="{% url 'quiz_app:question_edit' quiz.id question.id %}"
+                    data-modal-title="Edit Question"
+                  >
+                    <i class="bi bi-pencil me-1"></i>Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-info duplicate-question-btn me-1"
+                    data-quiz-id="{{ quiz.id }}"
+                    data-question-id="{{ question.id }}"
+                  >
+                    <i class="bi bi-files me-1"></i>Duplicate
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger delete-question-btn"
+                    data-quiz-id="{{ quiz.id }}"
+                    data-question-id="{{ question.id }}"
+                    data-question-text="{{ question.question_text|truncatewords:10 }}"
+                  >
+                    <i class="bi bi-trash me-1"></i>Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>No questions added yet. Add
+          questions to complete your quiz.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Quiz Information and Sidebar -->
+  <div class="col-lg-4 col-md-12">
+    <!-- Quiz Information Card -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-info-circle me-2"></i>Quiz Information
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-warning btn-sm"
+            id="editQuizBtn"
+            data-modal-url="{% url 'quiz_app:quiz_edit' quiz.id %}"
+            data-modal-title="Edit Quiz"
+          >
+            <i class="bi bi-pencil me-1"></i>Edit
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <strong>Quiz ID:</strong>
+          <span class="badge bg-secondary">{{ quiz.quiz_id }}</span>
+        </div>
+        <div class="mb-3">
+          <strong>Status:</strong>
+          {% if quiz.status == 'published' %}
+          <span class="badge bg-success">Published</span>
+          {% elif quiz.status == 'draft' %}
+          <span class="badge bg-warning">Draft</span>
+          {% elif quiz.status == 'archived' %}
+          <span class="badge bg-secondary">Archived</span>
+          {% endif %}
+        </div>
+        <div class="mb-3">
+          <strong>Subject:</strong> {{ quiz.subject.subject_name }}
+        </div>
+        <div class="mb-3">
+          <strong>Category:</strong>
+          {% if quiz.category %}
+          <span
+            class="badge"
+            style="background-color: {{ quiz.category.color }};"
+          >
+            {{ quiz.category.name }}
+          </span>
+          {% else %}
+          <span class="text-muted">None</span>
+          {% endif %}
+        </div>
+        {% if quiz.description %}
+        <div class="mb-3">
+          <strong>Description:</strong>
+          <p class="small mb-0">{{ quiz.description|truncatewords:30 }}</p>
+        </div>
+        {% endif %}
+        <div class="mb-3">
+          <strong>Difficulty:</strong> {{ quiz.get_difficulty_display }}
+        </div>
+        <div class="mb-3">
+          <strong>Time Limit:</strong>
+          {% if quiz.time_limit > 0 %} {{ quiz.time_limit }} minutes {% else %}
+          Unlimited {% endif %}
+        </div>
+        <div class="mb-3">
+          <strong>Total Marks:</strong> {{ quiz.total_marks }}
+        </div>
+        <div class="mb-3">
+          <strong>Passing Marks:</strong> {{ quiz.passing_marks }}
+        </div>
+        <div class="mb-3">
+          <strong>Max Attempts:</strong> {{ quiz.max_attempts }}
+        </div>
+        {% if quiz.academic_year %}
+        <div class="mb-3">
+          <strong>Academic Year:</strong> {{ quiz.academic_year.name }}
+        </div>
+        {% endif %} {% if quiz.term %}
+        <div class="mb-3"><strong>Term:</strong> {{ quiz.term.name }}</div>
+        {% endif %}
+        <div class="mb-3">
+          <strong>Assigned Classes:</strong>
+          {% if quiz.classes.exists %}
+          <br />
+          {% for class_obj in quiz.classes.all %}
+          <span class="badge bg-primary me-1 mb-1">{{ class_obj.name }}</span>
+          {% endfor %}
+          <br />
+          <a
+            href="{% url 'quiz_app:quiz_assignment_list' quiz.id %}"
+            class="btn btn-sm btn-outline-primary mt-2"
+          >
+            <i class="bi bi-people me-1"></i>Manage Assignments
+          </a>
+          {% else %}
+          <br />
+          <span class="text-muted">No classes assigned</span>
+          <br />
+          <a
+            href="{% url 'quiz_app:quiz_assignment_list' quiz.id %}"
+            class="btn btn-sm btn-outline-primary mt-2"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Assign Classes
+          </a>
+          {% endif %}
+        </div>
+        {% if quiz.available_from or quiz.available_until %}
+        <div class="mb-3">
+          {% if quiz.available_from %}
+          <div class="mb-2">
+            <strong>Available From:</strong><br />
+            <small class="text-muted"
+              >{{ quiz.available_from|date:"M d, Y H:i" }}</small
+            >
+          </div>
+          {% endif %} {% if quiz.available_until %}
+          <div>
+            <strong>Available Until:</strong><br />
+            <small class="text-muted"
+              >{{ quiz.available_until|date:"M d, Y H:i" }}</small
+            >
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="mb-3">
+          <strong>Quiz Settings:</strong>
+          <ul class="list-unstyled ms-2 small">
+            <li>
+              <i
+                class="bi bi-{% if quiz.randomize_questions %}check{% else %}x{% endif %}-circle me-2"
+              ></i
+              >Randomize Questions
+            </li>
+            <li>
+              <i
+                class="bi bi-{% if quiz.randomize_answers %}check{% else %}x{% endif %}-circle me-2"
+              ></i
+              >Randomize Answers
+            </li>
+            <li>
+              <i
+                class="bi bi-{% if quiz.show_results_immediately %}check{% else %}x{% endif %}-circle me-2"
+              ></i
+              >Show Results Immediately
+            </li>
+            <li>
+              <i
+                class="bi bi-{% if quiz.show_correct_answers %}check{% else %}x{% endif %}-circle me-2"
+              ></i
+              >Show Correct Answers
+            </li>
+            <li>
+              <i
+                class="bi bi-{% if quiz.allow_review %}check{% else %}x{% endif %}-circle me-2"
+              ></i
+              >Allow Review
+            </li>
+            <li>
+              <i
+                class="bi bi-{% if quiz.require_password %}check{% else %}x{% endif %}-circle me-2"
+              ></i
+              >Require Password
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics Card -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-bar-chart me-2"></i>Statistics
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <strong>Total Questions:</strong> {{ quiz.get_question_count }}
+        </div>
+        <div class="mb-3">
+          <strong>Total Marks:</strong> {{ quiz.total_marks }}
+        </div>
+        <div class="mb-3">
+          <strong>Average Score:</strong> {{
+          quiz.get_average_score|default:"N/A" }}
+        </div>
+        <div class="mb-3">
+          <strong>Completion Rate:</strong> {{ quiz.get_completion_rate }}%
+        </div>
+        <div class="mb-3">
+          <strong>Total Attempts:</strong> {{ quiz.get_participation_count }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline Card -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="bi bi-clock me-2"></i>Timeline</h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <strong>Created:</strong><br />
+          <small class="text-muted"
+            >{{ quiz.created_at|date:"M d, Y H:i" }}</small
+          >
+        </div>
+        <div class="mb-2">
+          <strong>Last Updated:</strong><br />
+          <small class="text-muted"
+            >{{ quiz.updated_at|date:"M d, Y H:i" }}</small
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions Card -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title"><i class="bi bi-tools me-2"></i>Actions</h3>
+      </div>
+      <div class="card-body">
+        <div class="d-grid gap-2">
+          <button
+            type="button"
+            class="btn btn-warning btn-sm"
+            id="editQuizBtn2"
+            data-modal-url="{% url 'quiz_app:quiz_edit' quiz.id %}"
+            data-modal-title="Edit Quiz"
+          >
+            <i class="bi bi-pencil me-1"></i>Edit Quiz
+          </button>
+          <a
+            href="{% url 'quiz_app:quiz_list' %}"
+            class="btn btn-secondary btn-sm"
+          >
+            <i class="bi bi-arrow-left me-1"></i>Back to List
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Containers -->
+<div id="quizModalsContainer"></div>
+<div id="questionModalsContainer"></div>
+
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/quiz_management.js' %}"></script>
+<script src="{% static 'js/question_management.js' %}"></script>
+{% endblock extra_js %}

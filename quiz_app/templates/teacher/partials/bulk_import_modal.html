@@ -1,0 +1,103 @@
+<div
+  class="modal fade"
+  id="bulkImportModal"
+  tabindex="-1"
+  aria-labelledby="bulkImportModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bulkImportModalLabel">
+          Bulk Import Teachers
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <form id="bulkImportForm" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <h6>
+              <i class="bi bi-info-circle me-2"></i>CSV Format Requirements:
+            </h6>
+            <p class="mb-2">
+              Your CSV file must contain the following columns:
+            </p>
+            <ul class="mb-0">
+              <li>
+                <strong>full_name</strong> (required) - Teacher's full name
+              </li>
+              <li>
+                <strong>contact_number</strong> (required) - Contact number
+              </li>
+              <li><strong>gender</strong> (optional) - M or F</li>
+              <li>
+                <strong>email</strong> (optional) - Teacher's email address
+              </li>
+              <li><strong>department</strong> (optional) - Department name</li>
+            </ul>
+          </div>
+
+          <div class="mb-3">
+            <label for="csv_file" class="form-label"
+              >CSV File <span class="text-danger">*</span></label
+            >
+            <input
+              type="file"
+              class="form-control"
+              id="csv_file"
+              name="csv_file"
+              accept=".csv,.xlsx,.xls"
+              required
+            />
+            <small class="text-muted"
+              >Accepted formats: CSV, Excel (.xlsx, .xls)</small
+            >
+          </div>
+
+          <div class="mb-3">
+            <label for="default_department" class="form-label"
+              >Default Department (Optional)</label
+            >
+            <select
+              class="form-select"
+              id="default_department"
+              name="default_department"
+            >
+              <option value="">No Default</option>
+              {% for dept in departments %}
+              <option value="{{ dept.id }}">{{ dept.name }}</option>
+              {% endfor %}
+            </select>
+            <small class="text-muted"
+              >Applied if department column is empty in CSV</small
+            >
+          </div>
+
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Note:</strong> Duplicate staff IDs will be automatically
+            generated. Make sure all required fields are filled in the CSV file.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-upload me-1"></i>Import Teachers
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

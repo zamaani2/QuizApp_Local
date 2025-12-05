@@ -1,0 +1,322 @@
+{% extends 'base.html' %} {% load static %} {% block title %}{{ quiz.title }}{% endblock title %} {% block page_title %}{{ quiz.title }}{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:student_quiz_list' %}">Available Quizzes</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">{{ quiz.title }}</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <!-- Quiz Information -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-info-circle me-2"></i>Quiz Information
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <strong><i class="bi bi-book me-2"></i>Subject:</strong>
+            <p class="ms-4">{{ quiz.subject.subject_name }}</p>
+          </div>
+          <div class="col-md-6">
+            <strong><i class="bi bi-person me-2"></i>Teacher:</strong>
+            <p class="ms-4">{{ quiz.teacher.full_name }}</p>
+          </div>
+        </div>
+
+        {% if quiz.description %}
+        <div class="mb-3">
+          <strong><i class="bi bi-file-text me-2"></i>Description:</strong>
+          <p class="ms-4">{{ quiz.description }}</p>
+        </div>
+        {% endif %} {% if quiz.instructions %}
+        <div class="mb-3">
+          <strong><i class="bi bi-list-check me-2"></i>Instructions:</strong>
+          <div class="ms-4">{{ quiz.instructions|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+        <div class="row">
+          <div class="col-md-6">
+            <strong
+              ><i class="bi bi-question-circle me-2"></i>Total
+              Questions:</strong
+            >
+            <p class="ms-4">{{ quiz.get_question_count }}</p>
+          </div>
+          <div class="col-md-6">
+            <strong><i class="bi bi-star me-2"></i>Total Marks:</strong>
+            <p class="ms-4">{{ quiz.total_marks }}</p>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6">
+            <strong><i class="bi bi-clock me-2"></i>Time Limit:</strong>
+            <p class="ms-4">
+              {% if quiz.time_limit > 0 %} {{ quiz.time_limit }} minutes {% else %}
+              <span class="text-muted">Unlimited</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="col-md-6">
+            <strong
+              ><i class="bi bi-arrow-repeat me-2"></i>Max Attempts:</strong
+            >
+            <p class="ms-4">{{ quiz.max_attempts }}</p>
+          </div>
+        </div>
+
+        {% if quiz.available_from or quiz.available_until %}
+        <div class="row">
+          <div class="col-md-6">
+            <strong
+              ><i class="bi bi-calendar-check me-2"></i>Available From:</strong
+            >
+            <p class="ms-4">
+              {% if quiz.available_from %} {{ quiz.available_from|date:"F d, Y h:i A" }} {% else %}
+              <span class="text-muted">Immediately</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="col-md-6">
+            <strong
+              ><i class="bi bi-calendar-x me-2"></i>Available Until:</strong
+            >
+            <p class="ms-4">
+              {% if quiz.available_until %} {{ quiz.available_until|date:"F d, Y h:i A" }} {% else %}
+              <span class="text-muted">No deadline</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
+        {% endif %} {% if quiz.category %}
+        <div class="mb-3">
+          <strong><i class="bi bi-tag me-2"></i>Category:</strong>
+          <span
+            class="badge ms-2"
+            style="background-color: {{ quiz.category.color }};"
+          >
+            {{ quiz.category.name }}
+          </span>
+        </div>
+        {% endif %} {% if quiz.difficulty %}
+        <div class="mb-3">
+          <strong><i class="bi bi-bar-chart me-2"></i>Difficulty:</strong>
+          <span
+            class="badge ms-2 {% if quiz.difficulty == 'easy' %}bg-success {% elif quiz.difficulty == 'medium' %}bg-warning {% else %}bg-danger{% endif %}"
+          >
+            {{ quiz.get_difficulty_display }}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Attempt History & Actions -->
+  <div class="col-lg-4">
+    <!-- Attempt Statistics -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-graph-up me-2"></i>Your Performance
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <strong>Attempts Made:</strong>
+          <p class="ms-2">{{ attempts_count }}/{{ quiz.max_attempts }}</p>
+        </div>
+
+        <div class="mb-3">
+          <strong>Remaining Attempts:</strong>
+          <p class="ms-2">
+            <span
+              class="badge {% if remaining_attempts > 0 %}bg-success{% else %}bg-danger{% endif %}"
+            >
+              {{ remaining_attempts }}
+            </span>
+          </p>
+        </div>
+
+        {% if best_attempt %}
+        <div class="mb-3">
+          <strong>Best Score:</strong>
+          <p class="ms-2">
+            <span
+              class="badge {% if best_percentage >= 70 %}bg-success{% elif best_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %} fs-6"
+            >
+              {{ best_percentage|floatformat:1 }}%
+            </span>
+            <br />
+            <small class="text-muted"
+              >{{ best_score|floatformat:1 }}/{{ quiz.total_marks }}
+              marks</small
+            >
+          </p>
+        </div>
+        {% else %}
+        <div class="mb-3">
+          <strong>Best Score:</strong>
+          <p class="ms-2 text-muted">No completed attempts yet</p>
+        </div>
+        {% endif %} {% if in_progress_attempt %}
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <strong>In Progress:</strong> You have an unfinished attempt. You can
+          resume it.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-lightning-charge me-2"></i>Actions
+        </h3>
+      </div>
+      <div class="card-body">
+        {% if in_progress_attempt %}
+        <a
+          href="{% url 'quiz_app:student_quiz_resume' quiz.id %}"
+          class="btn btn-warning btn-block w-100 mb-2"
+        >
+          <i class="bi bi-arrow-clockwise me-2"></i>Resume Quiz
+        </a>
+        {% elif can_attempt and is_available_now %}
+        <button
+          type="button"
+          class="btn btn-primary btn-block w-100 mb-2 start-quiz-btn"
+          data-quiz-id="{{ quiz.id }}"
+        >
+          <i class="bi bi-play-circle me-2"></i>Start Quiz
+        </button>
+        {% else %}
+        <button
+          type="button"
+          class="btn btn-secondary btn-block w-100 mb-2"
+          disabled
+          title="{% if not can_attempt %}{{ attempt_message }}{% elif not is_available_now %}{{ availability_message }}{% endif %}"
+        >
+          <i class="bi bi-lock me-2"></i>Cannot Start Quiz
+        </button>
+        {% if not can_attempt %}
+        <div class="alert alert-danger mt-2 mb-0">
+          <small>{{ attempt_message }}</small>
+        </div>
+        {% elif not is_available_now %}
+        <div class="alert alert-warning mt-2 mb-0">
+          <small>{{ availability_message }}</small>
+        </div>
+        {% endif %} {% endif %} {% if attempts_count > 0 %}
+        <button
+          type="button"
+          class="btn btn-success btn-block w-100 mb-2 view-attempts-btn"
+          data-quiz-id="{{ quiz.id }}"
+        >
+          <i class="bi bi-clipboard-check me-2"></i>View Previous Attempts
+        </button>
+        {% endif %}
+
+        <a
+          href="{% url 'quiz_app:student_quiz_list' %}"
+          class="btn btn-secondary btn-block w-100"
+        >
+          <i class="bi bi-arrow-left me-2"></i>Back to Quizzes
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Previous Attempts -->
+{% if submitted_attempts.exists %}
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-clock-history me-2"></i>Previous Attempts
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bordered table-striped table-hover">
+            <thead>
+              <tr>
+                <th>Attempt #</th>
+                <th>Started</th>
+                <th>Submitted</th>
+                <th>Score</th>
+                <th>Percentage</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for attempt in submitted_attempts %}
+              <tr>
+                <td>
+                  <span class="badge bg-secondary"
+                    >#{{ attempt.attempt_number }}</span
+                  >
+                </td>
+                <td>{{ attempt.started_at|date:"M d, Y h:i A" }}</td>
+                <td>
+                  {% if attempt.submitted_at %} {{ attempt.submitted_at|date:"M
+                  d, Y h:i A" }} {% else %}
+                  <span class="text-muted">Not submitted</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ attempt.score|floatformat:1 }}/{{ quiz.total_marks }}
+                </td>
+                <td>
+                  <span
+                    class="badge {% if attempt.percentage >= 70 %}bg-success{% elif attempt.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+                  >
+                    {{ attempt.percentage|floatformat:1 }}%
+                  </span>
+                </td>
+                <td>
+                  {% if attempt.is_submitted and attempt.is_completed %}
+                  <span class="badge bg-success">Completed</span>
+                  {% elif attempt.is_submitted %}
+                  <span class="badge bg-info">Submitted</span>
+                  {% elif attempt.needs_grading %}
+                  <span class="badge bg-warning">Grading Pending</span>
+                  {% else %}
+                  <span class="badge bg-secondary">In Progress</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if attempt.is_submitted %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-info view-result-btn"
+                    data-attempt-id="{{ attempt.id }}"
+                    title="View Results"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %} {% endblock content %} {% block extra_js %}
+<script src="{% static 'js/student_quiz_detail.js' %}"></script>
+{% endblock extra_js %}

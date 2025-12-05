@@ -1,0 +1,77 @@
+<div class="modal fade" id="departmentFormModal" tabindex="-1" aria-labelledby="departmentFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="departmentFormModalLabel">
+          {% if department %}Edit Department{% else %}Add New Department{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="departmentForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="code" class="form-label">Code <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="code"
+                  name="code"
+                  value="{% if department %}{{ department.code }}{% endif %}"
+                  placeholder="e.g., MATH"
+                  maxlength="10"
+                  required
+                />
+                <small class="text-muted">Must be unique per school</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="name"
+                  name="name"
+                  value="{% if department %}{{ department.name }}{% endif %}"
+                  placeholder="e.g., Mathematics Department"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="head_of_department" class="form-label">Head of Department</label>
+            <select class="form-select" id="head_of_department" name="head_of_department">
+              <option value="">Select Head of Department</option>
+              {% for teacher in teachers %}
+              <option value="{{ teacher.id }}" {% if department and department.head_of_department and department.head_of_department.id == teacher.id %}selected{% endif %}>
+                {{ teacher.full_name }} ({{ teacher.staff_id }})
+              </option>
+              {% endfor %}
+            </select>
+            <small class="text-muted">Optional - Select a teacher to head this department</small>
+          </div>
+          <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea
+              class="form-control"
+              id="description"
+              name="description"
+              rows="3"
+            >{% if department %}{{ department.description }}{% endif %}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>{% if department %}Update{% else %}Create{% endif %} Department
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

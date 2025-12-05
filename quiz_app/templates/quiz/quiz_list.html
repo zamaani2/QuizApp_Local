@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Quiz Management{% endblock title %}
+
+{% block page_title %}My Quizzes{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">My Quizzes</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-question-circle me-2"></i>All My Quizzes
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addQuizBtn"
+            data-modal-url="{% url 'quiz_app:quiz_create' %}"
+            data-modal-title="Create New Quiz"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Create Quiz
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search quizzes..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="subjectFilter">
+              <option value="">All Subjects</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" {% if subject_filter == subject.id|stringformat:"s" %}selected{% endif %}>
+                {{ subject.subject_name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+              <option value="">All Status</option>
+              <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Draft</option>
+              <option value="published" {% if status_filter == 'published' %}selected{% endif %}>Published</option>
+              <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="categoryFilter">
+              <option value="">All Categories</option>
+              {% for category in categories %}
+              <option value="{{ category.id }}" {% if category_filter == category.id|stringformat:"s" %}selected{% endif %}>
+                {{ category.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="academicYearFilter">
+              <option value="">All Academic Years</option>
+              {% for ay in academic_years %}
+              <option value="{{ ay.id }}" {% if academic_year_filter == ay.id|stringformat:"s" %}selected{% endif %}>
+                {{ ay.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-1">
+            <button type="button" class="btn btn-secondary btn-sm w-100" id="clearFiltersBtn">
+              <i class="bi bi-x-circle"></i> Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Quizzes Table -->
+        <table id="quizzesTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Quiz ID</th>
+              <th>Title</th>
+              <th>Subject</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th>Questions</th>
+              <th>Total Marks</th>
+              <th>Time Limit</th>
+              <th>Created</th>
+              <th width="200">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for quiz in quizzes %}
+            <tr data-quiz-id="{{ quiz.id }}">
+              <td><span class="badge bg-secondary">{{ quiz.quiz_id }}</span></td>
+              <td>
+                <strong>{{ quiz.title }}</strong>
+                {% if quiz.description %}
+                <br><small class="text-muted">{{ quiz.description|truncatewords:10 }}</small>
+                {% endif %}
+              </td>
+              <td>{{ quiz.subject.subject_name }}</td>
+              <td>
+                {% if quiz.category %}
+                <span class="badge" style="background-color: {{ quiz.category.color }};">
+                  {{ quiz.category.name }}
+                </span>
+                {% else %}
+                <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if quiz.status == 'published' %}
+                <span class="badge bg-success">Published</span>
+                {% elif quiz.status == 'draft' %}
+                <span class="badge bg-warning">Draft</span>
+                {% elif quiz.status == 'archived' %}
+                <span class="badge bg-secondary">Archived</span>
+                {% endif %}
+              </td>
+              <td>{{ quiz.get_question_count }}</td>
+              <td>{{ quiz.total_marks }}</td>
+              <td>
+                {% if quiz.time_limit > 0 %}
+                {{ quiz.time_limit }} min
+                {% else %}
+                <span class="text-muted">Unlimited</span>
+                {% endif %}
+              </td>
+              <td>{{ quiz.created_at|date:"M d, Y" }}</td>
+              <td>
+                <div class="btn-group" role="group">
+                  <a
+                    href="{% url 'quiz_app:quiz_detail' quiz.id %}"
+                    class="btn btn-sm btn-info"
+                    title="View Details"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-quiz-btn"
+                    data-modal-url="{% url 'quiz_app:quiz_edit' quiz.id %}"
+                    data-modal-title="Edit Quiz"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-quiz-btn"
+                    data-quiz-id="{{ quiz.id }}"
+                    data-quiz-title="{{ quiz.title }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="10" class="text-center text-muted py-4">
+                <i class="bi bi-inbox me-2"></i>No quizzes found. Create your first quiz!
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="quizModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/quiz_management.js' %}"></script>
+{% endblock extra_js %}
+

@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Subject Management{% endblock title %}
+
+{% block page_title %}Subject Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Subjects</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-book me-2"></i>All Subjects
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addSubjectBtn"
+            data-modal-url="{% url 'quiz_app:subject_create' %}"
+            data-modal-title="Add New Subject"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Subject
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name or code..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="learningAreaFilter">
+              <option value="">All Learning Areas</option>
+              {% for area in learning_areas %}
+              <option value="{{ area.id }}" {% if learning_area_filter == area.id|stringformat:"s" %}selected{% endif %}>
+                {{ area.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="departmentFilter">
+              <option value="">All Departments</option>
+              {% for dept in departments %}
+              <option value="{{ dept.id }}" {% if department_filter == dept.id|stringformat:"s" %}selected{% endif %}>
+                {{ dept.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Subjects Table -->
+        <table id="subjectsTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Subject Code</th>
+              <th>Subject Name</th>
+              <th>Learning Area</th>
+              <th>Department</th>
+              <th>Quizzes Count</th>
+              <th width="150">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for subject in subjects %}
+            <tr data-subject-id="{{ subject.id }}">
+              <td>
+                <span class="badge bg-primary">{{ subject.subject_code }}</span>
+              </td>
+              <td><strong>{{ subject.subject_name }}</strong></td>
+              <td>
+                {% if subject.learning_area %}
+                <span class="badge bg-info">{{ subject.learning_area.name }}</span>
+                {% else %}
+                <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if subject.department %}
+                <span class="badge bg-success">{{ subject.department.name }}</span>
+                {% else %}
+                <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-warning">{{ subject.quizzes.count }}</span>
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-subject-btn"
+                    data-modal-url="{% url 'quiz_app:subject_edit' subject.id %}"
+                    data-modal-title="Edit Subject"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-subject-btn"
+                    data-subject-id="{{ subject.id }}"
+                    data-subject-name="{{ subject.subject_name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center">No subjects found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="subjectModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/subject_management.js' %}"></script>
+{% endblock extra_js %}
+

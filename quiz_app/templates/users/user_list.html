@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}User Management{% endblock title %}
+
+{% block page_title %}User Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Users</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-people me-2"></i>All Users
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addUserBtn"
+            data-modal-url="{% url 'quiz_app:user_create' %}"
+            data-modal-title="Add New User"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add User
+          </button>
+          <button
+            type="button"
+            class="btn btn-warning btn-sm"
+            id="bulkPasswordResetBtn"
+            data-modal-url="{% url 'quiz_app:user_bulk_password_reset' %}"
+            data-modal-title="Bulk Password Reset"
+            disabled
+          >
+            <i class="bi bi-key me-1"></i>Reset Passwords
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by username, email, name..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-3">
+            <select class="form-select" id="roleFilter">
+              <option value="">All Roles</option>
+              {% for role_value, role_label in user_roles %}
+              <option value="{{ role_value }}" {% if role_filter == role_value %}selected{% endif %}>
+                {{ role_label }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Users Table -->
+        <table id="usersTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th width="30">
+                <input type="checkbox" id="selectAll" />
+              </th>
+              <th>Username</th>
+              <th>Full Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>School</th>
+              <th>Last Login</th>
+              <th width="150">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr data-user-id="{{ user.id }}">
+              <td>
+                <input type="checkbox" class="user-checkbox" value="{{ user.id }}" />
+              </td>
+              <td>{{ user.username }}</td>
+              <td>{{ user.full_name }}</td>
+              <td>{{ user.email }}</td>
+              <td>
+                {% if user.role == 'admin' %}
+                <span class="badge bg-danger">Administrator</span>
+                {% elif user.role == 'superadmin' %}
+                <span class="badge bg-dark">Super Administrator</span>
+                {% elif user.role == 'teacher' %}
+                <span class="badge bg-primary">Teacher</span>
+                {% elif user.role == 'student' %}
+                <span class="badge bg-success">Student</span>
+                {% else %}
+                <span class="badge bg-secondary">{{ user.get_role_display }}</span>
+                {% endif %}
+              </td>
+              <td>{{ user.school.name|default:"-" }}</td>
+              <td>
+                {% if user.last_login %}
+                {{ user.last_login|date:"M d, Y H:i" }}
+                {% else %}
+                <span class="text-muted">Never</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-user-btn"
+                    data-modal-url="{% url 'quiz_app:user_edit' user.id %}"
+                    data-modal-title="Edit User"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  {% if user != request.user %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-user-btn"
+                    data-user-id="{{ user.id }}"
+                    data-user-name="{{ user.full_name|default:user.username }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4">
+                <i class="bi bi-inbox me-2"></i>No users found.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="userModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/user_management.js' %}"></script>
+{% endblock extra_js %}
+

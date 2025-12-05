@@ -1,0 +1,50 @@
+<div
+  class="modal fade"
+  id="bulkUnassignModal"
+  tabindex="-1"
+  aria-labelledby="bulkUnassignModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bulkUnassignModalLabel">
+          Bulk Unassign Students
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <strong>Warning:</strong> Are you sure you want to unassign the
+          selected students from their classes? This action will deactivate
+          their current class assignments.
+        </div>
+        <p>
+          <strong id="selectedCount">0</strong> enrollment(s) will be
+          unassigned.
+        </p>
+        <div id="selectedEnrollmentsList" class="mt-3">
+          <!-- Will be populated by JavaScript -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          id="confirmBulkUnassignBtn"
+        >
+          <i class="bi bi-trash me-1"></i>Unassign Selected
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,133 @@
+<div
+  class="modal fade"
+  id="userFormModal"
+  tabindex="-1"
+  aria-labelledby="userFormModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="userFormModalLabel">
+          {% if user %}
+          <i class="bi bi-pencil me-2"></i>Edit User
+          {% else %}
+          <i class="bi bi-plus-circle me-2"></i>Add New User
+          {% endif %}
+        </h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <form id="userForm" method="POST" action="{% if user %}{% url 'quiz_app:user_edit' user.id %}{% else %}{% url 'quiz_app:user_create' %}{% endif %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+              <input
+                type="text"
+                class="form-control"
+                id="username"
+                name="username"
+                value="{% if user %}{{ user.username }}{% endif %}"
+                required
+              />
+              <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+              <input
+                type="email"
+                class="form-control"
+                id="email"
+                name="email"
+                value="{% if user %}{{ user.email }}{% endif %}"
+                required
+              />
+              <div class="invalid-feedback"></div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="full_name" class="form-label">Full Name <span class="text-danger">*</span></label>
+              <input
+                type="text"
+                class="form-control"
+                id="full_name"
+                name="full_name"
+                value="{% if user %}{{ user.full_name }}{% endif %}"
+                required
+              />
+              <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
+              <select class="form-select" id="role" name="role" required>
+                <option value="">Select Role</option>
+                {% for role_value, role_label in user_roles %}
+                <option value="{{ role_value }}" {% if user and user.role == role_value %}selected{% endif %}>
+                  {{ role_label }}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback"></div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="password" class="form-label">
+                Password
+                {% if not user %}<span class="text-danger">*</span>{% endif %}
+              </label>
+              <input
+                type="password"
+                class="form-control"
+                id="password"
+                name="password"
+                {% if not user %}required{% endif %}
+                placeholder="{% if user %}Leave blank to keep current password{% else %}Default: 0000{% endif %}"
+              />
+              <small class="form-text text-muted">
+                {% if user %}
+                Leave blank to keep the current password.
+                {% else %}
+                If left blank, default password "0000" will be used.
+                {% endif %}
+              </small>
+              <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="school" class="form-label">School</label>
+              <select class="form-select" id="school" name="school">
+                <option value="">No School</option>
+                {% for school in schools %}
+                <option value="{{ school.id }}" {% if user and user.school and user.school.id == school.id %}selected{% endif %}>
+                  {{ school.name }}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            {% if user %}
+            <i class="bi bi-check-circle me-1"></i>Update User
+            {% else %}
+            <i class="bi bi-plus-circle me-1"></i>Create User
+            {% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

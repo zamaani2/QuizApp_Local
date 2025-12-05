@@ -1,0 +1,202 @@
+<div
+  class="modal fade"
+  id="bulkImportModal"
+  tabindex="-1"
+  aria-labelledby="bulkImportModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bulkImportModalLabel">
+          Bulk Import Students
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <form id="bulkImportForm" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          <!-- Step 1: File Upload -->
+          <div id="step1" class="import-step">
+            <div class="alert alert-info">
+              <h6>
+                <i class="bi bi-info-circle me-2"></i>CSV Format Requirements:
+              </h6>
+              <p class="mb-2">
+                Your CSV file should contain student data. After uploading,
+                you'll be able to map your CSV columns to the system fields.
+                <strong>Download the template below</strong> to see the correct
+                format with example data.
+              </p>
+              <ul class="mb-0">
+                <li><strong>Required fields:</strong> Full Name, Gender</li>
+                <li>
+                  <strong>Optional fields:</strong> Admission Number
+                  (auto-generated if not provided), Date of Birth, Parent
+                  Contact, Admission Date, Email
+                </li>
+                <li>
+                  <strong>Date format:</strong> YYYY-MM-DD (e.g., 2024-01-15)
+                </li>
+                <li><strong>Gender:</strong> M or F</li>
+                <li>
+                  <strong>Admission Number:</strong> If not provided, a unique
+                  admission number will be automatically generated
+                </li>
+              </ul>
+            </div>
+
+            <div class="mb-3">
+              <label for="csv_file" class="form-label"
+                >CSV File <span class="text-danger">*</span></label
+              >
+              <input
+                type="file"
+                class="form-control"
+                id="csv_file"
+                name="csv_file"
+                accept=".csv,.xlsx,.xls"
+                required
+              />
+              <small class="text-muted"
+                >Accepted formats: CSV, Excel (.xlsx, .xls)</small
+              >
+            </div>
+
+            <div
+              class="d-flex justify-content-between align-items-center flex-wrap gap-2"
+            >
+              <div class="d-flex gap-2">
+                <a
+                  href="{% url 'quiz_app:student_bulk_import_template' %}"
+                  class="btn btn-outline-secondary btn-sm"
+                  download
+                  title="Download CSV Template"
+                >
+                  <i class="bi bi-filetype-csv me-1"></i>CSV Template
+                </a>
+                <a
+                  href="{% url 'quiz_app:student_bulk_import_template_xlsx' %}"
+                  class="btn btn-outline-success btn-sm"
+                  download
+                  title="Download Excel Template"
+                >
+                  <i class="bi bi-filetype-xlsx me-1"></i>Excel Template
+                </a>
+              </div>
+              <button
+                type="button"
+                class="btn btn-primary"
+                id="previewHeadersBtn"
+              >
+                <i class="bi bi-eye me-1"></i>Preview & Map Columns
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Column Mapping -->
+          <div id="step2" class="import-step" style="display: none">
+            <h6 class="mb-3">
+              <i class="bi bi-arrow-left-right me-2"></i>Map CSV Columns to
+              System Fields
+            </h6>
+            <div class="table-responsive">
+              <table class="table table-bordered table-sm">
+                <thead>
+                  <tr>
+                    <th width="40%">System Field</th>
+                    <th width="60%">CSV Column</th>
+                  </tr>
+                </thead>
+                <tbody id="columnMappingTable">
+                  <!-- Will be populated by JavaScript -->
+                </tbody>
+              </table>
+            </div>
+            <div class="text-end mt-3">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                id="backToStep1Btn"
+              >
+                <i class="bi bi-arrow-left me-1"></i>Back
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                id="continueToStep3Btn"
+              >
+                Continue <i class="bi bi-arrow-right ms-1"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 3: Import Options -->
+          <div id="step3" class="import-step" style="display: none">
+            <h6 class="mb-3"><i class="bi bi-gear me-2"></i>Import Options</h6>
+
+            <div class="row">
+              <div class="col-md-12">
+                <div class="mb-3">
+                  <label for="assign_class" class="form-label"
+                    >Assign to Class (Optional)</label
+                  >
+                  <select
+                    class="form-select"
+                    id="assign_class"
+                    name="assign_class"
+                  >
+                    <option value="">No Class Assignment</option>
+                    {% for class_obj in classes %}
+                    <option value="{{ class_obj.id }}">
+                      {{ class_obj.name }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  <small class="text-muted"
+                    >All imported students will be assigned to this class for
+                    the current academic year {% if current_academic_year %} ({{
+                    current_academic_year.name }}) {% endif %}
+                  </small>
+                </div>
+              </div>
+            </div>
+
+            {% if not current_academic_year %}
+            <div class="alert alert-warning">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              <strong>Warning:</strong> No current academic year is set. Please
+              set a current academic year before assigning students to classes.
+            </div>
+            {% endif %}
+
+            <div class="alert alert-warning">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              <strong>Note:</strong> If a student already has an active class
+              assignment, it will be deactivated and replaced with the new
+              assignment.
+            </div>
+
+            <div class="text-end mt-3">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                id="backToStep2Btn"
+              >
+                <i class="bi bi-arrow-left me-1"></i>Back
+              </button>
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-upload me-1"></i>Import Students
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

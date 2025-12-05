@@ -1,0 +1,96 @@
+<div
+  class="modal fade"
+  id="quizAssignmentModal"
+  tabindex="-1"
+  aria-labelledby="quizAssignmentModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="quizAssignmentModalLabel">
+          <i class="bi bi-people me-2"></i>Assign Classes to Quiz
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <form method="POST" id="quizAssignmentForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Quiz:</strong> {{ quiz.title }}<br />
+            <strong>Subject:</strong> {% if quiz.subject %}{{ quiz.subject.subject_name }}{% else %}Not assigned{% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="classes" class="form-label">
+              Select Classes <span class="text-danger">*</span>
+            </label>
+            <select
+              class="form-select"
+              id="classes"
+              name="classes"
+              multiple
+              size="10"
+              required
+            >
+              {% for class_obj in unassigned_classes %}
+              <option value="{{ class_obj.id }}">
+                {{ class_obj.name }} {% if class_obj.form %} - {{ class_obj.form.name }} {% endif %} {% if class_obj.learning_area %} ({{ class_obj.learning_area.name }}) {% endif %}
+              </option>
+              {% empty %}
+              <option disabled>
+                {% if assigned_classes.count > 0 %} All available classes are
+                already assigned to this quiz. {% else %} No classes available.
+                You must be assigned to teach {% if quiz.subject %}"{{ quiz.subject.subject_name }}"{% else %}this subject{% endif %}
+                in a class before you can assign this quiz. {% endif %}
+              </option>
+              {% endfor %}
+            </select>
+            <small class="text-muted"
+              >Hold Ctrl/Cmd to select multiple classes</small
+            >
+          </div>
+
+          {% if assigned_classes.count > 0 %}
+          <div class="alert alert-warning">
+            <strong>Already Assigned Classes:</strong>
+            <ul class="mb-0 mt-2">
+              {% for class_obj in assigned_classes %}
+              <li>{{ class_obj.name }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            {%
+            if
+            not
+            unassigned_classes
+            %}disabled{%
+            endif
+            %}
+          >
+            <i class="bi bi-check-circle me-1"></i>Assign Classes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

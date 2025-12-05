@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Class Management{% endblock title %}
+
+{% block page_title %}Class Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Classes</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-building me-2"></i>All Classes
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addClassBtn"
+            data-modal-url="{% url 'quiz_app:class_create' %}"
+            data-modal-title="Add New Class"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Class
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name or code..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="formFilter">
+              <option value="">All Forms</option>
+              {% for form in forms %}
+              <option value="{{ form.id }}" {% if form_filter == form.id|stringformat:"s" %}selected{% endif %}>
+                {{ form.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="learningAreaFilter">
+              <option value="">All Learning Areas</option>
+              {% for area in learning_areas %}
+              <option value="{{ area.id }}" {% if learning_area_filter == area.id|stringformat:"s" %}selected{% endif %}>
+                {{ area.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="academicYearFilter">
+              <option value="">All Academic Years</option>
+              {% for ay in academic_years %}
+              <option value="{{ ay.id }}" {% if academic_year_filter == ay.id|stringformat:"s" %}selected{% endif %}>
+                {{ ay.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Classes Table -->
+        <table id="classesTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Class ID</th>
+              <th>Name</th>
+              <th>Form</th>
+              <th>Learning Area</th>
+              <th>Academic Year</th>
+              <th>Students</th>
+              <th>Status</th>
+              <th width="200">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for class_obj in classes %}
+            <tr data-class-id="{{ class_obj.id }}">
+              <td>
+                <span class="badge bg-primary">{{ class_obj.class_id }}</span>
+              </td>
+              <td><strong>{{ class_obj.name }}</strong></td>
+              <td>{{ class_obj.form.name|default:"-" }}</td>
+              <td>{{ class_obj.learning_area.name|default:"-" }}</td>
+              <td>{{ class_obj.academic_year.name }}</td>
+              <td>
+                <span class="badge bg-info">{{ class_obj.get_current_student_count }}</span> / 
+                <span class="text-muted">{{ class_obj.maximum_students }}</span>
+              </td>
+              <td>
+                {% if class_obj.is_class_full %}
+                <span class="badge bg-danger">Full</span>
+                {% else %}
+                <span class="badge bg-success">Available</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <a
+                    href="{% url 'quiz_app:class_detail' class_obj.id %}"
+                    class="btn btn-sm btn-info"
+                    title="View Details"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-class-btn"
+                    data-modal-url="{% url 'quiz_app:class_edit' class_obj.id %}"
+                    data-modal-title="Edit Class"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-class-btn"
+                    data-class-id="{{ class_obj.id }}"
+                    data-class-name="{{ class_obj.name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center">No classes found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="classModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/class_management.js' %}"></script>
+{% endblock extra_js %}
+

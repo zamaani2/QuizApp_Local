@@ -1,0 +1,97 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Learning Area
+Management{% endblock title %} {% block page_title %}Learning Area Management{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Learning Areas</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-mortarboard me-2"></i>All Learning Areas
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addLearningAreaBtn"
+            data-modal-url="{% url 'quiz_app:learning_area_create' %}"
+            data-modal-title="Add New Learning Area"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Learning Area
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Learning Areas Table -->
+        <table
+          id="learningAreasTable"
+          class="table table-bordered table-striped table-hover"
+        >
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Students Count</th>
+              <th width="150">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for learning_area in learning_areas %}
+            <tr data-learning-area-id="{{ learning_area.id }}">
+              <td>
+                <span class="badge bg-secondary">{{ learning_area.code }}</span>
+              </td>
+              <td><strong>{{ learning_area.name }}</strong></td>
+              <td>
+                {{ learning_area.description|default:"-"|truncatewords:10 }}
+              </td>
+              <td>
+                <span class="badge bg-info"
+                  >{{ learning_area.student_set.count }}</span
+                >
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-learning-area-btn"
+                    data-modal-url="{% url 'quiz_app:learning_area_edit' learning_area.id %}"
+                    data-modal-title="Edit Learning Area"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-learning-area-btn"
+                    data-learning-area-id="{{ learning_area.id }}"
+                    data-learning-area-name="{{ learning_area.name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-center">No learning areas found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="schoolStructureModalsContainer"></div>
+
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/school_structure_management.js' %}"></script>
+{% endblock extra_js %}

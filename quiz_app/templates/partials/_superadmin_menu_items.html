@@ -1,0 +1,63 @@
+{% load static %}
+<!-- Superadmin Menu Items -->
+<li class="nav-item">
+  <a href="{% url 'quiz_app:superadmin_dashboard' %}" class="nav-link">
+    <i class="nav-icon bi bi-speedometer2"></i>
+    <p>Dashboard</p>
+  </a>
+</li>
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-building"></i>
+    <p>
+      Schools
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:superadmin_school_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>All Schools</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:superadmin_school_create' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Add New School</p>
+      </a>
+    </li>
+  </ul>
+</li>
+<li class="nav-item">
+  <a href="#" class="nav-link">
+    <i class="nav-icon bi bi-shield-check"></i>
+    <p>
+      Administrators
+      <i class="nav-arrow bi bi-chevron-right ms-auto"></i>
+    </p>
+  </a>
+  <ul class="nav-treeview">
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:superadmin_admin_list' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>All Administrators</p>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a href="{% url 'quiz_app:superadmin_admin_create' %}" class="nav-link">
+        <i class="bi bi-circle nav-icon"></i>
+        <p>Add Administrator</p>
+      </a>
+    </li>
+  </ul>
+</li>
+<li class="nav-item">
+  <a href="{% url 'quiz_app:superadmin_logout' %}" class="nav-link">
+    <i class="nav-icon bi bi-box-arrow-right"></i>
+    <p>Logout</p>
+  </a>
+</li>
+
+
+

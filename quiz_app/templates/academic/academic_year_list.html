@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Academic Year Management{% endblock title %}
+
+{% block page_title %}Academic Year Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Academic Years</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-calendar-range me-2"></i>All Academic Years
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addAcademicYearBtn"
+            data-modal-url="{% url 'quiz_app:academic_year_create' %}"
+            data-modal-title="Add New Academic Year"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Academic Year
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-3">
+            <select class="form-select" id="currentFilter">
+              <option value="">All Status</option>
+              <option value="true" {% if current_filter == 'true' %}selected{% endif %}>Current Only</option>
+              <option value="false" {% if current_filter == 'false' %}selected{% endif %}>Non-Current Only</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Academic Years Table -->
+        <table id="academicYearsTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Duration (Days)</th>
+              <th>Status</th>
+              <th>Terms Count</th>
+              <th width="200">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for academic_year in academic_years %}
+            <tr data-academic-year-id="{{ academic_year.id }}">
+              <td>
+                <strong>{{ academic_year.name }}</strong>
+                {% if academic_year.school %}
+                <br><small class="text-muted">{{ academic_year.school.name }}</small>
+                {% endif %}
+              </td>
+              <td>{{ academic_year.start_date|date:"M d, Y" }}</td>
+              <td>{{ academic_year.end_date|date:"M d, Y" }}</td>
+              <td>{{ academic_year.get_duration }}</td>
+              <td>
+                {% if academic_year.is_current %}
+                <span class="badge bg-success">Current</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-info">{{ academic_year.term_set.count }}</span>
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  {% if not academic_year.is_current %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-success set-current-btn"
+                    data-academic-year-id="{{ academic_year.id }}"
+                    title="Set as Current"
+                  >
+                    <i class="bi bi-check-circle"></i>
+                  </button>
+                  {% endif %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-academic-year-btn"
+                    data-modal-url="{% url 'quiz_app:academic_year_edit' academic_year.id %}"
+                    data-modal-title="Edit Academic Year"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-academic-year-btn"
+                    data-academic-year-id="{{ academic_year.id }}"
+                    data-academic-year-name="{{ academic_year.name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="text-center">No academic years found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="academicModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/academic_management.js' %}"></script>
+{% endblock extra_js %}
+

@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Student Class Enrollment Management{% endblock title %}
+
+{% block page_title %}Student Class Enrollments{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Enrollments</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-people-fill me-2"></i>All Student Class Enrollments
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addEnrollmentBtn"
+            data-modal-url="{% url 'quiz_app:enrollment_create' %}"
+            data-modal-title="Assign Student to Class"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Assign Student
+          </button>
+          <button
+            type="button"
+            class="btn btn-success btn-sm"
+            id="bulkAssignBtn"
+            data-modal-url="{% url 'quiz_app:enrollment_bulk_create' %}"
+            data-modal-title="Bulk Assign Students"
+          >
+            <i class="bi bi-list-check me-1"></i>Bulk Assign
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger btn-sm"
+            id="bulkUnassignBtn"
+            data-modal-url="{% url 'quiz_app:enrollment_bulk_delete' %}"
+            data-modal-title="Bulk Unassign Students"
+            disabled
+          >
+            <i class="bi bi-trash me-1"></i>Unassign Selected
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by student name, admission number, class..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="studentFilter">
+              <option value="">All Students</option>
+              {% for student in students %}
+              <option value="{{ student.id }}" {% if student_filter == student.id|stringformat:"s" %}selected{% endif %}>
+                {{ student.full_name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="classFilter">
+              <option value="">All Classes</option>
+              {% for class_obj in classes %}
+              <option value="{{ class_obj.id }}" {% if class_filter == class_obj.id|stringformat:"s" %}selected{% endif %}>
+                {{ class_obj.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="activeFilter">
+              <option value="">All Status</option>
+              <option value="true" {% if active_filter == 'true' %}selected{% endif %}>Active</option>
+              <option value="false" {% if active_filter == 'false' %}selected{% endif %}>Inactive</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="button" class="btn btn-secondary btn-sm" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Enrollments Table -->
+        <table id="enrollmentsTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th width="30">
+                <input type="checkbox" id="selectAll" />
+              </th>
+              <th>Student</th>
+              <th>Admission Number</th>
+              <th>Class</th>
+              <th>Date Assigned</th>
+              <th>Assigned By</th>
+              <th>Status</th>
+              <th width="150">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for enrollment in enrollments %}
+            <tr data-enrollment-id="{{ enrollment.id }}">
+              <td>
+                <input type="checkbox" class="enrollment-checkbox" value="{{ enrollment.id }}" />
+              </td>
+              <td>
+                {% if enrollment.student.profile_picture %}
+                <img
+                  src="{{ enrollment.student.profile_picture.url }}"
+                  alt="{{ enrollment.student.full_name }}"
+                  class="rounded-circle me-2"
+                  width="32"
+                  height="32"
+                />
+                {% else %}
+                <img
+                  src="{% static 'img/no_user_img.png' %}"
+                  alt="{{ enrollment.student.full_name }}"
+                  class="rounded-circle me-2"
+                  width="32"
+                  height="32"
+                />
+                {% endif %}
+                <strong>{{ enrollment.student.full_name }}</strong>
+              </td>
+              <td>{{ enrollment.student.admission_number }}</td>
+              <td>
+                <span class="badge bg-info">{{ enrollment.assigned_class.name }}</span>
+                <br><small class="text-muted">{{ enrollment.assigned_class.academic_year.name }}</small>
+              </td>
+              <td>{{ enrollment.date_assigned|date:"M d, Y" }}</td>
+              <td>
+                {% if enrollment.assigned_by %}
+                {{ enrollment.assigned_by.full_name }}
+                {% else %}
+                <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if enrollment.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-enrollment-btn"
+                    data-modal-url="{% url 'quiz_app:enrollment_edit' enrollment.id %}"
+                    data-modal-title="Edit Enrollment"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-enrollment-btn"
+                    data-enrollment-id="{{ enrollment.id }}"
+                    data-enrollment-info="{{ enrollment.student.full_name }} - {{ enrollment.assigned_class.name }}"
+                    title="Unassign"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="enrollmentModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/student_enrollment_management.js' %}"></script>
+{% endblock extra_js %}
+

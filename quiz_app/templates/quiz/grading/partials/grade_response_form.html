@@ -1,0 +1,107 @@
+<div
+  class="modal fade"
+  id="gradeResponseModal"
+  tabindex="-1"
+  aria-labelledby="gradeResponseModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="gradeResponseModalLabel">
+          <i class="bi bi-pencil me-2"></i>Grade Response
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <form method="POST" id="gradeResponseForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Question {{ question.order }}:</strong> {{
+            question.question_text|truncatewords:30 }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">
+              <strong>Student Answer:</strong>
+            </label>
+            <div class="p-3 bg-light rounded" style="min-height: 100px">
+              {{ response.text_answer|linebreaks|default:"No answer provided" }}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="marks_awarded" class="form-label">
+              Marks Awarded <span class="text-danger">*</span>
+              <small class="text-muted"
+                >(Max: {{ question.marks }} marks)</small
+              >
+            </label>
+            <input
+              type="number"
+              class="form-control"
+              id="marks_awarded"
+              name="marks_awarded"
+              min="0"
+              max="{{ question.marks }}"
+              step="0.1"
+              value="{% if response.is_graded %}{{ response.marks_awarded }}{% else %}0{% endif %}"
+              required
+            />
+            <small class="text-muted"
+              >Enter marks from 0 to {{ question.marks }}</small
+            >
+          </div>
+
+          <div class="mb-3">
+            <label for="grading_notes" class="form-label">
+              Grading Notes / Feedback
+            </label>
+            <textarea
+              class="form-control"
+              id="grading_notes"
+              name="grading_notes"
+              rows="4"
+              placeholder="Enter feedback or notes for the student..."
+            >
+{% if response.grading_notes %}{{ response.grading_notes }}{% endif %}</textarea
+            >
+            <small class="text-muted"
+              >Optional: Provide feedback to help the student improve</small
+            >
+          </div>
+
+          {% if response.is_graded %}
+          <div class="alert alert-info">
+            <small>
+              <strong>Previously graded by:</strong> {{
+              response.graded_by.get_full_name|default:response.graded_by.username
+              }}<br />
+              <strong>Graded on:</strong> {{ response.graded_at|date:"M d, Y
+              H:i" }}
+            </small>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i>Save Grade
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

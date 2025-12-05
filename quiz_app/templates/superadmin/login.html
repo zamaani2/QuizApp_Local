@@ -1,0 +1,461 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Superadmin Login - SchoolApp</title>
+
+    <!-- Include the centralized styles -->
+    {% include 'partials/_styles.html' %}
+
+    <!-- Custom Superadmin Login Page Styles -->
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+        overflow-x: hidden;
+      }
+
+      .login-page {
+        min-height: 100vh;
+        background: linear-gradient(
+          135deg,
+          #7c3aed 0%,
+          #a855f7 50%,
+          #c084fc 100%
+        );
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+      }
+
+      /* Animated Background */
+      .login-page::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(
+            circle at 20% 80%,
+            rgba(124, 58, 237, 0.3) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 80% 20%,
+            rgba(168, 85, 247, 0.3) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 40% 40%,
+            rgba(192, 132, 252, 0.3) 0%,
+            transparent 50%
+          );
+        animation: float 6s ease-in-out infinite;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px) rotate(0deg);
+        }
+        50% {
+          transform: translateY(-20px) rotate(1deg);
+        }
+      }
+
+      .login-container {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+      }
+
+      .login-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1),
+          0 8px 32px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        overflow: hidden;
+        animation: slideUp 0.8s ease-out;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .login-header {
+        background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+        padding: 2rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .login-header::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.1) 0%,
+          transparent 70%
+        );
+        animation: shimmer 3s ease-in-out infinite;
+      }
+
+      @keyframes shimmer {
+        0%,
+        100% {
+          transform: translateX(-100%) translateY(-100%) rotate(0deg);
+        }
+        50% {
+          transform: translateX(0%) translateY(0%) rotate(180deg);
+        }
+      }
+
+      .login-logo {
+        position: relative;
+        z-index: 2;
+      }
+
+      .login-logo a {
+        color: #fff;
+        font-size: 2.5rem;
+        font-weight: 700;
+        text-decoration: none;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        letter-spacing: -0.5px;
+      }
+
+      .login-logo .subtitle {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 1rem;
+        font-weight: 400;
+        margin-top: 0.5rem;
+        display: block;
+      }
+
+      .login-logo .badge {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+        backdrop-filter: blur(10px);
+      }
+
+      .login-card-body {
+        padding: 2.5rem;
+      }
+
+      .login-box-msg {
+        color: #64748b;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+        text-align: center;
+        font-weight: 500;
+      }
+
+      .form-group {
+        margin-bottom: 1.5rem;
+        position: relative;
+      }
+
+      .input-group {
+        position: relative;
+        margin-bottom: 1.5rem;
+      }
+
+      .form-control {
+        height: 56px;
+        border: 2px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 0 1rem 0 3rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: #f8fafc;
+      }
+
+      .form-control:focus {
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
+        background: #fff;
+        transform: translateY(-2px);
+      }
+
+      .input-group-text {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        z-index: 3;
+        font-size: 1.1rem;
+      }
+
+      .form-control:focus + .input-group-text {
+        color: #7c3aed;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+        border: none;
+        border-radius: 16px;
+        height: 56px;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn-primary::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        );
+        transition: left 0.5s;
+      }
+
+      .btn-primary:hover::before {
+        left: 100%;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(124, 58, 237, 0.4);
+      }
+
+      .remember-me {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+      }
+
+      .remember-me input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        margin-right: 0.75rem;
+        accent-color: #7c3aed;
+      }
+
+      .remember-me label {
+        color: #64748b;
+        font-weight: 500;
+        cursor: pointer;
+      }
+
+      .alert {
+        border-radius: 16px;
+        border: none;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        font-weight: 500;
+      }
+
+      .alert-danger {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        color: #dc2626;
+        border-left: 4px solid #dc2626;
+      }
+
+      .alert-success {
+        background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        color: #16a34a;
+        border-left: 4px solid #16a34a;
+      }
+
+      .alert-warning {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        color: #d97706;
+        border-left: 4px solid #d97706;
+      }
+
+      .back-to-school-login {
+        text-align: center;
+        margin-top: 1.5rem;
+      }
+
+      .back-to-school-login a {
+        color: #7c3aed;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.3s ease;
+      }
+
+      .back-to-school-login a:hover {
+        color: #a855f7;
+        text-decoration: underline;
+      }
+
+      @media (max-width: 768px) {
+        .login-page {
+          padding: 1rem;
+        }
+
+        .login-card-body {
+          padding: 2rem;
+        }
+
+        .login-logo a {
+          font-size: 2rem;
+        }
+      }
+    </style>
+  </head>
+
+  <body class="hold-transition login-page">
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-logo">
+            <a href="#"><b>SI</b>S</a>
+            <span class="subtitle">Super Administrator Portal</span>
+            <span class="badge">System Management</span>
+          </div>
+        </div>
+
+        <div class="login-card-body">
+          <p class="login-box-msg">Superadmin Access - System Management</p>
+
+          {% if messages %} {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Notice!</strong> {{ message }}
+          </div>
+          {% endfor %} {% endif %}
+
+          <!-- Superadmin Login Form -->
+          <form
+            method="POST"
+            action="{% url 'quiz_app:superadmin_login' %}"
+            id="loginForm"
+          >
+            {% csrf_token %}
+            <div class="input-group">
+              <input
+                type="text"
+                class="form-control"
+                name="username"
+                id="id_username"
+                placeholder="Username or Email"
+                required
+                autocomplete="username"
+              />
+              <div class="input-group-text">
+                <i class="fas fa-user-shield"></i>
+              </div>
+            </div>
+
+            <div class="input-group">
+              <input
+                type="password"
+                class="form-control"
+                name="password"
+                id="id_password"
+                placeholder="Password"
+                required
+                autocomplete="current-password"
+              />
+              <div class="input-group-text">
+                <i class="fas fa-lock"></i>
+              </div>
+            </div>
+
+            <div class="remember-me">
+              <input type="checkbox" id="remember" name="remember" />
+              <label for="remember">Remember me for 30 days</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" id="loginBtn">
+              <span
+                class="spinner-border spinner-border-sm d-none"
+                id="loadingSpinner"
+                role="status"
+                aria-hidden="true"
+              ></span>
+              <span id="btnText">Sign In as Superadmin</span>
+            </button>
+          </form>
+
+          <div class="back-to-school-login">
+            <a href="{% url 'quiz_app:login' %}">← Back to School Login</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="{% static 'vendor/jquery/3.7.1/jquery-3.7.1.min.js' %}"></script>
+    <!-- Bootstrap 5 -->
+    <script src="{% static 'vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js' %}"></script>
+
+    <!-- Custom Login Script -->
+    <script>
+      $(function () {
+        // Auto-focus on first input
+        $("#id_username").focus();
+
+        // Form submission with loading state
+        $("#loginForm").on("submit", function () {
+          $("#loginBtn").prop("disabled", true);
+          $("#loadingSpinner").removeClass("d-none");
+          $("#btnText").text("Signing In...");
+        });
+
+        // Enhanced form validation
+        $(".form-control").on("blur", function () {
+          if ($(this).val().trim() === "") {
+            $(this).addClass("is-invalid");
+          } else {
+            $(this).removeClass("is-invalid");
+            $(this).addClass("is-valid");
+          }
+        });
+
+        $(".form-control").on("input", function () {
+          if ($(this).hasClass("is-invalid") && $(this).val().trim() !== "") {
+            $(this).removeClass("is-invalid");
+            $(this).addClass("is-valid");
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

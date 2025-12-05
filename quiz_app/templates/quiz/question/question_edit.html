@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Question - {{ quiz.title }}{% endblock title %}
+
+{% block page_title %}Edit Question{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_list' %}">My Quizzes</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_detail' quiz.id %}">{{ quiz.title }}</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Edit Question</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <!-- Quiz Information Card -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">
+          <i class="bi bi-journal-text me-2"></i>{{ quiz.title }}
+        </h5>
+        <div class="row">
+          <div class="col-md-3">
+            <strong>Questions:</strong> {{ quiz.get_question_count }}
+          </div>
+          <div class="col-md-3">
+            <strong>Total Marks:</strong> {{ quiz.total_marks }}
+          </div>
+          <div class="col-md-3">
+            <strong>Time Limit:</strong> {{ quiz.time_limit }} min
+          </div>
+          <div class="col-md-3">
+            <strong>Subject:</strong> {{ quiz.subject.subject_name }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Question Form -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-pencil-square me-2"></i>Edit Question
+          <span class="badge bg-secondary ms-2">{{ question.get_question_type_display }}</span>
+        </h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" id="questionForm">
+          {% csrf_token %}
+
+          <!-- Common Fields -->
+          <div class="mb-3">
+            <label for="questionText" class="form-label">Question Text <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="questionText" name="question_text" rows="4" required>{{ question.question_text }}</textarea>
+          </div>
+
+          <div class="row">
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="marks" class="form-label">Marks <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="marks" name="marks" min="1" value="{{ question.marks }}" required>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="order" class="form-label">Question Order</label>
+                <input type="number" class="form-control" id="order" name="order" min="1" value="{{ question.order|default:1 }}">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="difficulty" class="form-label">Difficulty</label>
+                <select class="form-select" id="difficulty" name="difficulty">
+                  <option value="easy" {% if question.difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                  <option value="medium" {% if question.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                  <option value="hard" {% if question.difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multiple Choice / True False Options -->
+          {% if question.question_type == 'multiple_choice' or question.question_type == 'true_false' %}
+          <div class="mb-3">
+            <h6 class="mb-3">
+              <i class="bi bi-list-check me-2"></i>Answer Choices
+            </h6>
+            <div id="choicesContainer">
+              {% for choice in answer_choices %}
+              <div class="choice-item mb-2" data-choice-id="{{ choice.id }}">
+                <div class="input-group">
+                  <div class="input-group-text">
+                    <input class="form-check-input" 
+                      type="{% if question.question_type == 'multiple_choice' %}checkbox{% else %}radio{% endif %}"
+                      name="is_correct" value="{{ forloop.counter0 }}" 
+                      id="choice{{ forloop.counter0 }}Correct" {% if choice.is_correct %}checked{% endif %}>
+                  </div>
+                  <input type="hidden" name="choice_id" value="{{ choice.id }}">
+                  <input type="text" class="form-control" name="choice_text" value="{{ choice.choice_text }}" 
+                         {% if question.question_type == 'true_false' %}readonly{% endif %} required>
+                  {% if question.question_type == 'multiple_choice' and answer_choices.count > 2 %}
+                  <button type="button" class="btn btn-outline-danger remove-choice" onclick="removeChoice(this)">
+                    <i class="bi bi-x"></i>
+                  </button>
+                  {% endif %}
+                </div>
+              </div>
+              {% empty %}
+              <!-- Fallback for True/False when no choices exist -->
+              {% if question.question_type == 'true_false' %}
+              <div class="choice-item mb-2" data-choice-id="true-choice">
+                <div class="input-group">
+                  <div class="input-group-text">
+                    <input class="form-check-input" type="radio" name="is_correct" value="0" id="choiceTrueCorrect" 
+                           {% if question.correct_answer_text == 'True' %}checked{% endif %}>
+                  </div>
+                  <input type="hidden" name="choice_id" value="true-choice">
+                  <input type="text" class="form-control" name="choice_text" value="True" readonly required>
+                </div>
+              </div>
+              <div class="choice-item mb-2" data-choice-id="false-choice">
+                <div class="input-group">
+                  <div class="input-group-text">
+                    <input class="form-check-input" type="radio" name="is_correct" value="1" id="choiceFalseCorrect" 
+                           {% if question.correct_answer_text == 'False' %}checked{% endif %}>
+                  </div>
+                  <input type="hidden" name="choice_id" value="false-choice">
+                  <input type="text" class="form-control" name="choice_text" value="False" readonly required>
+                </div>
+              </div>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% if question.question_type == 'multiple_choice' %}
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addChoice()">
+              <i class="bi bi-plus-circle me-1"></i>Add Choice
+            </button>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <!-- Short Answer/Fill in the Blank Options -->
+          {% if question.question_type == 'short_answer' or question.question_type == 'fill_blank' %}
+          <div class="mb-3">
+            <label for="correctAnswer" class="form-label">
+              <i class="bi bi-check-circle me-2"></i>Correct Answer
+            </label>
+            <input type="text" class="form-control" id="correctAnswer" name="correct_answer" 
+                   value="{{ question.correct_answer_text|default:'' }}">
+            <small class="text-muted">
+              {% if question.question_type == 'short_answer' %}
+              The student's answer must match this exactly to be marked correct.
+              {% else %}
+              The word or phrase that should fill the blank.
+              {% endif %}
+            </small>
+          </div>
+          {% endif %}
+
+          <!-- Essay Options -->
+          {% if question.question_type == 'essay' %}
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Essay Question:</strong> Essay questions require manual grading after submission.
+          </div>
+          {% endif %}
+
+          <!-- Explanation -->
+          <div class="mb-3">
+            <label for="explanation" class="form-label">
+              <i class="bi bi-info-circle me-2"></i>Explanation (Optional)
+            </label>
+            <textarea class="form-control" id="explanation" name="explanation" rows="3" 
+                      placeholder="Explain the correct answer or provide additional context">{{ question.explanation|default:'' }}</textarea>
+            <small class="text-muted">This explanation can be shown to students after they complete the quiz.</small>
+          </div>
+
+          <!-- Additional Settings -->
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="is_required" name="is_required" 
+                       {% if question.is_required %}checked{% endif %}>
+                <label class="form-check-label" for="is_required">
+                  Required Question
+                </label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="negative_marks" class="form-label">Negative Marks</label>
+                <input type="number" class="form-control" id="negative_marks" name="negative_marks" 
+                       min="0" step="0.1" value="{{ question.negative_marks|default:0 }}">
+                <small class="text-muted">Marks deducted for wrong answer</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="d-flex justify-content-between">
+            <a href="{% url 'quiz_app:quiz_detail' quiz.id %}" class="btn btn-secondary">
+              <i class="bi bi-arrow-left me-1"></i>Cancel
+            </a>
+            <div>
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-circle me-1"></i>Save Changes
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/question_management.js' %}"></script>
+<script>
+  // Initialize for edit mode
+  document.addEventListener('DOMContentLoaded', function() {
+    const questionType = '{{ question.question_type }}';
+    // Set up form for existing question type
+    if (typeof initializeQuestionForm === 'function') {
+      initializeQuestionForm(questionType);
+    }
+  });
+</script>
+{% endblock extra_js %}
+

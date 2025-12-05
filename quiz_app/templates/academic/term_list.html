@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Term Management{% endblock title %}
+
+{% block page_title %}Term Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Terms</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-calendar3 me-2"></i>All Terms
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addTermBtn"
+            data-modal-url="{% url 'quiz_app:term_create' %}"
+            data-modal-title="Add New Term"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Term
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by academic year..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="academicYearFilter">
+              <option value="">All Academic Years</option>
+              {% for ay in academic_years %}
+              <option value="{{ ay.id }}" {% if academic_year_filter == ay.id|stringformat:"s" %}selected{% endif %}>
+                {{ ay.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="termNumberFilter">
+              <option value="">All Terms</option>
+              <option value="1" {% if term_number_filter == '1' %}selected{% endif %}>First Term</option>
+              <option value="2" {% if term_number_filter == '2' %}selected{% endif %}>Second Term</option>
+              <option value="3" {% if term_number_filter == '3' %}selected{% endif %}>Third Term</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="currentFilter">
+              <option value="">All Status</option>
+              <option value="true" {% if current_filter == 'true' %}selected{% endif %}>Current Only</option>
+              <option value="false" {% if current_filter == 'false' %}selected{% endif %}>Non-Current Only</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Terms Table -->
+        <table id="termsTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Academic Year</th>
+              <th>Term</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Duration (Days)</th>
+              <th>Status</th>
+              <th width="200">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for term in terms %}
+            <tr data-term-id="{{ term.id }}">
+              <td>
+                <strong>{{ term.academic_year.name }}</strong>
+                {% if term.school %}
+                <br><small class="text-muted">{{ term.school.name }}</small>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-primary">{{ term.get_term_number_display }}</span>
+              </td>
+              <td>{{ term.start_date|date:"M d, Y" }}</td>
+              <td>{{ term.end_date|date:"M d, Y" }}</td>
+              <td>{{ term.get_duration }}</td>
+              <td>
+                {% if term.is_current %}
+                <span class="badge bg-success">Current</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  {% if not term.is_current %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-success set-current-term-btn"
+                    data-term-id="{{ term.id }}"
+                    title="Set as Current"
+                  >
+                    <i class="bi bi-check-circle"></i>
+                  </button>
+                  {% endif %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-term-btn"
+                    data-modal-url="{% url 'quiz_app:term_edit' term.id %}"
+                    data-modal-title="Edit Term"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-term-btn"
+                    data-term-id="{{ term.id }}"
+                    data-term-name="{{ term.academic_year.name }} - {{ term.get_term_number_display }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="text-center">No terms found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="academicModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/academic_management.js' %}"></script>
+{% endblock extra_js %}
+

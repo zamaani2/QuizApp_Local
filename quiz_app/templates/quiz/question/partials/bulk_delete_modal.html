@@ -1,0 +1,50 @@
+<div
+  class="modal fade"
+  id="bulkDeleteQuestionsModal"
+  tabindex="-1"
+  aria-labelledby="bulkDeleteQuestionsModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="bulkDeleteQuestionsModalLabel">
+          <i class="bi bi-exclamation-triangle me-2"></i>Bulk Delete Questions
+        </h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          <strong>Warning!</strong> This action cannot be undone. You are about
+          to delete <span id="selectedQuestionsCount">0</span> question(s).
+        </div>
+        <p>
+          Are you sure you want to proceed with deleting the selected questions?
+          This will also delete all associated answer choices and reduce the
+          quiz's total marks.
+        </p>
+        <div id="selectedQuestionsList" class="mt-3">
+          <!-- Selected questions will be listed here -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="btn btn-danger"
+          id="confirmBulkDeleteQuestionsBtn"
+        >
+          <i class="bi bi-trash me-1"></i>Delete Selected
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

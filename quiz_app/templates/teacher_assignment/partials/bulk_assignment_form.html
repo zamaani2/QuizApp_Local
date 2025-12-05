@@ -1,0 +1,147 @@
+<div
+  class="modal fade"
+  id="bulkAssignmentFormModal"
+  tabindex="-1"
+  aria-labelledby="bulkAssignmentFormModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bulkAssignmentFormModalLabel">
+          Bulk Assign Subjects to Teacher
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <form id="bulkAssignmentForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Bulk Assignment:</strong> Select a teacher, academic year,
+            multiple classes, and then subjects. Only subjects assigned to the
+            selected classes (via ClassSubject) will be available. All
+            combinations of selected subjects and classes will be created for
+            the selected teacher.
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="bulk_teacher" class="form-label"
+                  >Teacher <span class="text-danger">*</span></label
+                >
+                <select
+                  class="form-select"
+                  id="bulk_teacher"
+                  name="bulk_teacher"
+                  required
+                >
+                  <option value="">Select Teacher</option>
+                  {% for teacher in teachers %}
+                  <option value="{{ teacher.id }}">
+                    {{ teacher.full_name }} ({{ teacher.staff_id }})
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="bulk_academic_year" class="form-label"
+                  >Academic Year <span class="text-danger">*</span></label
+                >
+                <select
+                  class="form-select"
+                  id="bulk_academic_year"
+                  name="bulk_academic_year"
+                  required
+                >
+                  <option value="">Select Academic Year</option>
+                  {% for ay in academic_years %}
+                  <option value="{{ ay.id }}">{{ ay.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="bulk_classes" class="form-label"
+                  >Classes <span class="text-danger">*</span></label
+                >
+                <select
+                  class="form-select"
+                  id="bulk_classes"
+                  name="bulk_classes"
+                  multiple
+                  size="8"
+                  required
+                >
+                  {% for class_obj in classes %}
+                  <option value="{{ class_obj.id }}">
+                    {{ class_obj.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted"
+                  >Hold Ctrl/Cmd to select multiple classes. Select classes
+                  first to load available subjects.</small
+                >
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="bulk_subjects" class="form-label"
+                  >Subjects <span class="text-danger">*</span></label
+                >
+                <select
+                  class="form-select"
+                  id="bulk_subjects"
+                  name="bulk_subjects"
+                  multiple
+                  size="8"
+                  required
+                >
+                  <option value="">
+                    Select classes and academic year first
+                  </option>
+                </select>
+                <small class="text-muted"
+                  >Hold Ctrl/Cmd to select multiple subjects. Only subjects
+                  assigned to selected classes will be shown.</small
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Note:</strong> This will create assignments for all
+            combinations of selected subjects and classes. If an assignment
+            already exists, it will be skipped.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-list-check me-1"></i>Create Assignments
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

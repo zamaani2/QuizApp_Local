@@ -1,0 +1,192 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Import Questions -
+{{ quiz.title }}{% endblock title %} {% block page_title %}Import Questions{%
+endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_list' %}">My Quizzes</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_detail' quiz.id %}">{{ quiz.title }}</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Import Questions</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-12">
+    <!-- Quiz Information Card -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">
+          <i class="bi bi-journal-text me-2"></i>{{ quiz.title }}
+        </h5>
+        <div class="row">
+          <div class="col-md-3">
+            <strong>Questions:</strong> {{ quiz.get_question_count }}
+          </div>
+          <div class="col-md-3">
+            <strong>Total Marks:</strong> {{ quiz.total_marks }}
+          </div>
+          <div class="col-md-3">
+            <strong>Subject:</strong> {{ quiz.subject.subject_name }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Form -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-upload me-2"></i>Import Questions
+        </h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" enctype="multipart/form-data" id="importForm">
+          {% csrf_token %}
+
+          <!-- File Format Selection -->
+          <div class="mb-4">
+            <h6 class="mb-3">Step 1: Select Import Format</h6>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="card format-option selected" data-format="csv">
+                  <div class="card-body">
+                    <div class="form-check">
+                      <input
+                        type="radio"
+                        name="file_format"
+                        value="csv"
+                        id="format-csv"
+                        checked
+                        class="form-check-input"
+                      />
+                      <label class="form-check-label" for="format-csv">
+                        <strong>CSV</strong>
+                        <p class="small mb-0 text-muted">
+                          Comma-separated values format
+                        </p>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card format-option" data-format="excel">
+                  <div class="card-body">
+                    <div class="form-check">
+                      <input
+                        type="radio"
+                        name="file_format"
+                        value="excel"
+                        id="format-excel"
+                        class="form-check-input"
+                      />
+                      <label class="form-check-label" for="format-excel">
+                        <strong>Excel</strong>
+                        <p class="small mb-0 text-muted">
+                          Microsoft Excel spreadsheet
+                        </p>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- File Upload -->
+          <div class="mb-4">
+            <h6 class="mb-3">Step 2: Upload File</h6>
+            <div class="mb-3">
+              <label for="importFile" class="form-label">Select File</label>
+              <input
+                type="file"
+                name="import_file"
+                id="importFile"
+                class="form-control"
+                accept=".csv,.xlsx,.xls"
+                required
+              />
+              <small class="text-muted"
+                >Supported formats: CSV, Excel (.xlsx, .xls)</small
+              >
+            </div>
+          </div>
+
+          <!-- Format Instructions -->
+          <div class="mb-4">
+            <h6 class="mb-3">Step 3: File Format Instructions</h6>
+            <div class="alert alert-info">
+              <h6>CSV Format:</h6>
+              <p class="mb-2">
+                Your CSV file should have the following columns:
+              </p>
+              <ul class="mb-0">
+                <li>
+                  <strong>question_text</strong> - The question text (required)
+                </li>
+                <li>
+                  <strong>question_type</strong> - Type: multiple_choice,
+                  true_false, short_answer, fill_blank, essay
+                </li>
+                <li>
+                  <strong>marks</strong> - Points for this question (default: 1)
+                </li>
+                <li>
+                  <strong>correct_answer</strong> - For short_answer/fill_blank:
+                  the correct answer. For multiple_choice: the index (1-based)
+                  of correct choice
+                </li>
+                <li>
+                  <strong>choice1, choice2, choice3, choice4</strong> - Answer
+                  choices for multiple choice questions
+                </li>
+                <li><strong>explanation</strong> - Optional explanation</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="d-flex justify-content-between">
+            <a
+              href="{% url 'quiz_app:quiz_detail' quiz.id %}"
+              class="btn btn-secondary"
+            >
+              <i class="bi bi-arrow-left me-1"></i>Cancel
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-upload me-1"></i>Import Questions
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %} {% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // Format option selection
+    const formatOptions = document.querySelectorAll(".format-option");
+    formatOptions.forEach((option) => {
+      option.addEventListener("click", function () {
+        formatOptions.forEach((opt) => opt.classList.remove("selected"));
+        this.classList.add("selected");
+        const radio = this.querySelector('input[type="radio"]');
+        if (radio) {
+          radio.checked = true;
+        }
+      });
+    });
+
+    // File input change
+    const fileInput = document.getElementById("importFile");
+    fileInput.addEventListener("change", function () {
+      if (this.files.length > 0) {
+        console.log("File selected:", this.files[0].name);
+      }
+    });
+  });
+</script>
+{% endblock extra_js %}

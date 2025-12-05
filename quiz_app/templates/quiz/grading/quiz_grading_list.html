@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Quiz Grading{% endblock title %}
+
+{% block page_title %}Quiz Grading{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Quiz Grading</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-check-circle me-2"></i>Quiz Attempts Needing Grading
+        </h5>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by student name, admission number, quiz..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-3">
+            <select class="form-select" id="quizFilter">
+              <option value="">All Quizzes</option>
+              {% for quiz in quizzes %}
+              <option value="{{ quiz.id }}" {% if quiz_filter == quiz.id|stringformat:"s" %}selected{% endif %}>
+                {{ quiz.title }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select class="form-select" id="statusFilter">
+              <option value="needs_grading" {% if grading_status == 'needs_grading' %}selected{% endif %}>Needs Grading</option>
+              <option value="graded" {% if grading_status == 'graded' %}selected{% endif %}>Graded</option>
+              <option value="all" {% if grading_status == 'all' %}selected{% endif %}>All</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-secondary w-100" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Attempts Table -->
+        {% if attempts %}
+        <div class="table-responsive">
+          <table class="table table-hover" id="gradingTable">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Quiz</th>
+                <th>Subject</th>
+                <th>Score</th>
+                <th>Essay Questions</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for attempt in attempts %}
+              <tr>
+                <td>
+                  <strong>{{ attempt.student.full_name }}</strong><br>
+                  <small class="text-muted">{{ attempt.student.admission_number }}</small>
+                </td>
+                <td>
+                  <strong>{{ attempt.quiz.title }}</strong>
+                </td>
+                <td>
+                  <span class="badge bg-primary">{{ attempt.quiz.subject.subject_name }}</span>
+                </td>
+                <td>
+                  <strong>{{ attempt.score|floatformat:1 }}</strong> / {{ attempt.quiz.total_marks }}<br>
+                  <small class="text-muted">{{ attempt.percentage|floatformat:1 }}%</small>
+                </td>
+                <td>
+                  {% if attempt.total_essay_count > 0 %}
+                  <span class="badge {% if attempt.ungraded_essay_count > 0 %}bg-warning{% else %}bg-success{% endif %}">
+                    {{ attempt.graded_essay_count }} / {{ attempt.total_essay_count }} graded
+                  </span>
+                  {% else %}
+                  <span class="text-muted">No essay questions</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if attempt.needs_grading %}
+                  <span class="badge bg-warning">Needs Grading</span>
+                  {% elif attempt.is_graded %}
+                  <span class="badge bg-success">Graded</span>
+                  {% else %}
+                  <span class="badge bg-secondary">Pending</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <small class="text-muted">{{ attempt.submitted_at|date:"M d, Y H:i" }}</small>
+                </td>
+                <td>
+                  <a
+                    href="{% url 'quiz_app:quiz_attempt_grading' attempt.id %}"
+                    class="btn btn-sm btn-outline-primary"
+                    title="Grade Attempt"
+                  >
+                    <i class="bi bi-pencil me-1"></i>Grade
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>No quiz attempts found matching your criteria.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/quiz_grading_list.js' %}"></script>
+{% endblock extra_js %}
+

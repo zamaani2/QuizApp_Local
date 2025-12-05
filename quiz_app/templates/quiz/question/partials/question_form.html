@@ -1,0 +1,245 @@
+<div class="modal fade" id="questionFormModal" tabindex="-1" aria-labelledby="questionFormModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="questionFormModalLabel">
+          {% if question %}Edit Question{% else %}Create New Question{% endif %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="questionForm" method="post">
+        {% csrf_token %}
+        <div class="modal-body">
+          <!-- Question Type Selector (only for create) -->
+          {% if not question %}
+          <div class="mb-3">
+            <label class="form-label">Question Type <span class="text-danger">*</span></label>
+            <div class="row g-2">
+              <div class="col-md-4">
+                <div class="question-type-option-small active" data-type="multiple_choice">
+                  <i class="bi bi-list-check"></i>
+                  <small>Multiple Choice</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="question-type-option-small" data-type="true_false">
+                  <i class="bi bi-check2-circle"></i>
+                  <small>True/False</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="question-type-option-small" data-type="short_answer">
+                  <i class="bi bi-input-cursor-text"></i>
+                  <small>Short Answer</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="question-type-option-small" data-type="fill_blank">
+                  <i class="bi bi-pencil-square"></i>
+                  <small>Fill in Blank</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="question-type-option-small" data-type="essay">
+                  <i class="bi bi-file-text"></i>
+                  <small>Essay</small>
+                </div>
+              </div>
+            </div>
+            <input type="hidden" name="question_type" id="questionType" value="multiple_choice">
+          </div>
+          {% else %}
+          <input type="hidden" name="question_type" id="existingQuestionType" value="{{ question.question_type }}">
+          <div class="alert alert-info mb-3">
+            <strong>Question Type:</strong> {{ question.get_question_type_display }}
+          </div>
+          {% endif %}
+
+          <!-- Common Fields -->
+          <div class="mb-3">
+            <label for="questionText" class="form-label">Question Text <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="questionText" name="question_text" rows="3" required>{% if question %}{{ question.question_text }}{% endif %}</textarea>
+          </div>
+
+          <div class="row">
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="marks" class="form-label">Marks <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="marks" name="marks" min="1" 
+                       value="{% if question %}{{ question.marks }}{% else %}1{% endif %}" required>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="order" class="form-label">Order</label>
+                <input type="number" class="form-control" id="order" name="order" min="1" 
+                       value="{% if question %}{{ question.order|default:1 }}{% else %}{{ quiz.get_question_count|add:1 }}{% endif %}">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="difficulty" class="form-label">Difficulty</label>
+                <select class="form-select" id="difficulty" name="difficulty">
+                  <option value="easy" {% if question and question.difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                  <option value="medium" {% if not question or question.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                  <option value="hard" {% if question and question.difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multiple Choice Section (only for multiple_choice questions) -->
+          <div id="multipleChoiceSection" class="question-type-section" {% if question and question.question_type != 'multiple_choice' %}style="display: none;"{% elif not question %}style="display: block;"{% endif %}>
+            <h6 class="mb-2">Answer Choices</h6>
+            <div id="choicesContainer">
+              {% if question and question.question_type == 'multiple_choice' %}
+                {% for choice in answer_choices %}
+                <div class="choice-item mb-2" data-choice-id="{{ choice.id }}">
+                  <div class="input-group input-group-sm">
+                    <div class="input-group-text">
+                      <input type="checkbox" name="is_correct" value="{{ forloop.counter0 }}" 
+                             class="form-check-input" {% if choice.is_correct %}checked{% endif %}>
+                    </div>
+                    <input type="hidden" name="choice_id" value="{{ choice.id }}">
+                    <input type="text" name="choice_text" class="form-control" value="{{ choice.choice_text }}" required>
+                    {% if answer_choices|length > 2 %}
+                    <button type="button" class="btn btn-outline-danger remove-choice" onclick="removeChoice(this)">
+                      <i class="bi bi-x"></i>
+                    </button>
+                    {% endif %}
+                  </div>
+                </div>
+                {% empty %}
+                <!-- No choices exist, show default empty choices -->
+                <div class="choice-item mb-2">
+                  <div class="input-group input-group-sm">
+                    <div class="input-group-text">
+                      <input type="checkbox" name="is_correct" value="0" class="form-check-input">
+                    </div>
+                    <input type="text" name="choice_text" class="form-control" placeholder="Enter choice text" required>
+                    <button type="button" class="btn btn-outline-danger remove-choice" onclick="removeChoice(this)">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="choice-item mb-2">
+                  <div class="input-group input-group-sm">
+                    <div class="input-group-text">
+                      <input type="checkbox" name="is_correct" value="1" class="form-check-input">
+                    </div>
+                    <input type="text" name="choice_text" class="form-control" placeholder="Enter choice text" required>
+                    <button type="button" class="btn btn-outline-danger remove-choice" onclick="removeChoice(this)">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                </div>
+                {% endfor %}
+              {% elif not question %}
+                <!-- Create mode - show default empty choices -->
+                <div class="choice-item mb-2">
+                  <div class="input-group input-group-sm">
+                    <div class="input-group-text">
+                      <input type="checkbox" name="is_correct" value="0" class="form-check-input">
+                    </div>
+                    <input type="text" name="choice_text" class="form-control" placeholder="Enter choice text" required>
+                    <button type="button" class="btn btn-outline-danger remove-choice" onclick="removeChoice(this)">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="choice-item mb-2">
+                  <div class="input-group input-group-sm">
+                    <div class="input-group-text">
+                      <input type="checkbox" name="is_correct" value="1" class="form-check-input">
+                    </div>
+                    <input type="text" name="choice_text" class="form-control" placeholder="Enter choice text" required>
+                    <button type="button" class="btn btn-outline-danger remove-choice" onclick="removeChoice(this)">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addChoice()">
+              <i class="bi bi-plus-circle me-1"></i>Add Choice
+            </button>
+            <small class="text-muted d-block mt-1">Check the box next to the correct answer(s)</small>
+          </div>
+
+          <!-- True/False Section -->
+          <div id="trueFalseSection" class="question-type-section" {% if not question or question.question_type != 'true_false' %}style="display: none;"{% endif %}>
+            <h6 class="mb-2">Correct Answer</h6>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="tf_correct" value="true" id="tfTrue" 
+                     {% if tf_correct_answer == 'true' or not tf_correct_answer %}checked{% endif %} required>
+              <label class="form-check-label" for="tfTrue">True</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="tf_correct" value="false" id="tfFalse"
+                     {% if tf_correct_answer == 'false' %}checked{% endif %}>
+              <label class="form-check-label" for="tfFalse">False</label>
+            </div>
+          </div>
+
+          <!-- Short Answer Section -->
+          <div id="shortAnswerSection" class="question-type-section" {% if not question or question.question_type != 'short_answer' %}style="display: none;"{% endif %}>
+            <h6 class="mb-2">Correct Answer</h6>
+            <input type="text" class="form-control" name="correct_answer" 
+                   value="{% if question and question.question_type == 'short_answer' and question.correct_answer_text %}{{ question.correct_answer_text }}{% endif %}"
+                   placeholder="Enter the correct answer">
+            <small class="text-muted">The student's answer must match this exactly.</small>
+          </div>
+
+          <!-- Fill in the Blank Section -->
+          <div id="fillBlankSection" class="question-type-section" {% if not question or question.question_type != 'fill_blank' %}style="display: none;"{% endif %}>
+            <h6 class="mb-2">Correct Answer</h6>
+            <input type="text" class="form-control" name="correct_answer" 
+                   value="{% if question and question.question_type == 'fill_blank' and question.correct_answer_text %}{{ question.correct_answer_text }}{% endif %}"
+                   placeholder="Enter the word/phrase that fills the blank">
+            <small class="text-muted">The word or phrase that should fill the blank.</small>
+          </div>
+
+          <!-- Essay Section -->
+          <div id="essaySection" class="question-type-section" {% if not question or question.question_type != 'essay' %}style="display: none;"{% endif %}>
+            <div class="alert alert-info mb-0">
+              <i class="bi bi-info-circle me-2"></i>
+              Essay questions require manual grading after submission.
+            </div>
+          </div>
+
+          <!-- Explanation -->
+          <div class="mb-3 mt-3">
+            <label for="explanation" class="form-label">Explanation (Optional)</label>
+            <textarea class="form-control" id="explanation" name="explanation" rows="2" 
+                      placeholder="Explain the correct answer">{% if question %}{{ question.explanation|default:'' }}{% endif %}</textarea>
+          </div>
+
+          <!-- Additional Settings -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="is_required" name="is_required" 
+                       {% if not question or question.is_required %}checked{% endif %}>
+                <label class="form-check-label" for="is_required">Required Question</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="negative_marks" class="form-label">Negative Marks</label>
+                <input type="number" class="form-control form-control-sm" id="negative_marks" name="negative_marks" 
+                       min="0" step="0.1" value="{% if question %}{{ question.negative_marks|default:0 }}{% else %}0{% endif %}">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i>{% if question %}Update{% else %}Create{% endif %} Question
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

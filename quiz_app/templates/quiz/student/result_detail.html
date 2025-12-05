@@ -1,0 +1,265 @@
+{% extends 'base.html' %} {% load static %} {% load quiz_filters %} {% block title %}Quiz Result - {{ quiz.title }}{% endblock title %} {% block page_title %}
+<div class="d-flex justify-content-between align-items-center">
+  <span>Quiz Result - {{ quiz.title }}</span>
+  <div>
+    <a
+      href="{% url 'quiz_app:student_quiz_result_print' attempt.id %}"
+      class="btn btn-secondary btn-sm"
+      target="_blank"
+    >
+      <i class="bi bi-printer me-1"></i>Print
+    </a>
+    <a
+      href="{% url 'quiz_app:student_quiz_attempts' %}"
+      class="btn btn-secondary btn-sm"
+    >
+      <i class="bi bi-arrow-left me-1"></i>Back to My Results
+    </a>
+  </div>
+</div>
+{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:student_quiz_attempts' %}">My Results</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">{{ quiz.title }}</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-md-4">
+    <!-- Result Information Card -->
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2"></i>Result Information
+        </h5>
+      </div>
+      <div class="card-body">
+        <h6 class="mb-3">Quiz Information</h6>
+        <p class="mb-1"><strong>Quiz:</strong> {{ quiz.title }}</p>
+        <p class="mb-1">
+          <strong>Subject:</strong> {{ quiz.subject.subject_name }}
+        </p>
+        <p class="mb-1">
+          <strong>Teacher:</strong> {{ quiz.teacher.full_name }}
+        </p>
+        <p class="mb-1">
+          <strong>Attempt #:</strong> {{ attempt.attempt_number }}
+        </p>
+        {% if attempt.academic_year %}
+        <p class="mb-1">
+          <strong>Academic Year:</strong> {{ attempt.academic_year.name }}
+        </p>
+        {% endif %} {% if attempt.term %}
+        <p class="mb-1"><strong>Term:</strong> {{ attempt.term.name }}</p>
+        {% endif %}
+        <hr />
+        <h6 class="mb-3">Score Summary</h6>
+        <div class="text-center mb-3">
+          <h2 class="mb-0">
+            <span
+              class="badge {% if attempt.percentage >= 70 %}bg-success{% elif attempt.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+              style="font-size: 2rem"
+            >
+              {{ attempt.percentage|floatformat:1 }}%
+            </span>
+          </h2>
+          <p class="mb-0">
+            <strong>{{ attempt.score|floatformat:1 }}</strong> / {{ quiz.total_marks }} marks
+          </p>
+        </div>
+        <div class="row text-center">
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <strong class="text-success">{{ attempt.correct_answers }}</strong
+              ><br />
+              <small>Correct</small>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <strong class="text-danger">{{ attempt.wrong_answers }}</strong
+              ><br />
+              <small>Wrong</small>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <strong class="text-muted">{{ attempt.unanswered }}</strong><br />
+              <small>Unanswered</small>
+            </div>
+          </div>
+        </div>
+        <hr />
+        <h6 class="mb-3">Timing</h6>
+        <p class="mb-1">
+          <strong>Started:</strong> {{ attempt.started_at|date:"M d, Y h:i A" }}
+        </p>
+        {% if attempt.submitted_at %}
+        <p class="mb-1">
+          <strong>Submitted:</strong> {{ attempt.submitted_at|date:"M d, Y h:i A" }}
+        </p>
+        {% endif %} {% if attempt.time_taken %}
+        <p class="mb-1">
+          <strong>Time Taken:</strong> {{ attempt.get_duration_minutes }}
+          minutes
+        </p>
+        {% endif %}
+        <hr />
+        <h6 class="mb-3">Status</h6>
+        {% if attempt.needs_grading and not attempt.is_graded %}
+        <p class="mb-1">
+          <span class="badge bg-warning">Grading Pending</span>
+        </p>
+        <p class="text-muted small">
+          Some questions require manual grading. Your final score may change
+          after grading.
+        </p>
+        {% elif attempt.is_graded %}
+        <p class="mb-1">
+          <span class="badge bg-success">Graded</span>
+        </p>
+        {% else %}
+        <p class="mb-1">
+          <span class="badge bg-success">Completed</span>
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <!-- Questions and Answers -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-question-circle me-2"></i>Questions and Answers
+        </h5>
+      </div>
+      <div class="card-body">
+        {% for question in all_questions %}
+        <div class="card mb-3">
+          <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">
+                Question {{ question.order }}
+                <span class="badge bg-secondary ms-2"
+                  >{{ question.marks }} mark{{ question.marks|pluralize }}</span
+                >
+              </h6>
+              <span class="badge bg-info"
+                >{{ question.get_question_type_display }}</span
+              >
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="fw-bold mb-3">{{ question.question_text }}</p>
+
+            {% if question.id in answered_question_ids %} {% for response in responses %} {% if response.question.id == question.id %} {% with response=response %}
+            <!-- Multiple Choice / True False -->
+            {% if question.question_type == 'multiple_choice' or question.question_type == 'true_false' %}
+            <div class="mb-3">
+              <strong>Your Answer:</strong>
+              <div class="mt-2">
+                {% if response.selected_choice %}
+                <div
+                  class="alert {% if response.is_correct %}alert-success{% else %}alert-danger{% endif %}"
+                >
+                  <i
+                    class="bi {% if response.is_correct %}bi-check-circle{% else %}bi-x-circle{% endif %} me-2"
+                  ></i>
+                  {{ response.selected_choice.choice_text }} {% if not response.is_correct %}
+                  <br /><small class="text-muted"
+                    >Correct answer: {% for choice in question.answer_choices.all %} {% if choice.is_correct %}{{ choice.choice_text }}{% endif %} {% endfor %}
+                  </small>
+                  {% endif %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                  <i class="bi bi-exclamation-circle me-2"></i>No answer
+                  selected
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Short Answer / Fill Blank / Essay -->
+            {% if question.question_type == 'short_answer' or question.question_type == 'fill_blank' or question.question_type == 'essay' %}
+            <div class="mb-3">
+              <strong>Your Answer:</strong>
+              <div class="mt-2">
+                {% if response.text_answer %}
+                <div
+                  class="alert {% if response.is_correct %}alert-success{% else %}alert-info{% endif %}"
+                >
+                  {{ response.text_answer|linebreaks }}
+                </div>
+                {% if question.question_type == 'short_answer' or question.question_type == 'fill_blank' %} {% if not response.is_correct and question.correct_answer_text %}
+                <div class="alert alert-success">
+                  <strong>Correct Answer:</strong> {{ question.correct_answer_text }}
+                </div>
+                {% endif %} {% endif %} {% else %}
+                <div class="alert alert-warning">
+                  <i class="bi bi-exclamation-circle me-2"></i>No answer
+                  provided
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Marks and Feedback -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <strong>Marks Awarded:</strong>
+                <span
+                  class="badge {% if response.is_correct %}bg-success{% else %}bg-danger{% endif %}"
+                >
+                  {{ response.marks_awarded|floatformat:1 }} / {{ question.marks }}
+                </span>
+              </div>
+              <div class="col-md-6">
+                <strong>Status:</strong>
+                {% if response.is_correct %}
+                <span class="badge bg-success">Correct</span>
+                {% else %}
+                <span class="badge bg-danger">Incorrect</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Teacher Feedback -->
+            {% if response.grading_notes %}
+            <div class="alert alert-info">
+              <strong
+                ><i class="bi bi-chat-left-text me-2"></i>Teacher
+                Feedback:</strong
+              >
+              <p class="mb-0 mt-2">{{ response.grading_notes|linebreaks }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Explanation -->
+            {% if question.explanation %}
+            <div class="alert alert-secondary">
+              <strong><i class="bi bi-lightbulb me-2"></i>Explanation:</strong>
+              <p class="mb-0 mt-2">{{ question.explanation|linebreaks }}</p>
+            </div>
+            {% endif %} {% endwith %} {% endif %} {% endfor %} {% else %}
+            <!-- Unanswered Question -->
+            <div class="alert alert-warning">
+              <i class="bi bi-exclamation-triangle me-2"></i>This question was
+              not answered.
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}

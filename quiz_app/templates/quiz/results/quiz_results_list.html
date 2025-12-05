@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Quiz Results{% endblock title %}
+
+{% block page_title %}Quiz Results{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Quiz Results</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <!-- Statistics Cards -->
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <div class="card bg-primary text-white">
+          <div class="card-body">
+            <h5 class="card-title">Total Attempts</h5>
+            <h3 class="mb-0">{{ total_attempts }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-success text-white">
+          <div class="card-body">
+            <h5 class="card-title">Average Score</h5>
+            <h3 class="mb-0">{{ avg_score|floatformat:1 }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-info text-white">
+          <div class="card-body">
+            <h5 class="card-title">Average Percentage</h5>
+            <h3 class="mb-0">{{ avg_percentage|floatformat:1 }}%</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="card-title mb-0">
+              <i class="bi bi-clipboard-data me-2"></i>Quiz Results
+            </h5>
+            <small class="text-muted">
+              <i class="bi bi-info-circle me-1"></i>Showing best attempt per student per quiz
+            </small>
+          </div>
+          <div>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm me-2"
+              id="bulkPrintBtn"
+              disabled
+            >
+              <i class="bi bi-printer me-1"></i>Print Selected
+            </button>
+            <button
+              type="button"
+              class="btn btn-info btn-sm me-2"
+              id="printAllBtn"
+            >
+              <i class="bi bi-printer-fill me-1"></i>Print All Filtered
+            </button>
+            <button
+              type="button"
+              class="btn btn-success btn-sm"
+              id="exportResultsBtn"
+            >
+              <i class="bi bi-file-earmark-excel me-1"></i>Export to Excel
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by student, quiz..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="quizFilter">
+              <option value="">All Quizzes</option>
+              {% for quiz in quizzes %}
+              <option value="{{ quiz.id }}" {% if quiz_filter == quiz.id|stringformat:"s" %}selected{% endif %}>
+                {{ quiz.title }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="academicYearFilter">
+              <option value="">All Academic Years</option>
+              {% for ay in academic_years %}
+              <option value="{{ ay.id }}" {% if academic_year_filter == ay.id|stringformat:"s" %}selected{% endif %}>
+                {{ ay.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="classFilter">
+              <option value="">All Classes</option>
+              {% for class_obj in classes %}
+              <option value="{{ class_obj.id }}" {% if class_filter == class_obj.id|stringformat:"s" %}selected{% endif %}>
+                {{ class_obj.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-secondary w-100" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Results Table -->
+        {% if attempts %}
+        <div class="table-responsive">
+          <table class="table table-hover" id="resultsTable">
+            <thead>
+              <tr>
+                <th width="30">
+                  <input type="checkbox" id="selectAllCheckbox" title="Select All">
+                </th>
+                <th>Student</th>
+                <th>Quiz</th>
+                <th>Subject</th>
+                <th>Score</th>
+                <th>Percentage</th>
+                <th>Attempt #</th>
+                <th>Submitted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for attempt in attempts %}
+              <tr>
+                <td>
+                  <input type="checkbox" class="attempt-checkbox" value="{{ attempt.id }}" data-attempt-id="{{ attempt.id }}">
+                </td>
+                <td>
+                  <strong>{{ attempt.student.full_name }}</strong><br>
+                  <small class="text-muted">{{ attempt.student.admission_number }}</small>
+                </td>
+                <td>
+                  <strong>{{ attempt.quiz.title }}</strong>
+                </td>
+                <td>
+                  <span class="badge bg-primary">{{ attempt.quiz.subject.subject_name }}</span>
+                </td>
+                <td>
+                  <strong>{{ attempt.score|floatformat:1 }}</strong> / {{ attempt.quiz.total_marks }}
+                </td>
+                <td>
+                  <span class="badge {% if attempt.percentage >= 70 %}bg-success{% elif attempt.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
+                    {{ attempt.percentage|floatformat:1 }}%
+                  </span>
+                </td>
+                <td>
+                  <span class="badge bg-secondary">{{ attempt.attempt_number }}</span>
+                </td>
+                <td>
+                  <small class="text-muted">{{ attempt.submitted_at|date:"M d, Y H:i" }}</small>
+                </td>
+                <td>
+                  <a
+                    href="{% url 'quiz_app:quiz_result_detail' attempt.id %}"
+                    class="btn btn-sm btn-outline-primary"
+                    title="View Result"
+                  >
+                    <i class="bi bi-eye me-1"></i>View
+                  </a>
+                  <a
+                    href="{% url 'quiz_app:quiz_result_print' attempt.id %}"
+                    class="btn btn-sm btn-outline-secondary"
+                    title="Print Result"
+                    target="_blank"
+                  >
+                    <i class="bi bi-printer me-1"></i>Print
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>No quiz results found matching your criteria.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/quiz_results_list.js' %}"></script>
+{% endblock extra_js %}
+

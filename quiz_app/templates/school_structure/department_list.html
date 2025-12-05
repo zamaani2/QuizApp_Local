@@ -1,0 +1,105 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Department
+Management{% endblock title %} {% block page_title %}Department Management{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Departments</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-building me-2"></i>All Departments
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addDepartmentBtn"
+            data-modal-url="{% url 'quiz_app:department_create' %}"
+            data-modal-title="Add New Department"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Department
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Departments Table -->
+        <table
+          id="departmentsTable"
+          class="table table-bordered table-striped table-hover"
+        >
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Head of Department</th>
+              <th>Description</th>
+              <th>Teachers Count</th>
+              <th width="150">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for department in departments %}
+            <tr data-department-id="{{ department.id }}">
+              <td>
+                <span class="badge bg-secondary">{{ department.code }}</span>
+              </td>
+              <td><strong>{{ department.name }}</strong></td>
+              <td>
+                {% if department.head_of_department %}
+                <span class="badge bg-success"
+                  >{{ department.head_of_department.full_name }}</span
+                >
+                {% else %}
+                <span class="text-muted">Not assigned</span>
+                {% endif %}
+              </td>
+              <td>{{ department.description|default:"-"|truncatewords:10 }}</td>
+              <td>
+                <span class="badge bg-info"
+                  >{{ department.teacher_set.count }}</span
+                >
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-department-btn"
+                    data-modal-url="{% url 'quiz_app:department_edit' department.id %}"
+                    data-modal-title="Edit Department"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-department-btn"
+                    data-department-id="{{ department.id }}"
+                    data-department-name="{{ department.name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center">No departments found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="schoolStructureModalsContainer"></div>
+
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/school_structure_management.js' %}"></script>
+{% endblock extra_js %}

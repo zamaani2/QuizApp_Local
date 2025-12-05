@@ -1,0 +1,257 @@
+{% extends 'base.html' %} {% load static %} {% load quiz_filters %} {% block title %}My Quiz Results{% endblock title %} {% block page_title %}My Quiz Results{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">My Results</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <!-- Statistics Cards -->
+  <div class="col-lg-3 col-md-6">
+    <div class="card card-primary card-outline">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h5 class="mb-0">Total Attempts</h5>
+            <h2 class="mt-2 mb-0">{{ total_attempts }}</h2>
+          </div>
+          <div class="align-self-center">
+            <i class="bi bi-clipboard-data fs-1 text-primary"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="card card-success card-outline">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h5 class="mb-0">Average Score</h5>
+            <h2 class="mt-2 mb-0">{{ avg_score|floatformat:1 }}</h2>
+            <small class="text-muted">{{ avg_percentage|floatformat:1 }}%</small>
+          </div>
+          <div class="align-self-center">
+            <i class="bi bi-graph-up fs-1 text-success"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="card card-info card-outline">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h5 class="mb-0">Best Score</h5>
+            <h2 class="mt-2 mb-0">{{ best_score|floatformat:1 }}</h2>
+            <small class="text-muted">{{ best_percentage|floatformat:1 }}%</small>
+          </div>
+          <div class="align-self-center">
+            <i class="bi bi-trophy fs-1 text-info"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-3 col-md-6">
+    <div class="card card-warning card-outline">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h5 class="mb-0">Completed</h5>
+            <h2 class="mt-2 mb-0">{{ completed_attempts_count }}</h2>
+          </div>
+          <div class="align-self-center">
+            <i class="bi bi-check-circle fs-1 text-warning"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Attempts List -->
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-clock-history me-2"></i>My Quiz Attempts
+        </h3>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search quizzes..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="quizFilter">
+              <option value="">All Quizzes</option>
+              {% for quiz in quizzes %}
+              <option value="{{ quiz.id }}" {% if quiz_filter == quiz.id|stringformat:"s" %}selected{% endif %}>
+                {{ quiz.title }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="subjectFilter">
+              <option value="">All Subjects</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" {% if subject_filter == subject.id|stringformat:"s" %}selected{% endif %}>
+                {{ subject.subject_name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="academicYearFilter">
+              <option value="">All Academic Years</option>
+              {% for ay in academic_years %}
+              <option value="{{ ay.id }}" {% if academic_year_filter == ay.id|stringformat:"s" %}selected{% endif %}>
+                {{ ay.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+              <option value="">All Status</option>
+              <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+              <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>In Progress</option>
+              <option value="grading_pending" {% if status_filter == 'grading_pending' %}selected{% endif %}>Grading Pending</option>
+              <option value="graded" {% if status_filter == 'graded' %}selected{% endif %}>Graded</option>
+            </select>
+          </div>
+          <div class="col-md-1">
+            <button type="button" class="btn btn-secondary btn-sm w-100" id="clearFiltersBtn">
+              <i class="bi bi-x-circle"></i> Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Attempts Table -->
+        <div class="table-responsive">
+          <table id="attemptsTable" class="table table-bordered table-striped table-hover">
+            <thead>
+              <tr>
+                <th>Quiz</th>
+                <th>Subject</th>
+                <th>Teacher</th>
+                <th>Attempt #</th>
+                <th>Score</th>
+                <th>Percentage</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Time Taken</th>
+                <th width="150">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for attempt in attempts %}
+              <tr data-attempt-id="{{ attempt.id }}" {% if attempt.id in best_attempt_ids %}class="table-success"{% endif %}>
+                <td>
+                  <strong>{{ attempt.quiz.title }}</strong>
+                  {% if attempt.id in best_attempt_ids %}
+                  <span class="badge bg-success ms-2">
+                    <i class="bi bi-trophy me-1"></i>Best
+                  </span>
+                  {% endif %}
+                </td>
+                <td>{{ attempt.quiz.subject.subject_name }}</td>
+                <td>{{ attempt.quiz.teacher.full_name }}</td>
+                <td>
+                  <span class="badge bg-secondary">#{{ attempt.attempt_number }}</span>
+                </td>
+                <td>
+                  {{ attempt.score|floatformat:1 }}/{{ attempt.quiz.total_marks }}
+                </td>
+                <td>
+                  <span class="badge {% if attempt.percentage >= 70 %}bg-success{% elif attempt.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
+                    {{ attempt.percentage|floatformat:1 }}%
+                  </span>
+                </td>
+                <td>
+                  {% if attempt.is_submitted and attempt.is_completed %}
+                  <span class="badge bg-success">Completed</span>
+                  {% elif attempt.is_submitted %}
+                  <span class="badge bg-info">Submitted</span>
+                  {% elif attempt.needs_grading and not attempt.is_graded %}
+                  <span class="badge bg-warning">Grading Pending</span>
+                  {% elif attempt.needs_grading and attempt.is_graded %}
+                  <span class="badge bg-success">Graded</span>
+                  {% else %}
+                  <span class="badge bg-secondary">In Progress</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if attempt.submitted_at %}
+                  {{ attempt.submitted_at|date:"M d, Y h:i A" }}
+                  {% else %}
+                  <span class="text-muted">Not submitted</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if attempt.time_taken %}
+                  {{ attempt.get_duration_minutes|default:"-" }} min
+                  {% else %}
+                  <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="btn-group" role="group">
+                    {% if attempt.is_submitted %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-info view-result-btn"
+                      data-attempt-id="{{ attempt.id }}"
+                      title="View Results"
+                    >
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-secondary print-result-btn"
+                      data-attempt-id="{{ attempt.id }}"
+                      title="Print"
+                    >
+                      <i class="bi bi-printer"></i>
+                    </button>
+                    {% else %}
+                    <a
+                      href="{% url 'quiz_app:student_quiz_take' attempt.id %}"
+                      class="btn btn-sm btn-warning"
+                      title="Continue"
+                    >
+                      <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="10" class="text-center text-muted py-4">
+                  <i class="bi bi-inbox me-2"></i>No quiz attempts found.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %} {% block extra_js %}
+<script src="{% static 'js/student_quiz_attempts.js' %}"></script>
+{% endblock extra_js %}
+

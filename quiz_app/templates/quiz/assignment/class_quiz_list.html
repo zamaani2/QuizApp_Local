@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Quizzes for {{ class_obj.name }}{% endblock title %}
+
+{% block page_title %}
+  <div class="d-flex justify-content-between align-items-center">
+    <span>Quizzes - {{ class_obj.name }}</span>
+    <div>
+      <a href="{% url 'quiz_app:class_detail' class_obj.id %}" class="btn btn-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Back to Class
+      </a>
+    </div>
+  </div>
+{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:class_list' %}">Classes</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:class_detail' class_obj.id %}">{{ class_obj.name }}</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Quizzes</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <!-- Class Info Card -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2"></i>Class Information
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Class Name:</strong> {{ class_obj.name }}</p>
+            <p class="mb-1"><strong>Form:</strong> 
+              {% if class_obj.form %}
+                {{ class_obj.form.name }}
+              {% else %}
+                <span class="text-muted">N/A</span>
+              {% endif %}
+            </p>
+            <p class="mb-1"><strong>Learning Area:</strong> 
+              {% if class_obj.learning_area %}
+                {{ class_obj.learning_area.name }}
+              {% else %}
+                <span class="text-muted">N/A</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Total Students:</strong> {{ class_obj.get_current_student_count|default:0 }}</p>
+            <p class="mb-1"><strong>Assigned Quizzes:</strong> {{ quizzes.count }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quizzes Card -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-question-square me-2"></i>Assigned Quizzes ({{ quizzes.count }})
+        </h5>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by title, subject..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="subjectFilter">
+              <option value="">All Subjects</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" {% if subject_filter == subject.id|stringformat:"s" %}selected{% endif %}>
+                {{ subject.subject_name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="academicYearFilter">
+              <option value="">All Academic Years</option>
+              {% for ay in academic_years %}
+              <option value="{{ ay.id }}" {% if academic_year_filter == ay.id|stringformat:"s" %}selected{% endif %}>
+                {{ ay.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+              <option value="">All Status</option>
+              <option value="published" {% if status_filter == 'published' %}selected{% endif %}>Published</option>
+              <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Draft</option>
+              <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-secondary w-100" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Quizzes Table -->
+        {% if quizzes %}
+        <div class="table-responsive">
+          <table class="table table-hover" id="quizzesTable">
+            <thead>
+              <tr>
+                <th>Quiz Title</th>
+                <th>Subject</th>
+                <th>Status</th>
+                <th>Questions</th>
+                <th>Total Marks</th>
+                <th>Academic Year</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for quiz in quizzes %}
+              <tr>
+                <td>
+                  <strong>{{ quiz.title }}</strong>
+                  {% if quiz.description %}
+                  <br><small class="text-muted">{{ quiz.description|truncatewords:10 }}</small>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-primary">{{ quiz.subject.subject_name }}</span>
+                </td>
+                <td>
+                  {% if quiz.status == 'published' %}
+                  <span class="badge bg-success">Published</span>
+                  {% elif quiz.status == 'draft' %}
+                  <span class="badge bg-warning">Draft</span>
+                  {% else %}
+                  <span class="badge bg-secondary">Archived</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-info">{{ quiz.get_question_count }}</span>
+                </td>
+                <td>
+                  <strong>{{ quiz.total_marks }}</strong>
+                </td>
+                <td>
+                  {% if quiz.academic_year %}
+                  {{ quiz.academic_year.name }}
+                  {% else %}
+                  <span class="text-muted">N/A</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <small class="text-muted">{{ quiz.created_at|date:"M d, Y" }}</small>
+                </td>
+                <td>
+                  <a
+                    href="{% url 'quiz_app:quiz_detail' quiz.id %}"
+                    class="btn btn-sm btn-outline-primary"
+                    title="View Quiz"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>No quizzes assigned to this class yet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/class_quiz_list.js' %}"></script>
+{% endblock extra_js %}
+

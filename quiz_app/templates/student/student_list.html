@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Student Management{% endblock title %}
+
+{% block page_title %}Student Management{% endblock page_title %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">Students</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-people me-2"></i>All Students
+        </h3>
+        <div class="card-tools">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            id="addStudentBtn"
+            data-modal-url="{% url 'quiz_app:student_create' %}"
+            data-modal-title="Add New Student"
+          >
+            <i class="bi bi-plus-circle me-1"></i>Add Student
+          </button>
+          <button
+            type="button"
+            class="btn btn-success btn-sm"
+            id="importStudentsBtn"
+            data-modal-url="{% url 'quiz_app:student_bulk_import' %}"
+            data-modal-title="Bulk Import Students"
+          >
+            <i class="bi bi-upload me-1"></i>Import CSV
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger btn-sm"
+            id="bulkDeleteBtn"
+            data-modal-url="{% url 'quiz_app:student_bulk_delete' %}"
+            data-modal-title="Bulk Delete Students"
+            disabled
+          >
+            <i class="bi bi-trash me-1"></i>Delete Selected
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <input
+              type="text"
+              class="form-control"
+              id="searchInput"
+              placeholder="Search by name, admission number, email..."
+              value="{{ search_query }}"
+            />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="formFilter">
+              <option value="">All Forms</option>
+              {% for form in forms %}
+              <option value="{{ form.id }}" {% if form_filter == form.id|stringformat:"s" %}selected{% endif %}>
+                {{ form.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="genderFilter">
+              <option value="">All Genders</option>
+              <option value="M" {% if gender_filter == 'M' %}selected{% endif %}>Male</option>
+              <option value="F" {% if gender_filter == 'F' %}selected{% endif %}>Female</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="classFilter">
+              <option value="">All Classes</option>
+              {% for class_obj in classes %}
+              <option value="{{ class_obj.id }}" {% if class_filter == class_obj.id|stringformat:"s" %}selected{% endif %}>
+                {{ class_obj.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-1">
+            <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
+              <i class="bi bi-x-circle me-1"></i>Clear Filters
+            </button>
+          </div>
+        </div>
+
+        <!-- Students Table -->
+        <table id="studentsTable" class="table table-bordered table-striped table-hover">
+          <thead>
+            <tr>
+              <th width="30">
+                <input type="checkbox" id="selectAll" />
+              </th>
+              <th>Admission Number</th>
+              <th>Full Name</th>
+              <th>Form</th>
+              <th>Class</th>
+              <th>Gender</th>
+              <th>Email</th>
+              <th>Parent Contact</th>
+              <th width="150">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for student in students %}
+            <tr data-student-id="{{ student.id }}">
+              <td>
+                <input type="checkbox" class="student-checkbox" value="{{ student.id }}" />
+              </td>
+              <td>{{ student.admission_number }}</td>
+              <td>
+                {% if student.profile_picture %}
+                <img
+                  src="{{ student.profile_picture.url }}"
+                  alt="{{ student.full_name }}"
+                  class="rounded-circle me-2"
+                  width="32"
+                  height="32"
+                />
+                {% else %}
+                <img
+                  src="{% static 'img/no_user_img.png' %}"
+                  alt="{{ student.full_name }}"
+                  class="rounded-circle me-2"
+                  width="32"
+                  height="32"
+                />
+                {% endif %}
+                {{ student.full_name }}
+              </td>
+              <td>
+                {% if student.current_form %}
+                  {{ student.current_form.name }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% with current_class=student.get_current_class %}
+                  {% if current_class %}
+                    {{ current_class.name }}
+                  {% else %}
+                    -
+                  {% endif %}
+                {% endwith %}
+              </td>
+              <td>
+                {% if student.gender == 'M' %}
+                <span class="badge bg-primary">Male</span>
+                {% else %}
+                <span class="badge bg-danger">Female</span>
+                {% endif %}
+              </td>
+              <td>{{ student.email|default:"-" }}</td>
+              <td>{{ student.parent_contact }}</td>
+              <td>
+                <div class="btn-group" role="group">
+                  <a
+                    href="{% url 'quiz_app:student_detail' student.id %}"
+                    class="btn btn-sm btn-info"
+                    title="View Details"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning edit-student-btn"
+                    data-modal-url="{% url 'quiz_app:student_edit' student.id %}"
+                    data-modal-title="Edit Student"
+                    title="Edit"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger delete-student-btn"
+                    data-student-id="{{ student.id }}"
+                    data-student-name="{{ student.full_name }}"
+                    title="Delete"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Container -->
+<div id="studentModalsContainer"></div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/student_management.js' %}"></script>
+{% endblock extra_js %}
+

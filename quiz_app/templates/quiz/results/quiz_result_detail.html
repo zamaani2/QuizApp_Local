@@ -1,0 +1,185 @@
+{% extends 'base.html' %} {% load static %} {% block title %}Quiz Result - {{ attempt.student.full_name }}{% endblock title %} {% block page_title %}
+<div class="d-flex justify-content-between align-items-center">
+  <span>Quiz Result - {{ attempt.student.full_name }}</span>
+  <div>
+    <a
+      href="{% url 'quiz_app:quiz_result_print' attempt.id %}"
+      class="btn btn-secondary btn-sm"
+      target="_blank"
+    >
+      <i class="bi bi-printer me-1"></i>Print
+    </a>
+    <a
+      href="{% url 'quiz_app:quiz_results_list' %}"
+      class="btn btn-secondary btn-sm"
+    >
+      <i class="bi bi-arrow-left me-1"></i>Back to Results
+    </a>
+  </div>
+</div>
+{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:quiz_results_list' %}">Quiz Results</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">
+  {{ attempt.student.full_name }}
+</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <div class="col-md-4">
+    <!-- Student & Quiz Info Card -->
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-info-circle me-2"></i>Result Information
+        </h5>
+      </div>
+      <div class="card-body">
+        <h6 class="mb-3">Student Information</h6>
+        <p class="mb-1">
+          <strong>Name:</strong> {{ attempt.student.full_name }}
+        </p>
+        <p class="mb-1">
+          <strong>Admission No:</strong> {{ attempt.student.admission_number }}
+        </p>
+        <hr />
+        <h6 class="mb-3">Quiz Information</h6>
+        <p class="mb-1"><strong>Quiz:</strong> {{ attempt.quiz.title }}</p>
+        <p class="mb-1">
+          <strong>Subject:</strong> {{ attempt.quiz.subject.subject_name }}
+        </p>
+        <p class="mb-1">
+          <strong>Attempt #:</strong> {{ attempt.attempt_number }}
+        </p>
+        {% if attempt.academic_year %}
+        <p class="mb-1">
+          <strong>Academic Year:</strong> {{ attempt.academic_year.name }}
+        </p>
+        {% endif %} {% if attempt.term %}
+        <p class="mb-1"><strong>Term:</strong> {{ attempt.term.name }}</p>
+        {% endif %}
+        <hr />
+        <h6 class="mb-3">Score Summary</h6>
+        <div class="text-center mb-3">
+          <h2 class="mb-0">
+            <span
+              class="badge {% if attempt.percentage >= 70 %}bg-success{% elif attempt.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+              style="font-size: 2rem"
+            >
+              {{ attempt.percentage|floatformat:1 }}%
+            </span>
+          </h2>
+          <p class="mb-0">
+            <strong>{{ attempt.score|floatformat:1 }}</strong> / {{ attempt.quiz.total_marks }} marks
+          </p>
+        </div>
+        <div class="row text-center">
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <strong class="text-success">{{ attempt.correct_answers }}</strong
+              ><br />
+              <small>Correct</small>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <strong class="text-danger">{{ attempt.wrong_answers }}</strong
+              ><br />
+              <small>Wrong</small>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="border rounded p-2">
+              <strong class="text-muted">{{ attempt.unanswered }}</strong><br />
+              <small>Unanswered</small>
+            </div>
+          </div>
+        </div>
+        <hr />
+        <p class="mb-1">
+          <strong>Started:</strong> {{ attempt.started_at|date:"M d, Y H:i" }}
+        </p>
+        <p class="mb-1">
+          <strong>Submitted:</strong> {{ attempt.submitted_at|date:"M d, Y H:i" }}
+        </p>
+        {% if attempt.time_taken %}
+        <p class="mb-1">
+          <strong>Time Taken:</strong> {{ attempt.time_taken }}
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <!-- Responses Card -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-question-circle me-2"></i>Question Responses
+        </h5>
+      </div>
+      <div class="card-body">
+        {% for response in responses %}
+        <div
+          class="card mb-3 {% if response.is_correct %}border-success{% else %}border-danger{% endif %}"
+        >
+          <div
+            class="card-header d-flex justify-content-between align-items-center"
+          >
+            <div>
+              <strong>Question {{ response.question.order }}</strong>
+              <span class="badge bg-info ms-2"
+                >{{ response.question.marks }} marks</span
+              >
+              <span
+                class="badge {% if response.is_correct %}bg-success{% else %}bg-danger{% endif %} ms-2"
+              >
+                {% if response.is_correct %}Correct{% else %}Incorrect{% endif %}
+              </span>
+            </div>
+            <div>
+              <strong
+                >{{ response.marks_awarded|floatformat:1 }} / {{ response.question.marks }}</strong
+              >
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="mb-2">
+              <strong>Question:</strong>
+              <p>{{ response.question.question_text|linebreaks }}</p>
+            </div>
+            <div class="mb-2">
+              <strong>Student Answer:</strong>
+              <div class="p-3 bg-light rounded">
+                {% if response.text_answer %} {{ response.text_answer|linebreaks }} {% elif response.selected_choice %} {{ response.selected_choice.choice_text }} {% elif response.selected_choices.exists %} {% for choice in response.selected_choices.all %} {{ choice.choice_text }}{% if not forloop.last %}, {% endif %} {% endfor %} {% else %}
+                <span class="text-muted">No answer provided</span>
+                {% endif %}
+              </div>
+            </div>
+            {% if response.question.question_type != 'essay' %}
+            <div class="mb-2">
+              <strong>Correct Answer:</strong>
+              <div class="p-2 bg-success bg-opacity-10 rounded">
+                {% if response.question.question_type == 'multiple_choice' or response.question.question_type == 'true_false' %} {% for choice in response.question.answer_choices.all %} {% if choice.is_correct %} {{ choice.choice_text }}{% if not forloop.last %}, {% endif %} {% endif %} {% endfor %} {% elif response.question.correct_answer_text %} {{ response.question.correct_answer_text }} {% endif %}
+              </div>
+            </div>
+            {% endif %} {% if response.grading_notes %}
+            <div class="mt-2">
+              <strong>Feedback:</strong>
+              <p class="mb-0 text-muted">
+                {{ response.grading_notes|linebreaks }}
+              </p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

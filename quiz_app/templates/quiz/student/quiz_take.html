@@ -1,0 +1,453 @@
+{% extends 'base.html' %} {% load static %} {% load quiz_filters %} {% block title %}Taking Quiz: {{ quiz.title }}{% endblock title %} {% block page_title%}Taking Quiz: {{ quiz.title }}{% endblock page_title %} {% block breadcrumb %}
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:dashboard' %}">Home</a>
+</li>
+<li class="breadcrumb-item">
+  <a href="{% url 'quiz_app:student_quiz_list' %}">Available Quizzes</a>
+</li>
+<li class="breadcrumb-item active" aria-current="page">{{ quiz.title }}</li>
+{% endblock breadcrumb %} {% block content %}
+<div class="row">
+  <!-- Main Quiz Area -->
+  <div class="col-lg-9">
+    <!-- Quiz Header -->
+    <div class="card mb-2 shadow-sm">
+      <div class="card-header bg-primary text-white py-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">
+              <i class="bi bi-mortarboard me-2"></i>{{ quiz.title }}
+            </h5>
+            <small class="text-white-50">
+              <i class="bi bi-book me-1"></i>{{ quiz.subject.subject_name }}
+              <span class="mx-1">•</span>
+              <i class="bi bi-person me-1"></i>{{ quiz.teacher.full_name }}
+            </small>
+          </div>
+          <div class="text-end">
+            {% if time_remaining_seconds %}
+            <div class="timer-display bg-white bg-opacity-25 px-2 py-1 rounded">
+              <i class="bi bi-clock-history me-1"></i>
+              <span id="timerDisplay" class="fw-bold"
+                >{{ time_remaining }}</span
+              >
+            </div>
+            {% else %}
+            <div class="bg-white bg-opacity-25 px-2 py-1 rounded">
+              <i class="bi bi-infinity me-1"></i>
+              <small>Unlimited Time</small>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="card-body py-2">
+        <div class="row align-items-center">
+          <div class="col-md-6 mb-2 mb-md-0">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-graph-up me-1 text-primary"></i>
+              <strong class="me-2 small">Progress:</strong>
+              <span id="progressText" class="badge bg-info">
+                {{ answered_count }}/{{ total_questions }} answered
+              </span>
+            </div>
+            <div class="progress" style="height: 8px">
+              <div
+                class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                role="progressbar"
+                id="progressBar"
+                style="width: {% widthratio answered_count total_questions 100 %}%"
+              ></div>
+            </div>
+          </div>
+          <div class="col-md-6 text-md-end">
+            <button
+              type="button"
+              class="btn btn-success btn-sm me-1"
+              id="saveProgressBtn"
+            >
+              <i class="bi bi-save me-1"></i>Save
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              id="submitQuizBtn"
+            >
+              <i class="bi bi-check-circle me-1"></i>Submit
+            </button>
+          </div>
+        </div>
+        <div id="saveStatus" class="mt-1"></div>
+      </div>
+    </div>
+
+    <!-- Questions Container -->
+    <div id="questionsContainer">
+      {% for question in questions %}
+      <div
+        class="card mb-2 question-card shadow-sm"
+        data-question-id="{{ question.id }}"
+        data-question-order="{{ question.order }}"
+        {%
+        if
+        not
+        forloop.first
+        %}style="display: none;"
+        {%
+        endif
+        %}
+      >
+        <div class="card-header bg-primary text-white py-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="mb-0">
+                <i class="bi bi-question-circle me-1"></i>Question {{
+                question.order }} of {{ total_questions }}
+              </h6>
+              <small class="text-white-50"
+                >{{ question.get_question_type_display }}</small
+              >
+            </div>
+            <div class="text-end">
+              <span class="badge bg-light text-dark px-2 py-1"
+                ><i class="bi bi-star-fill me-1"></i>{{ question.marks }} mark{{
+                question.marks|pluralize }}</span
+              >
+            </div>
+          </div>
+        </div>
+        <div class="card-body py-2 px-3">
+          <div class="question-text mb-2">
+            <div class="question-number-badge mb-2">
+              <span class="badge bg-primary rounded-pill px-2 py-1"
+                >{{ question.order }}</span
+              >
+            </div>
+            <p class="fw-semibold text-dark mb-0">
+              {{ question.question_text }}
+            </p>
+          </div>
+
+          <!-- Multiple Choice / True False -->
+          {% if question.question_type == 'multiple_choice' or question.question_type == 'true_false' %}
+          <div class="answer-choices">
+            {% for choice in question.answer_choices.all %}
+            <div
+              class="card mb-1 answer-choice-card {% if question.id in existing_responses %}{% with response=existing_responses|get_item:question.id %}{% if response.selected_choice and response.selected_choice.id == choice.id %}selected-choice{% endif %}{% endwith %}{% endif %}"
+              style="border-left: 3px solid #0d6efd; transition: all 0.3s"
+            >
+              <div class="card-body py-1 px-2">
+                <div class="form-check mb-0">
+                  <input class="form-check-input answer-choice" type="radio"
+                  name="question_{{ question.id }}" id="choice_{{ choice.id }}"
+                  value="{{ choice.id }}" data-question-id="{{ question.id }}"
+                  data-choice-id="{{ choice.id }}" {% if question.id in existing_responses %}{% with response=existing_responses|get_item:question.id %}{% if response.selected_choice and response.selected_choice.id == choice.id %}checked{% endif %}{% endwith %}{% endif %} />
+                  <label
+                    class="form-check-label"
+                    for="choice_{{ choice.id }}"
+                    style="cursor: pointer; width: 100%; padding-left: 5px"
+                  >
+                    {{ choice.choice_text }}
+                  </label>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <!-- Short Answer / Fill Blank -->
+          {% if question.question_type == 'short_answer' or question.question_type == 'fill_blank' %}
+          <div class="answer-input">
+            <div class="card bg-light">
+              <div class="card-body py-1 px-2">
+                <label class="form-label small mb-1">
+                  <i class="bi bi-pencil-square me-1"></i>Your Answer
+                </label>
+                <textarea
+                  class="form-control answer-text form-control-sm"
+                  name="question_{{ question.id }}"
+                  id="answer_{{ question.id }}"
+                  rows="3"
+                  data-question-id="{{ question.id }}"
+                  placeholder="Enter your answer here..."
+                >
+{% if question.id in existing_responses %}{% with response=existing_responses|get_item:question.id %}{{ response.text_answer }}{% endwith %}{% endif %}</textarea
+                >
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Essay -->
+          {% if question.question_type == 'essay' %}
+          <div class="answer-input">
+            <div class="card bg-light">
+              <div class="card-body py-1 px-2">
+                <label class="form-label small mb-1">
+                  <i class="bi bi-file-text me-1"></i>Write Your Essay
+                </label>
+                <textarea
+                  class="form-control answer-text form-control-sm"
+                  name="question_{{ question.id }}"
+                  id="answer_{{ question.id }}"
+                  rows="6"
+                  data-question-id="{{ question.id }}"
+                  placeholder="Write your essay answer here..."
+                >
+{% if question.id in existing_responses %}{% with response=existing_responses|get_item:question.id %}{{ response.text_answer }}{% endwith %}{% endif %}</textarea
+                >
+                <small class="text-muted mt-1 d-block">
+                  <i class="bi bi-info-circle me-1"></i>Take your time to write
+                  a comprehensive answer
+                </small>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>No questions available
+        for this quiz.
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div class="card shadow-sm mb-2">
+      <div class="card-body py-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm px-3"
+            id="prevQuestionBtn"
+            {%
+            if
+            questions|length
+            <="1"
+            %}disabled{%
+            endif
+            %}
+          >
+            <i class="bi bi-arrow-left me-1"></i>Previous
+          </button>
+          <div id="currentQuestionInfo" class="text-center">
+            <span class="badge bg-primary px-3 py-1">
+              <i class="bi bi-list-ol me-1"></i>
+              Question <span id="currentQuestionNum" class="fw-bold">1</span> of
+              {{ total_questions }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm px-3"
+            id="nextQuestionBtn"
+            {%
+            if
+            questions|length
+            <="1"
+            %}disabled{%
+            endif
+            %}
+          >
+            Next <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Question Navigation Sidebar -->
+  <div class="col-lg-3">
+    <div class="card sticky-top shadow-sm" style="top: 20px">
+      <div class="card-header py-2">
+        <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Questions</h6>
+      </div>
+      <div class="card-body py-2 px-2">
+        <div
+          class="question-nav-list"
+          style="max-height: 500px; overflow-y: auto"
+        >
+          {% for question in questions %}
+          <button
+            type="button"
+            class="btn btn-sm w-100 mb-1 question-nav-btn {% if forloop.first %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+            data-question-id="{{ question.id }}"
+            data-question-order="{{ question.order }}"
+            id="nav_question_{{ question.id }}"
+          >
+            <div class="d-flex justify-content-between align-items-center">
+              <span>Q{{ question.order }}</span>
+              <span
+                class="question-status-indicator"
+                data-question-id="{{ question.id }}"
+              >
+                {% if question.id in existing_responses %}
+                <i class="bi bi-check-circle-fill text-success"></i>
+                {% else %}
+                <i class="bi bi-circle text-muted"></i>
+                {% endif %}
+              </span>
+            </div>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Submit Confirmation Modal -->
+<div class="modal fade" id="submitConfirmModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirm Submission</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to submit this quiz?</p>
+        <p class="text-muted">
+          <small
+            >You have answered
+            <span id="submitAnsweredCount">{{ answered_count }}</span> out of {{
+            total_questions }} questions.</small
+          >
+        </p>
+        <p class="text-danger">
+          <strong>This action cannot be undone.</strong>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button type="button" class="btn btn-primary" id="confirmSubmitBtn">
+          Yes, Submit Quiz
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden CSRF Token for AJAX -->
+{% csrf_token %}
+
+<style>
+  .question-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .question-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .answer-choice-card {
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .answer-choice-card:hover {
+    background-color: #f8f9fa !important;
+    border-left-color: #0d6efd !important;
+    transform: translateX(3px);
+  }
+
+  .answer-choice-card.selected-choice {
+    background-color: #e7f3ff !important;
+    border-left-color: #0d6efd !important;
+  }
+
+  .answer-choice-card input[type="radio"]:checked + label {
+    color: #0d6efd;
+    font-weight: 600;
+  }
+
+  .form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+
+  .question-nav-btn {
+    transition: all 0.2s ease;
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  .question-nav-btn:hover {
+    transform: scale(1.02);
+  }
+
+  .timer-display {
+    font-family: "Courier New", monospace;
+  }
+
+  #timerDisplay {
+    font-weight: bold;
+  }
+
+  /* Compact card headers */
+  .card-header {
+    padding: 0.5rem 1rem !important;
+  }
+
+  /* Compact card bodies */
+  .card-body {
+    padding: 0.75rem 1rem !important;
+  }
+</style>
+
+<script>
+  // Update card styling when radio buttons are changed
+  document.addEventListener("DOMContentLoaded", function () {
+    document
+      .querySelectorAll('.answer-choice-card input[type="radio"]')
+      .forEach(function (radio) {
+        radio.addEventListener("change", function () {
+          // Remove selected class from all cards in the same question group
+          const questionContainer = this.closest(".answer-choices");
+          if (questionContainer) {
+            questionContainer
+              .querySelectorAll(".answer-choice-card")
+              .forEach(function (card) {
+                card.classList.remove("selected-choice");
+              });
+
+            // Add selected class to the checked card
+            if (this.checked) {
+              this.closest(".answer-choice-card").classList.add(
+                "selected-choice"
+              );
+            }
+          }
+        });
+      });
+
+    // Initialize selected state for pre-checked answers
+    document
+      .querySelectorAll('.answer-choice-card input[type="radio"]:checked')
+      .forEach(function (radio) {
+        radio.closest(".answer-choice-card").classList.add("selected-choice");
+      });
+  });
+</script>
+
+{% endblock content %} {% block extra_js %}
+<script>
+  // Quiz taking data
+  const quizData = {
+    attemptId: {{ attempt.id }},
+    totalQuestions: {{ total_questions }},
+    timeRemainingSeconds: {{ time_remaining_seconds|default:0 }},
+    saveUrl: "{% url 'quiz_app:student_quiz_save' attempt.id %}",
+    submitUrl: "{% url 'quiz_app:student_quiz_submit' attempt.id %}",
+  };
+</script>
+<script src="{% static 'js/quiz_taking.js' %}"></script>
+{% endblock extra_js %}
