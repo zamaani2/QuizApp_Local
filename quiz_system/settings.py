@@ -38,7 +38,12 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 # For hostname access, set this in .env file, e.g.:
 # ALLOWED_HOSTS=your-hostname.local,your-server-name,192.168.1.100
 # Or use '*' for development (NOT recommended for production)
-ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
+# Vercel automatically sets VERCEL_URL environment variable
+vercel_url = os.environ.get("VERCEL_URL")
+if vercel_url:
+    ALLOWED_HOSTS = [vercel_url, f"*.{vercel_url}"]
+else:
+    ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
 
 
 # Application definition
@@ -89,16 +94,53 @@ WSGI_APPLICATION = "quiz_system.wsgi.application"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 # PostgreSQL Database Configuration
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "quiz_system_db"),
-        "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "4545"),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+# Supports Supabase connection string format: postgresql://user:password@host:port/dbname
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL:
+    # Parse Supabase connection string
+    # Format: postgresql://[user]:[password]@[host]:[port]/[database]?[params]
+    import urllib.parse as urlparse
+    try:
+        url = urlparse.urlparse(DATABASE_URL)
+        
+        # Handle connection pooler URLs (port 6543) vs direct connection (port 5432)
+        # Connection pooler is recommended for serverless/Vercel deployments
+        port = url.port or ("6543" if "pooler.supabase.com" in url.hostname else "5432")
+        
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": url.path[1:] if url.path.startswith("/") else url.path,  # Remove leading '/'
+                "USER": url.username,
+                "PASSWORD": url.password,
+                "HOST": url.hostname,
+                "PORT": port,
+                "OPTIONS": {
+                    "sslmode": "require",  # Supabase requires SSL
+                },
+                "CONN_MAX_AGE": 600,  # Connection pooling for serverless
+            }
+        }
+    except Exception as e:
+        # If parsing fails, log error and fall back to individual env vars
+        import sys
+        print(f"Warning: Failed to parse DATABASE_URL: {e}", file=sys.stderr)
+        DATABASE_URL = None  # Force fallback to individual variables
+else:
+    # Fallback to individual environment variables
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("DB_NAME", "quiz_system_db"),
+            "USER": os.environ.get("DB_USER", "postgres"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", "4545"),
+            "HOST": os.environ.get("DB_HOST", "localhost"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+            "OPTIONS": {
+                "sslmode": "require" if os.environ.get("DB_HOST") and "supabase.co" in os.environ.get("DB_HOST", "") else "prefer",
+            },
+        }
     }
-}
 
 # For development, you can use SQLite by uncommenting below:
 # DATABASES = {
@@ -143,10 +185,13 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATICFILES_DIRS = [
     BASE_DIR / "quiz_app" / "static",
 ]
+
+# Static files root for production (Vercel)
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Media files
 MEDIA_URL = "/media/"
