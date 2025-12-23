@@ -221,3 +221,5 @@ If you encounter issues:
 3. Ensure firewall allows port 8000
 4. Test with IP address first, then move to hostname
 
+
+
