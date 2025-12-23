@@ -38,7 +38,7 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 # For hostname access, set this in .env file, e.g.:
 # ALLOWED_HOSTS=your-hostname.local,your-server-name,192.168.1.100
 # Or use '*' for development (NOT recommended for production)
-ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1,192.168.5.1,*,").split(",")]
+ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
 
 
 # Application definition
