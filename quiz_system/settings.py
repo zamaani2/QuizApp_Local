@@ -13,6 +13,12 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import os
 
+# Optional: parse DATABASE_URL style connection strings when provided
+try:
+    import dj_database_url
+except ImportError:
+    dj_database_url = None
+
 # Load environment variables from .env file if it exists
 try:
     from dotenv import load_dotenv
@@ -39,6 +45,17 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 # ALLOWED_HOSTS=your-hostname.local,your-server-name,192.168.1.100
 # Or use '*' for development (NOT recommended for production)
 ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
+# Automatically trust the Vercel-provided hostname when deployed
+vercel_url = os.environ.get("VERCEL_URL")
+if vercel_url and vercel_url.strip():
+    ALLOWED_HOSTS.append(vercel_url.strip().lower())
+
+# CSRF trusted origins for production hosts (comma-separated in env)
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 
 
 # Application definition
@@ -100,6 +117,13 @@ DATABASES = {
     }
 }
 
+# Prefer DATABASE_URL when provided (e.g., Supabase pooled connection)
+database_url = os.environ.get("DATABASE_URL")
+if database_url and dj_database_url:
+    DATABASES["default"] = dj_database_url.parse(
+        database_url, conn_max_age=600, ssl_require=True
+    )
+
 # For development, you can use SQLite by uncommenting below:
 # DATABASES = {
 #     "default": {
@@ -144,6 +168,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
     BASE_DIR / "quiz_app" / "static",
 ]
