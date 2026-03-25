@@ -72,13 +72,20 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+# Serve collected static files in production (Docker, gunicorn) without a separate nginx
+if not DEBUG:
+    MIDDLEWARE.append("whitenoise.middleware.WhiteNoiseMiddleware")
+MIDDLEWARE.extend(
+    [
+        "django.contrib.sessions.middleware.SessionMiddleware",
+        "django.middleware.common.CommonMiddleware",
+        "django.middleware.csrf.CsrfViewMiddleware",
+        "django.contrib.auth.middleware.AuthenticationMiddleware",
+        "django.contrib.messages.middleware.MessageMiddleware",
+        "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    ]
+)
 
 ROOT_URLCONF = "quiz_system.urls"
 
@@ -172,6 +179,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
     BASE_DIR / "quiz_app" / "static",
 ]
+if not DEBUG:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 # Media files
 MEDIA_URL = "/media/"
