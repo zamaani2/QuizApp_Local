@@ -216,5 +216,10 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@schoolsystem.
 # SITE_URL: Base URL for the application (used in emails, links, etc.)
 # For hostname access, set this in .env file, e.g.:
 # SITE_URL=http://your-hostname.local:8000
-# Or: SITE_URL=http://your-server-name:8000
-SITE_URL = os.environ.get("SITE_URL", "http://localhost:8000")
+# If you list multiple URLs separated by commas, only the first is used (canonical base).
+_raw_site_url = os.environ.get("SITE_URL", "http://localhost:8000").strip()
+SITE_URL = (
+    _raw_site_url.split(",")[0].strip()
+    if "," in _raw_site_url
+    else _raw_site_url
+)
