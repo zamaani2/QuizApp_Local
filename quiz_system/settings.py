@@ -44,7 +44,14 @@ DEBUG = os.environ.get("DEBUG", "True") == "True"
 # For hostname access, set this in .env file, e.g.:
 # ALLOWED_HOSTS=your-hostname.local,your-server-name,192.168.1.100
 # Or use '*' for development (NOT recommended for production)
-ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
+ALLOWED_HOSTS = [
+    host.strip().lower()
+    for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
+# Local-network development fallback: avoid DisallowedHost noise when DEBUG is on.
+if DEBUG:
+    ALLOWED_HOSTS = ["*"]
 # Automatically trust the Vercel-provided hostname when deployed
 vercel_url = os.environ.get("VERCEL_URL")
 if vercel_url and vercel_url.strip():
