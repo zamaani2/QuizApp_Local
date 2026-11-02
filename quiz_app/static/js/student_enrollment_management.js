@@ -740,6 +740,17 @@
             return;
         }
 
+        const targetSchoolId = $('#bulkUnassignSchool').val();
+        if ($('#bulkUnassignSchool').length && !targetSchoolId) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Select a School',
+                text: 'Choose the target school for this bulk unassignment.',
+                confirmButtonColor: '#3085d6'
+            });
+            return;
+        }
+
         // Get enrollment details for display
         const enrollmentIds = Array.from(selectedEnrollments);
         const enrollmentDetails = [];
@@ -796,14 +807,14 @@
 
         // Handle confirmation
         $(document).off('click', '#confirmBulkUnassignBtn').on('click', '#confirmBulkUnassignBtn', function () {
-            performBulkUnassign(enrollmentIds);
+            performBulkUnassign(enrollmentIds, targetSchoolId);
         });
     }
 
     /**
      * Perform bulk unassign
      */
-    function performBulkUnassign(enrollmentIds) {
+    function performBulkUnassign(enrollmentIds, targetSchoolId) {
         Swal.fire({
             title: 'Unassigning...',
             allowOutsideClick: false,
@@ -816,7 +827,8 @@
             url: '/enrollments/bulk-delete/',
             type: 'POST',
             data: JSON.stringify({
-                enrollment_ids: enrollmentIds
+                enrollment_ids: enrollmentIds,
+                ...(targetSchoolId ? { target_school_id: targetSchoolId } : {})
             }),
             contentType: 'application/json',
             headers: {
@@ -959,4 +971,3 @@
     }
 
 })(jQuery);
-

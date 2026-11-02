@@ -178,6 +178,9 @@
                 autoWidth: false,
                 columns: columns,
                 responsive: true,
+                paging: false,
+                info: false,
+                lengthChange: false,
                 pageLength: 25,
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
                 order: [[1, 'asc']],
@@ -262,7 +265,7 @@
         }, 300));
 
         // Filter dropdowns
-        $('#formFilter, #genderFilter, #classFilter').on('change', function () {
+        $('#formFilter, #genderFilter, #classFilter, #statusFilter').on('change', function () {
             applyFilters();
         });
 
@@ -270,6 +273,7 @@
         $('#clearFiltersBtn').on('click', function () {
             $('#searchInput').val('');
             $('#formFilter, #genderFilter, #classFilter').val('');
+            $('#statusFilter').val('active');
             if ($.fn.DataTable) {
                 $('#studentsTable').DataTable().search('').draw();
             }
@@ -281,6 +285,12 @@
             const studentId = $(this).data('student-id');
             const studentName = $(this).data('student-name');
             deleteStudent(studentId, studentName);
+        });
+        $(document).on('click', '.restore-student-btn', function () {
+            restoreStudent(
+                $(this).data('restore-url'),
+                $(this).data('student-name')
+            );
         });
 
         // View student button - handled by direct link in template
@@ -513,17 +523,17 @@
     function deleteStudent(studentId, studentName) {
         Swal.fire({
             icon: 'warning',
-            title: 'Delete Student?',
-            html: `Are you sure you want to delete <strong>${studentName}</strong>?<br>This action cannot be undone.`,
+            title: 'Archive Student?',
+            html: `Archive <strong>${studentName}</strong>? The account will be disabled and active enrollments deactivated; academic history will be retained.`,
             showCancelButton: true,
-            confirmButtonText: 'Yes, delete it!',
+            confirmButtonText: 'Archive Student',
             cancelButtonText: 'Cancel',
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d'
         }).then((result) => {
             if (result.isConfirmed) {
                 Swal.fire({
-                    title: 'Deleting...',
+                    title: 'Archiving...',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -543,7 +553,7 @@
                         if (response.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Deleted!',
+                                title: 'Archived',
                                 text: response.message,
                                 confirmButtonColor: '#28a745',
                                 timer: 2000,
@@ -556,14 +566,14 @@
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Error',
-                                text: response.error || 'Failed to delete student.',
+                                text: response.error || 'Failed to archive student.',
                                 confirmButtonColor: '#dc3545'
                             });
                         }
                     },
                     error: function (xhr) {
                         Swal.close();
-                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while deleting.';
+                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while archiving.';
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
@@ -573,6 +583,42 @@
                     }
                 });
             }
+        });
+    }
+
+    function restoreStudent(url, studentName) {
+        Swal.fire({
+            icon: 'question',
+            title: 'Restore Student?',
+            text: `Restore ${studentName}? Previous class enrollments will remain inactive.`,
+            showCancelButton: true,
+            confirmButtonText: 'Restore Student',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#198754'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function (response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        Swal.fire('Error', response.error || 'Failed to restore student.', 'error');
+                    }
+                },
+                error: function (xhr) {
+                    Swal.fire(
+                        'Error',
+                        xhr.responseJSON?.error || 'An error occurred while restoring.',
+                        'error'
+                    );
+                }
+            });
         });
     }
 
@@ -1012,20 +1058,30 @@
      */
     function performBulkDelete() {
         const studentIds = Array.from(selectedStudents);
+        const targetSchool = document.getElementById('bulkDeleteSchoolId');
+        if (targetSchool && !targetSchool.value) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Select a School',
+                text: 'Choose the school that owns the selected students.',
+                confirmButtonColor: '#3085d6'
+            });
+            return;
+        }
 
         Swal.fire({
             icon: 'warning',
-            title: 'Confirm Delete',
-            html: `Are you sure you want to delete <strong>${studentIds.length}</strong> student(s)?<br>This action cannot be undone.`,
+            title: $('#archiveAction').val() === 'restore' ? 'Confirm Restore' : 'Confirm Archive',
+            html: `${$('#archiveAction').val() === 'restore' ? 'Restore' : 'Archive'} <strong>${studentIds.length}</strong> student(s)?`,
             showCancelButton: true,
-            confirmButtonText: 'Yes, delete them!',
+            confirmButtonText: $('#archiveAction').val() === 'restore' ? 'Restore Selected' : 'Archive Selected',
             cancelButtonText: 'Cancel',
-            confirmButtonColor: '#dc3545',
+            confirmButtonColor: $('#archiveAction').val() === 'restore' ? '#198754' : '#ffc107',
             cancelButtonColor: '#6c757d'
         }).then((result) => {
             if (result.isConfirmed) {
                 Swal.fire({
-                    title: 'Deleting...',
+                    title: $('#archiveAction').val() === 'restore' ? 'Restoring...' : 'Archiving...',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -1036,7 +1092,11 @@
                     url: '/students/bulk-delete/',
                     type: 'POST',
                     contentType: 'application/json',
-                    data: JSON.stringify({ student_ids: studentIds }),
+                    data: JSON.stringify({
+                        student_ids: studentIds,
+                        school_id: targetSchool ? targetSchool.value : null,
+                        action: $('#archiveAction').val()
+                    }),
                     headers: {
                         'X-CSRFToken': getCsrfToken(),
                         'X-Requested-With': 'XMLHttpRequest'
@@ -1047,7 +1107,7 @@
                         if (response.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Deleted!',
+                                title: 'Updated',
                                 text: response.message,
                                 confirmButtonColor: '#28a745',
                                 timer: 2000,
@@ -1061,14 +1121,14 @@
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Error',
-                                text: response.error || 'Failed to delete students.',
+                                text: response.error || 'Failed to update students.',
                                 confirmButtonColor: '#dc3545'
                             });
                         }
                     },
                     error: function (xhr) {
                         Swal.close();
-                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while deleting.';
+                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while updating students.';
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
@@ -1106,12 +1166,14 @@
         const formFilter = $('#formFilter').val();
         const genderFilter = $('#genderFilter').val();
         const classFilter = $('#classFilter').val();
+        const statusFilter = $('#statusFilter').val();
 
         // Build URL with filters
         const params = new URLSearchParams();
         if (formFilter) params.append('form', formFilter);
         if (genderFilter) params.append('gender', genderFilter);
         if (classFilter) params.append('class', classFilter);
+        if (statusFilter) params.append('status', statusFilter);
 
         const searchQuery = $('#searchInput').val();
         if (searchQuery) params.append('search', searchQuery);
@@ -1146,4 +1208,3 @@
     }
 
 })(jQuery);
-

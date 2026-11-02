@@ -13,8 +13,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q
-from django.db import transaction
+from django.db.models import F, Q
+from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
 
 from ..models import (
@@ -26,6 +26,7 @@ from ..models import (
     SchoolInformation,
     ClassSubject,
 )
+from ..utils.tenant_utils import get_object_or_404_with_school
 
 
 @login_required
@@ -39,7 +40,16 @@ def assignment_list_view(request):
         return redirect("quiz_app:dashboard")
 
     school = request.user.school
-    assignments = TeacherSubjectAssignment.objects.all()
+    assignments = TeacherSubjectAssignment.objects.filter(
+        school__isnull=False,
+        teacher__school_id=F("school_id"),
+        subject__school_id=F("school_id"),
+        class_assigned__school_id=F("school_id"),
+        academic_year__school_id=F("school_id"),
+    ).filter(
+        Q(previous_teacher__isnull=True)
+        | Q(previous_teacher__school_id=F("school_id"))
+    )
     
     if school:
         assignments = assignments.filter(school=school)
@@ -179,16 +189,31 @@ def assignment_create_view(request):
                     'error': 'Please fill in all required fields.'
                 }, status=400)
             
-            # Get related objects
+            class_queryset = Class.objects.filter(pk=class_id)
+            if request.user.role != "superadmin":
+                class_queryset = class_queryset.filter(school=school)
             try:
-                teacher = Teacher.objects.get(pk=teacher_id, school=school)
-                subject = Subject.objects.get(pk=subject_id, school=school)
-                class_obj = Class.objects.get(pk=class_id, school=school)
-                academic_year = AcademicYear.objects.get(pk=academic_year_id, school=school)
-            except (Teacher.DoesNotExist, Subject.DoesNotExist, Class.DoesNotExist, AcademicYear.DoesNotExist) as e:
+                class_obj = class_queryset.get()
+            except Class.DoesNotExist:
                 return JsonResponse({
                     'success': False,
                     'error': 'Invalid selection. Please ensure all selections belong to your school.'
+                }, status=400)
+            school = class_obj.school
+            if school is None or not school.is_active:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'The selected class has no school association.',
+                }, status=400)
+
+            try:
+                teacher = Teacher.objects.get(pk=teacher_id, school=school)
+                subject = Subject.objects.get(pk=subject_id, school=school)
+                academic_year = AcademicYear.objects.get(pk=academic_year_id, school=school)
+            except (Teacher.DoesNotExist, Subject.DoesNotExist, AcademicYear.DoesNotExist):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid selection. Please ensure all selections belong to the selected class school.'
                 }, status=400)
             
             # Validate that subject is assigned to class via ClassSubject
@@ -237,6 +262,11 @@ def assignment_create_view(request):
             'success': False,
             'error': ' '.join(error_messages)
         }, status=400)
+    except IntegrityError:
+        return JsonResponse({
+            'success': False,
+            'error': 'An active assignment already exists for this subject, class, and academic year.',
+        }, status=409)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -318,30 +348,49 @@ def assignment_bulk_create_view(request):
                 'error': 'Please select at least one class.'
             }, status=400)
         
-        # Get teacher and academic year
+        # Get subjects and classes
+        classes = Class.objects.filter(pk__in=class_ids)
+        if request.user.role != "superadmin":
+            classes = classes.filter(school=school)
+        if classes.count() != len(class_ids):
+            return JsonResponse({
+                'success': False,
+                'error': 'One or more selected classes are invalid.'
+            }, status=400)
+        school_ids = set(classes.values_list('school_id', flat=True))
+        if len(school_ids) != 1 or None in school_ids:
+            return JsonResponse({
+                'success': False,
+                'error': 'Select classes from exactly one valid school.'
+            }, status=400)
+        school = SchoolInformation.objects.filter(
+            pk=school_ids.pop(),
+            is_active=True,
+        ).first()
+        if school is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'The selected classes do not belong to an active school.'
+            }, status=400)
+
         try:
             teacher = Teacher.objects.get(pk=teacher_id, school=school)
-            academic_year = AcademicYear.objects.get(pk=academic_year_id, school=school)
+            academic_year = AcademicYear.objects.get(
+                pk=academic_year_id,
+                school=school,
+            )
         except (Teacher.DoesNotExist, AcademicYear.DoesNotExist):
             return JsonResponse({
                 'success': False,
                 'error': 'Invalid teacher or academic year selected.'
             }, status=400)
-        
-        # Get subjects and classes
+
         subjects = Subject.objects.filter(pk__in=subject_ids, school=school)
-        classes = Class.objects.filter(pk__in=class_ids, school=school)
         
         if subjects.count() != len(subject_ids):
             return JsonResponse({
                 'success': False,
                 'error': 'One or more selected subjects are invalid.'
-            }, status=400)
-        
-        if classes.count() != len(class_ids):
-            return JsonResponse({
-                'success': False,
-                'error': 'One or more selected classes are invalid.'
             }, status=400)
         
         # Create assignments
@@ -388,14 +437,28 @@ def assignment_bulk_create_view(request):
                             assigned_by=request.user,
                             school=school,
                         )
-                        assignment.full_clean()
-                        assignment.save()
+                        with transaction.atomic():
+                            assignment.full_clean()
+                            assignment.save()
                         created += 1
                     
                     except ValidationError as e:
                         errors.append(f'{subject.subject_name} - {class_obj.name}: {str(e)}')
-                    except Exception as e:
-                        errors.append(f'{subject.subject_name} - {class_obj.name}: {str(e)}')
+                    except IntegrityError:
+                        existing = TeacherSubjectAssignment.objects.filter(
+                            subject=subject,
+                            class_assigned=class_obj,
+                            academic_year=academic_year,
+                            is_active=True,
+                            school=school,
+                        ).exists()
+                        if existing:
+                            skipped += 1
+                        else:
+                            errors.append(
+                                f'{subject.subject_name} - {class_obj.name}: '
+                                'The assignment could not be saved because of a database integrity conflict.'
+                            )
         
         # Prepare response
         response_data = {
@@ -443,23 +506,22 @@ def assignment_edit_view(request, assignment_id):
     
     school = request.user.school
     
-    # Superadmin can access any assignment, regular admin only their school
-    if request.user.role == "superadmin":
-        assignment = get_object_or_404(TeacherSubjectAssignment, pk=assignment_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:assignment_list")
-        assignment = get_object_or_404(TeacherSubjectAssignment, pk=assignment_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and assignment.school != school:
-        if request.method == "GET":
-            return JsonResponse({'error': 'Assignment not found'}, status=404)
-        messages.error(request, "You don't have permission to edit this assignment.")
-        return redirect("quiz_app:assignment_list")
+    assignment = get_object_or_404_with_school(
+        TeacherSubjectAssignment, request, pk=assignment_id
+    )
+    school = assignment.school
+    if (
+        school is None
+        or assignment.teacher.school_id != school.pk
+        or assignment.subject.school_id != school.pk
+        or assignment.class_assigned.school_id != school.pk
+        or assignment.academic_year.school_id != school.pk
+        or (
+            assignment.previous_teacher_id
+            and assignment.previous_teacher.school_id != school.pk
+        )
+    ):
+        return JsonResponse({'error': 'Assignment has an invalid school association.'}, status=404)
     
     if request.method == "GET":
         # Get options for dropdowns
@@ -482,10 +544,12 @@ def assignment_edit_view(request, assignment_id):
             class_subjects = ClassSubject.objects.filter(
                 class_name=assignment.class_assigned,
                 academic_year=assignment.academic_year,
-                school=school
+                school=school,
+                subject__school=school,
             ).select_related('subject')
             subjects = Subject.objects.filter(
-                pk__in=class_subjects.values_list('subject_id', flat=True)
+                pk__in=class_subjects.values_list('subject_id', flat=True),
+                school=school,
             ).order_by('subject_name')
         
         # Return form for modal
@@ -562,6 +626,11 @@ def assignment_edit_view(request, assignment_id):
             'success': False,
             'error': ' '.join(error_messages)
         }, status=400)
+    except IntegrityError:
+        return JsonResponse({
+            'success': False,
+            'error': 'An active assignment already exists for this subject, class, and academic year.',
+        }, status=409)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -578,7 +647,6 @@ def get_class_subjects_view(request):
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    school = request.user.school
     class_id = request.GET.get('class_id')
     academic_year_id = request.GET.get('academic_year_id')
     
@@ -588,20 +656,39 @@ def get_class_subjects_view(request):
             'error': 'Class ID and Academic Year ID are required.'
         }, status=400)
     
+    class_queryset = Class.objects.filter(pk=class_id)
+    if request.user.role != "superadmin":
+        class_queryset = class_queryset.filter(school=request.user.school)
     try:
-        class_obj = Class.objects.get(pk=class_id, school=school)
-        academic_year = AcademicYear.objects.get(pk=academic_year_id, school=school)
-    except (Class.DoesNotExist, AcademicYear.DoesNotExist):
+        class_obj = class_queryset.get()
+    except Class.DoesNotExist:
         return JsonResponse({
             'success': False,
-            'error': 'Invalid class or academic year.'
+            'error': 'Invalid class.'
+        }, status=400)
+    school = class_obj.school
+    if school is None or not school.is_active:
+        return JsonResponse({
+            'success': False,
+            'error': 'The selected class has no active school association.'
+        }, status=400)
+    try:
+        academic_year = AcademicYear.objects.get(
+            pk=academic_year_id,
+            school=school,
+        )
+    except AcademicYear.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid academic year for the selected class.'
         }, status=400)
     
     # Get subjects assigned to this class for the academic year
     class_subjects = ClassSubject.objects.filter(
         class_name=class_obj,
         academic_year=academic_year,
-        school=school
+        school=school,
+        subject__school=school,
     ).select_related('subject').order_by('subject__subject_name')
     
     subjects = [
@@ -630,20 +717,22 @@ def assignment_delete_view(request, assignment_id):
     
     school = request.user.school
     
-    # Superadmin can access any assignment, regular admin only their school
-    if request.user.role == "superadmin":
-        assignment = get_object_or_404(TeacherSubjectAssignment, pk=assignment_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:assignment_list")
-        assignment = get_object_or_404(TeacherSubjectAssignment, pk=assignment_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and assignment.school != school:
-        return JsonResponse({'error': 'Assignment not found'}, status=404)
+    assignment = get_object_or_404_with_school(
+        TeacherSubjectAssignment, request, pk=assignment_id
+    )
+    school = assignment.school
+    if (
+        school is None
+        or assignment.teacher.school_id != school.pk
+        or assignment.subject.school_id != school.pk
+        or assignment.class_assigned.school_id != school.pk
+        or assignment.academic_year.school_id != school.pk
+        or (
+            assignment.previous_teacher_id
+            and assignment.previous_teacher.school_id != school.pk
+        )
+    ):
+        return JsonResponse({'error': 'Assignment has an invalid school association.'}, status=404)
     
     try:
         assignment_info = f"{assignment.teacher.full_name} - {assignment.subject.subject_name}"
@@ -657,4 +746,3 @@ def assignment_delete_view(request, assignment_id):
             'success': False,
             'error': f'Error deleting assignment: {str(e)}'
         }, status=500)
-

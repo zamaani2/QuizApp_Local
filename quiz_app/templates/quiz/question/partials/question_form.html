@@ -45,6 +45,18 @@
                   <small>Essay</small>
                 </div>
               </div>
+              <div class="col-md-4">
+                <div class="question-type-option-small" data-type="matching">
+                  <i class="bi bi-link-45deg"></i>
+                  <small>Matching</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="question-type-option-small" data-type="ordering">
+                  <i class="bi bi-sort-numeric-down"></i>
+                  <small>Ordering</small>
+                </div>
+              </div>
             </div>
             <input type="hidden" name="question_type" id="questionType" value="multiple_choice">
           </div>
@@ -205,6 +217,20 @@
               <i class="bi bi-info-circle me-2"></i>
               Essay questions require manual grading after submission.
             </div>
+
+            <div id="matchingSection" class="question-type-section" {% if not question or question.question_type != 'matching' %}style="display: none;"{% endif %}>
+              <h6 class="mb-2">Correct pairs</h6>
+              <textarea class="form-control" name="correct_answer" rows="3"
+                placeholder="term=definition; term=definition">{% if question and question.question_type == 'matching' %}{{ question.correct_answer_text }}{% endif %}</textarea>
+              <small class="text-muted">Use left=right for each pair, separated by semicolons. Students submit the same pairs in any order.</small>
+            </div>
+
+            <div id="orderingSection" class="question-type-section" {% if not question or question.question_type != 'ordering' %}style="display: none;"{% endif %}>
+              <h6 class="mb-2">Correct item order</h6>
+              <textarea class="form-control" name="correct_answer" rows="3"
+                placeholder="First item; Second item; Third item">{% if question and question.question_type == 'ordering' %}{{ question.correct_answer_text }}{% endif %}</textarea>
+              <small class="text-muted">Enter at least two distinct items separated by semicolons. The student sees them shuffled.</small>
+            </div>
           </div>
 
           <!-- Explanation -->
@@ -242,4 +268,3 @@
     </div>
   </div>
 </div>
-

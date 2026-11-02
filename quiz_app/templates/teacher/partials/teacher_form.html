@@ -10,6 +10,17 @@
       <form id="teacherForm" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="modal-body">
+          {% if user.role == "superadmin" and not teacher %}
+          <div class="mb-3">
+            <label for="school_id" class="form-label">Target School <span class="text-danger">*</span></label>
+            <select class="form-select" id="school_id" name="school_id" required>
+              <option value="">Select School</option>
+              {% for school in schools %}
+              <option value="{{ school.id }}">{{ school.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
           <div class="row">
             <div class="col-md-6">
               <div class="mb-3">
@@ -112,4 +123,3 @@
     </div>
   </div>
 </div>
-

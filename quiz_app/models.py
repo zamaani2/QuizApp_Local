@@ -187,7 +187,7 @@ class User(AbstractUser):
 
     def get_administered_schools(self):
         """Get schools administered by this user"""
-        if self.is_superadmin:
+        if self.role == "superadmin":
             return SchoolInformation.objects.all()
         elif self.is_school_admin():
             return SchoolInformation.objects.filter(pk=self.school.pk)
@@ -412,7 +412,9 @@ class Teacher(models.Model):
 
     full_name = models.CharField(max_length=100)
     staff_id = models.CharField(max_length=10, unique=True, editable=False)
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True)
+    department = models.ForeignKey(
+        Department, on_delete=models.SET_NULL, null=True, blank=True
+    )
     gender = models.CharField(
         max_length=1, choices=GENDER_CHOICES, blank=True, null=True
     )
@@ -424,6 +426,10 @@ class Teacher(models.Model):
     skip_user_creation = models.BooleanField(
         default=False, editable=False
     )  # Flag to skip automatic user creation
+    is_active = models.BooleanField(default=True)
+    account_active_before_archive = models.BooleanField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     # Add school relationship for multi-tenancy
     school = models.ForeignKey(
         "SchoolInformation",
@@ -438,6 +444,14 @@ class Teacher(models.Model):
             models.Index(fields=["school"]),
             models.Index(fields=["department"]),
         ]
+
+    def clean(self):
+        super().clean()
+        if self.school_id and self.department_id:
+            if self.department.school_id != self.school_id:
+                raise ValidationError(
+                    {"department": "Department must belong to the teacher's school."}
+                )
 
     def save(self, *args, **kwargs):
         if not self.staff_id:
@@ -490,6 +504,10 @@ class Student(models.Model):
         LearningArea, on_delete=models.SET_NULL, null=True, blank=True
     )
     email = models.EmailField(max_length=100, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    account_active_before_archive = models.BooleanField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     # Add school relationship for multi-tenancy
     school = models.ForeignKey(
         "SchoolInformation",
@@ -506,6 +524,20 @@ class Student(models.Model):
             models.Index(fields=["school"]),
         ]
 
+    def clean(self):
+        super().clean()
+        errors = {}
+        if not self.school_id:
+            errors["school"] = "Student must belong to a school."
+        if self.form_id and self.school_id != self.form.school_id:
+            errors["form"] = "Form must belong to the student's school."
+        if self.learning_area_id and self.school_id != self.learning_area.school_id:
+            errors["learning_area"] = (
+                "Learning area must belong to the student's school."
+            )
+        if errors:
+            raise ValidationError(errors)
+
     def save(self, *args, **kwargs):
         if not self.admission_number:
             self.admission_number = generate_unique_id(entity_type="student", length=5)
@@ -520,8 +552,28 @@ class Student(models.Model):
         super().save(*args, **kwargs)
 
     def get_current_class(self):
-        current_class = self.studentclass_set.filter(is_active=True).first()
-        return current_class.assigned_class if current_class else None
+        if "studentclass_set" in getattr(self, "_prefetched_objects_cache", {}):
+            current_enrollments = self._prefetched_objects_cache["studentclass_set"]
+            return next(
+                (
+                    enrollment.assigned_class
+                    for enrollment in current_enrollments
+                    if enrollment.is_active
+                    and enrollment.school_id == self.school_id
+                    and enrollment.assigned_class.school_id == self.school_id
+                ),
+                None,
+            )
+        current_enrollment = (
+            self.studentclass_set.filter(
+                is_active=True,
+                school_id=self.school_id,
+                assigned_class__school_id=self.school_id,
+            )
+            .select_related("assigned_class")
+            .first()
+        )
+        return current_enrollment.assigned_class if current_enrollment else None
 
     def get_class_history(self):
         return self.studentclass_set.all().order_by("-date_assigned")
@@ -608,6 +660,7 @@ class Class(models.Model):
     )
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE)
     maximum_students = models.SmallIntegerField(default=40)
+    is_active = models.BooleanField(default=True)
     # Add school relationship for multi-tenancy
     school = models.ForeignKey(
         "SchoolInformation",
@@ -630,6 +683,29 @@ class Class(models.Model):
             models.Index(fields=["school"]),
         ]
 
+    def clean(self):
+        super().clean()
+        errors = {}
+        academic_year_school_id = (
+            self.academic_year.school_id if self.academic_year_id else None
+        )
+        school_id = self.school_id or academic_year_school_id
+        if self.maximum_students <= 0:
+            errors["maximum_students"] = "Maximum students must be greater than zero."
+        if not school_id:
+            errors["school"] = "Class must belong to a school."
+        else:
+            if academic_year_school_id != school_id:
+                errors["academic_year"] = "Academic year must belong to the class school."
+            if self.form_id and self.form.school_id != school_id:
+                errors["form"] = "Form must belong to the class school."
+            if self.learning_area_id and self.learning_area.school_id != school_id:
+                errors["learning_area"] = (
+                    "Learning area must belong to the class school."
+                )
+        if errors:
+            raise ValidationError(errors)
+
     def save(self, *args, **kwargs):
         if not self.class_id:
             self.class_id = generate_unique_id("CLS")
@@ -646,7 +722,14 @@ class Class(models.Model):
         super().save(*args, **kwargs)
 
     def get_current_student_count(self):
-        return StudentClass.objects.filter(assigned_class=self, is_active=True).count()
+        if hasattr(self, "current_student_count"):
+            return self.current_student_count
+        return StudentClass.objects.filter(
+            assigned_class=self,
+            is_active=True,
+            school=self.school,
+            student__school=self.school,
+        ).count()
 
     def is_class_full(self):
         return self.get_current_student_count() >= self.maximum_students
@@ -742,18 +825,51 @@ class StudentClass(models.Model):
             models.Index(fields=["student", "assigned_class", "is_active"]),
             models.Index(fields=["school", "is_active"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "school"],
+                condition=models.Q(is_active=True, school__isnull=False),
+                name="unique_active_student_enrollment_per_school",
+            )
+        ]
 
     def clean(self):
         super().clean()
+        school_id = (
+            self.school_id
+            or (self.student.school_id if self.student_id else None)
+            or (self.assigned_class.school_id if self.assigned_class_id else None)
+        )
+        if (
+            school_id is None
+            or self.student.school_id != school_id
+            or self.assigned_class.school_id != school_id
+            or not self.student.is_active
+            or not self.assigned_class.is_active
+        ):
+            raise ValidationError(
+                "Active student, active class, and enrollment must belong to the same school."
+            )
+
         if self.is_active:
             existing = StudentClass.objects.filter(
-                student=self.student, is_active=True, school=self.school
+                student=self.student, is_active=True, school_id=school_id
             ).exclude(pk=self.pk)
 
             if existing.exists():
                 raise ValidationError(
                     f"Student {self.student} is already assigned to an active class in this school."
                 )
+            current_count = StudentClass.objects.filter(
+                assigned_class=self.assigned_class,
+                is_active=True,
+                school_id=school_id,
+                student__school_id=school_id,
+            ).exclude(pk=self.pk).count()
+            if current_count >= self.assigned_class.maximum_students:
+                raise ValidationError({
+                    "assigned_class": "The selected class has reached its capacity."
+                })
 
     def save(self, *args, **kwargs):
         # Ensure student class gets school from student, assigned class, or assigned_by
@@ -788,6 +904,7 @@ class Subject(models.Model):
         related_name="subjects",
         null=True,
     )
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         indexes = [
@@ -797,6 +914,22 @@ class Subject(models.Model):
         ]
         # Ensure subject codes are unique per school
         unique_together = ["subject_code", "school"]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.school_id and self.department_id:
+            if self.department.school_id != self.school_id:
+                errors["department"] = (
+                    "Department must belong to the subject's school."
+                )
+        if self.school_id and self.learning_area_id:
+            if self.learning_area.school_id != self.school_id:
+                errors["learning_area"] = (
+                    "Learning area must belong to the subject's school."
+                )
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         if not self.subject_code:
@@ -857,16 +990,61 @@ class TeacherSubjectAssignment(models.Model):
             ),
             models.Index(fields=["school", "is_active"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["school", "subject", "class_assigned", "academic_year"],
+                condition=models.Q(is_active=True, school__isnull=False),
+                name="unique_active_teacher_subject_assignment_per_school",
+            )
+        ]
 
     def clean(self):
         super().clean()
+        if not all(
+            (
+                self.teacher_id,
+                self.subject_id,
+                self.class_assigned_id,
+                self.academic_year_id,
+            )
+        ):
+            raise ValidationError(
+                "Teacher, subject, class, and academic year are required."
+            )
+        school_id = (
+            self.school_id
+            or (self.class_assigned.school_id if self.class_assigned_id else None)
+        )
+        if (
+            school_id is None
+            or self.teacher.school_id != school_id
+            or self.subject.school_id != school_id
+            or self.class_assigned.school_id != school_id
+            or not self.class_assigned.is_active
+            or self.academic_year.school_id != school_id
+            or not self.teacher.is_active
+        ):
+            raise ValidationError(
+                "Teacher, subject, class, academic year, and assignment must belong to the same school."
+            )
+
+        if not ClassSubject.objects.filter(
+            subject_id=self.subject_id,
+            class_name_id=self.class_assigned_id,
+            academic_year_id=self.academic_year_id,
+            school_id=school_id,
+        ).exists():
+            raise ValidationError(
+                "The subject must be allocated to the selected class and academic year."
+            )
+
         if self.is_active:
             existing = TeacherSubjectAssignment.objects.filter(
                 subject=self.subject,
                 class_assigned=self.class_assigned,
                 academic_year=self.academic_year,
                 is_active=True,
-                school=self.school,  # Add school filter for multi-tenancy
+                school_id=school_id,
             ).exclude(pk=self.pk)
 
             if existing.exists():
@@ -994,6 +1172,29 @@ class ClassSubject(models.Model):
             models.Index(fields=["academic_year"]),
             models.Index(fields=["school"]),
         ]
+
+    def clean(self):
+        super().clean()
+        if not all((self.subject_id, self.class_name_id, self.academic_year_id)):
+            raise ValidationError(
+                "Subject, class, and academic year are required."
+            )
+        school_id = (
+            self.school_id
+            or (self.class_name.school_id if self.class_name_id else None)
+        )
+        if (
+            school_id is None
+            or self.class_name.school_id != school_id
+            or self.subject.school_id != school_id
+            or self.academic_year.school_id != school_id
+            or not self.class_name.is_active
+            or not self.subject.is_active
+            or self.class_name.academic_year_id != self.academic_year_id
+        ):
+            raise ValidationError(
+                "Subject allocation, subject, class, and academic year must belong to the same school and year."
+            )
 
     def save(self, *args, **kwargs):
         if not self.class_subject_id:
@@ -1731,7 +1932,13 @@ class Quiz(models.Model):
 
         # Check if student has exceeded max attempts
         if student:
-            attempts_count = self.attempts.filter(student=student).count()
+            attempts_count = self.attempts.filter(
+                student=student,
+                school_id=self.school_id,
+                student__school_id=self.school_id,
+                quiz__school_id=self.school_id,
+                is_submitted=True,
+            ).count()
             if attempts_count >= self.max_attempts:
                 return False, f"Maximum attempts ({self.max_attempts}) reached"
 
@@ -2199,6 +2406,9 @@ class QuizAttempt(models.Model):
     is_graded = models.BooleanField(
         default=False, help_text="Whether all questions have been graded"
     )
+    question_order = models.JSONField(default=list, blank=True)
+    answer_order = models.JSONField(default=dict, blank=True)
+    configuration_snapshot = models.JSONField(default=dict, blank=True)
 
     # Additional data
     ip_address = models.GenericIPAddressField(
@@ -2291,25 +2501,124 @@ class QuizAttempt(models.Model):
     def __str__(self):
         return f"{self.student.full_name} - {self.quiz.title} (Attempt {self.attempt_number})"
 
+    def capture_configuration(self):
+        """Persist the quiz and question configuration used by this attempt."""
+        questions = list(
+            self.quiz.questions.filter(school_id=self.school_id)
+            .prefetch_related("answer_choices")
+            .order_by("order", "pk")
+        )
+        question_ids = [question.pk for question in questions]
+        if self.quiz.randomize_questions:
+            secrets.SystemRandom().shuffle(question_ids)
+
+        answer_order = {}
+        question_snapshots = {}
+        for question in questions:
+            choices = list(
+                question.answer_choices.filter(school_id=self.school_id)
+                .order_by("order", "pk")
+            )
+            if question.question_type == "ordering" and question.correct_answer_text:
+                choice_ids = [
+                    item.strip()
+                    for item in question.correct_answer_text.split(";")
+                    if item.strip()
+                ]
+                secrets.SystemRandom().shuffle(choice_ids)
+            else:
+                choice_ids = [choice.pk for choice in choices]
+            if self.quiz.randomize_answers and question.question_type != "ordering":
+                secrets.SystemRandom().shuffle(choice_ids)
+            answer_order[str(question.pk)] = choice_ids
+            question_snapshots[str(question.pk)] = {
+                "question_id": question.pk,
+                "question_text": question.question_text,
+                "question_type": question.question_type,
+                "marks": question.marks,
+                "negative_marks": question.negative_marks,
+                "partial_credit": question.partial_credit,
+                "correct_answer_text": question.correct_answer_text or "",
+                "choices": {
+                    str(choice.pk): {
+                        "text": choice.choice_text,
+                        "is_correct": choice.is_correct,
+                        "partial_credit": choice.partial_credit,
+                        "order": choice.order,
+                    }
+                    for choice in choices
+                },
+            }
+
+        self.question_order = question_ids
+        self.answer_order = answer_order
+        self.configuration_snapshot = {
+            "quiz": {
+                "title": self.quiz.title,
+                "description": self.quiz.description or "",
+                "instructions": self.quiz.instructions or "",
+                "time_limit": self.quiz.time_limit,
+                "total_marks": self.quiz.total_marks,
+                "passing_marks": self.quiz.passing_marks,
+                "randomize_questions": self.quiz.randomize_questions,
+                "randomize_answers": self.quiz.randomize_answers,
+                "show_results_immediately": self.quiz.show_results_immediately,
+                "show_correct_answers": self.quiz.show_correct_answers,
+                "allow_review": self.quiz.allow_review,
+            },
+            "questions": question_snapshots,
+        }
+        self.total_questions = len(question_ids)
+        self.save(
+            update_fields=[
+                "question_order",
+                "answer_order",
+                "configuration_snapshot",
+                "total_questions",
+            ]
+        )
+
     def calculate_score(self):
         """Calculate and update the score for this attempt"""
-        responses = self.responses.all()
+        responses = list(
+            self.responses.select_related("question", "selected_choice").prefetch_related(
+                "selected_choices"
+            )
+        )
         total_score = 0
         correct_count = 0
         wrong_count = 0
         needs_grading = False
 
         for response in responses:
+            selected_choice_ids = {
+                choice.pk for choice in response.selected_choices.all()
+            }
+            if response.selected_choice_id:
+                selected_choice_ids.add(response.selected_choice_id)
+            response._selected_choice_ids_for_score = selected_choice_ids
             # Check if response needs manual grading
-            if response.question.question_type == "essay" and not response.is_graded:
+            snapshot = self.configuration_snapshot.get("questions", {}).get(
+                str(response.question_id), {}
+            )
+            question_type = snapshot.get(
+                "question_type", response.question.question_type
+            )
+            if question_type == "essay" and not response.is_graded:
                 needs_grading = True
                 continue
+
+            if question_type != "essay":
+                response.check_correctness()
+                response.save(update_fields=["is_correct", "marks_awarded", "updated_at"])
 
             # Calculate score based on marks awarded
             if response.marks_awarded > 0:
                 total_score += response.marks_awarded
                 if response.is_correct:
                     correct_count += 1
+                else:
+                    wrong_count += 1
             elif response.marks_awarded < 0:
                 total_score += response.marks_awarded  # Negative marks
                 wrong_count += 1
@@ -2317,13 +2626,30 @@ class QuizAttempt(models.Model):
                 wrong_count += 1
 
         self.score = max(0, total_score)  # Ensure score doesn't go negative
-        self.total_questions = self.quiz.get_question_count()
+        quiz_snapshot = self.configuration_snapshot.get("quiz", {})
+        self.total_questions = len(
+            self.configuration_snapshot.get("questions", {})
+        ) or self.quiz.get_question_count()
         self.correct_answers = correct_count
         self.wrong_answers = wrong_count
-        self.unanswered = self.total_questions - self.responses.count()
+        answered_question_ids = {
+            response.question_id
+            for response in responses
+            if response.selected_choice_id
+            or response.text_answer
+            or response._selected_choice_ids_for_score
+        }
+        self.unanswered = max(0, self.total_questions - len(answered_question_ids))
         self.percentage = (
-            round((self.score / self.quiz.total_marks * 100), 2)
-            if self.quiz.total_marks > 0
+            round(
+                (
+                    self.score
+                    / quiz_snapshot.get("total_marks", self.quiz.total_marks)
+                    * 100
+                ),
+                2,
+            )
+            if quiz_snapshot.get("total_marks", self.quiz.total_marks) > 0
             else 0
         )
         self.needs_grading = needs_grading
@@ -2359,14 +2685,20 @@ class QuizAttempt(models.Model):
 
     def is_passed(self):
         """Check if student passed the quiz"""
-        return self.score >= self.quiz.passing_marks
+        passing_marks = self.configuration_snapshot.get("quiz", {}).get(
+            "passing_marks", self.quiz.passing_marks
+        )
+        return self.score >= passing_marks
 
     def get_time_remaining(self):
         """Get remaining time for the quiz"""
-        if self.is_completed or self.quiz.time_limit == 0:
+        time_limit_minutes = self.configuration_snapshot.get("quiz", {}).get(
+            "time_limit", self.quiz.time_limit
+        )
+        if self.is_completed or time_limit_minutes == 0:
             return timezone.timedelta(0)
 
-        time_limit = timezone.timedelta(minutes=self.quiz.time_limit)
+        time_limit = timezone.timedelta(minutes=time_limit_minutes)
         elapsed = timezone.now() - self.started_at
         remaining = time_limit - elapsed
 
@@ -2380,7 +2712,10 @@ class QuizAttempt(models.Model):
 
     def is_time_expired(self):
         """Check if time limit has been exceeded"""
-        if self.quiz.time_limit == 0:
+        time_limit = self.configuration_snapshot.get("quiz", {}).get(
+            "time_limit", self.quiz.time_limit
+        )
+        if time_limit == 0:
             return False
         return self.get_time_remaining() <= timezone.timedelta(0)
 
@@ -2474,6 +2809,7 @@ class QuizResponse(models.Model):
     updated_at = models.DateTimeField(
         auto_now=True, help_text="When the response was last updated"
     )
+    grading_history = models.JSONField(default=list, blank=True)
 
     # Multi-tenancy (inherited from attempt)
     school = models.ForeignKey(
@@ -2509,7 +2845,13 @@ class QuizResponse(models.Model):
             self.school = self.attempt.school
 
         # Auto-check correctness and calculate marks (unless manually graded)
-        if not self.is_graded or self.question.question_type != "essay":
+        question_snapshot = self.attempt.configuration_snapshot.get(
+            "questions", {}
+        ).get(str(self.question_id), {})
+        question_type = question_snapshot.get(
+            "question_type", self.question.question_type
+        )
+        if not self.is_graded or question_type != "essay":
             self.check_correctness()
 
         super().save(*args, **kwargs)
@@ -2519,59 +2861,147 @@ class QuizResponse(models.Model):
 
     def check_correctness(self):
         """Check if the response is correct and calculate marks"""
-        # Skip auto-calculation for essay questions that have been manually graded
-        if self.question.question_type == "essay" and self.is_graded:
+        snapshot = self.attempt.configuration_snapshot.get("questions", {}).get(
+            str(self.question_id), {}
+        )
+        question_type = snapshot.get("question_type", self.question.question_type)
+        if question_type == "essay" and self.is_graded:
             return
+        marks = snapshot.get("marks", self.question.marks)
+        negative_marks = snapshot.get(
+            "negative_marks", self.question.negative_marks
+        )
 
-        if self.question.question_type in ["multiple_choice", "true_false"]:
-            if self.selected_choice:
-                self.is_correct = self.selected_choice.is_correct
-                if self.is_correct:
-                    # Check for partial credit
-                    if self.question.partial_credit and self.selected_choice.partial_credit > 0:
-                        self.marks_awarded = (
-                            self.question.marks * self.selected_choice.partial_credit
-                        )
-                    else:
-                        self.marks_awarded = self.question.marks
-                else:
-                    self.marks_awarded = -self.question.negative_marks
-            else:
-                self.is_correct = False
-                self.marks_awarded = 0
-
-        elif self.question.question_type in ["short_answer", "fill_blank"]:
-            # For text answers, check against correct answer(s)
-            correct_answers = self.question.get_correct_answer()
-            if self.text_answer and correct_answers:
-                # Check if answer matches any of the correct answers
-                student_answer = self.text_answer.strip().lower()
-                is_match = any(
-                    student_answer == ans.strip().lower() for ans in correct_answers
+        if question_type in ["multiple_choice", "true_false"]:
+            choice_snapshot = snapshot.get("choices", {})
+            selected_ids = (
+                self._selected_choice_ids_for_score
+                if hasattr(self, "_selected_choice_ids_for_score")
+                else (
+                    {choice.pk for choice in self.selected_choices.all()}
+                    if self.pk
+                    else set()
                 )
-                self.is_correct = is_match
-                if self.is_correct:
-                    self.marks_awarded = self.question.marks
-                else:
-                    self.marks_awarded = -self.question.negative_marks
+            )
+            if self.selected_choice_id:
+                selected_ids = set(selected_ids) | {self.selected_choice_id}
             else:
+                selected_ids = set(selected_ids)
+
+            correct_ids = {
+                int(choice_id)
+                for choice_id, choice in choice_snapshot.items()
+                if choice.get("is_correct")
+            }
+            if not snapshot:
+                choices = list(self.question.answer_choices.all())
+                correct_ids = {choice.pk for choice in choices if choice.is_correct}
+                choice_snapshot = {
+                    str(choice.pk): {
+                        "partial_credit": choice.partial_credit,
+                    }
+                    for choice in choices
+                }
+
+            if not selected_ids:
                 self.is_correct = False
                 self.marks_awarded = 0
+                return
 
-        elif self.question.question_type == "essay":
-            # Essay questions require manual grading
+            self.is_correct = selected_ids == correct_ids
+            if self.is_correct:
+                self.marks_awarded = marks
+            elif snapshot.get("partial_credit", self.question.partial_credit):
+                correct_selected = len(selected_ids & correct_ids)
+                incorrect_selected = len(selected_ids - correct_ids)
+                incorrect_total = max(0, len(choice_snapshot) - len(correct_ids))
+                earned = (
+                    marks * correct_selected / len(correct_ids)
+                    if correct_ids
+                    else 0
+                )
+                penalty = (
+                    negative_marks * incorrect_selected / incorrect_total
+                    if incorrect_total
+                    else 0
+                )
+                self.marks_awarded = min(marks, max(-negative_marks, earned - penalty))
+            else:
+                self.marks_awarded = -negative_marks
+
+        elif question_type in ["short_answer", "fill_blank", "matching", "ordering"]:
+            correct_answer_text = snapshot.get(
+                "correct_answer_text", self.question.correct_answer_text or ""
+            )
+            correct_answers = [
+                answer.strip().casefold()
+                for answer in correct_answer_text.split(";")
+                if answer.strip()
+            ]
+            student_answer = (self.text_answer or "").strip().casefold()
+            if question_type == "matching":
+                expected = set(correct_answers)
+                submitted = {
+                    answer.strip()
+                    for answer in student_answer.split(";")
+                    if answer.strip()
+                }
+                self.is_correct = bool(expected) and submitted == expected
+                partial_ratio = (
+                    len(expected & submitted) / len(expected) if expected else 0
+                )
+            elif question_type == "ordering":
+                expected = correct_answers
+                submitted = [
+                    answer.strip()
+                    for answer in student_answer.split(";")
+                    if answer.strip()
+                ]
+                self.is_correct = bool(expected) and submitted == expected
+                matching_positions = sum(
+                    1
+                    for index, expected_item in enumerate(expected)
+                    if index < len(submitted) and submitted[index] == expected_item
+                )
+                partial_ratio = matching_positions / len(expected) if expected else 0
+            else:
+                self.is_correct = bool(student_answer and student_answer in correct_answers)
+                partial_ratio = 1 if self.is_correct else 0
+
+            if not student_answer:
+                self.marks_awarded = 0
+            elif self.is_correct:
+                self.marks_awarded = marks
+            elif snapshot.get("partial_credit", self.question.partial_credit):
+                self.marks_awarded = max(
+                    -negative_marks,
+                    marks * partial_ratio - negative_marks * (1 - partial_ratio),
+                )
+            else:
+                self.marks_awarded = -negative_marks
+
+        elif question_type == "essay":
             self.is_correct = False
             self.marks_awarded = 0
-            # Note: needs_grading is tracked on QuizAttempt, not QuizResponse
 
     def grade(self, marks, grader, notes=None):
         """Manually grade this response (for essay questions)"""
-        max_marks = self.question.marks
-        self.marks_awarded = min(max(0, marks), max_marks)  # Clamp between 0 and max
-        self.is_correct = self.marks_awarded >= (max_marks * 0.5)  # 50% threshold
+        max_marks = self.attempt.configuration_snapshot.get("questions", {}).get(
+            str(self.question_id), {}
+        ).get("marks", self.question.marks)
+        self.marks_awarded = min(max(0, marks), max_marks)
+        self.is_correct = self.marks_awarded >= (max_marks * 0.5)
         self.is_graded = True
         self.graded_by = grader
         self.graded_at = timezone.now()
+        self.grading_history.append(
+            {
+                "marks_awarded": self.marks_awarded,
+                "graded_by_id": grader.pk,
+                "graded_at": self.graded_at.isoformat(),
+                "grading_notes": notes or "",
+            }
+        )
         if notes:
             self.grading_notes = notes
         self.save()

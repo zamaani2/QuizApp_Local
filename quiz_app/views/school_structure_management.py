@@ -22,6 +22,7 @@ from ..models import (
     Teacher,
     SchoolInformation,
 )
+from ..utils.tenant_utils import get_object_or_404_with_school, get_write_school
 
 
 # ==================== Form Views ====================
@@ -82,11 +83,23 @@ def form_create_view(request):
         # Return form for modal
         html = render(request, 'school_structure/partials/form_form.html', {
             'form_obj': None,
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
     
     # POST - Create form
+    school = get_write_school(request)
+    if school is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Select a valid target school.',
+        }, status=400)
+
     try:
         with transaction.atomic():
             # Get form data
@@ -163,23 +176,8 @@ def form_edit_view(request, form_id):
     
     school = request.user.school
     
-    # Superadmin can access any form, regular admin only their school
-    if request.user.role == "superadmin":
-        form_obj = get_object_or_404(Form, pk=form_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:form_list")
-        form_obj = get_object_or_404(Form, pk=form_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and form_obj.school != school:
-        if request.method == "GET":
-            return JsonResponse({'error': 'Form not found'}, status=404)
-        messages.error(request, "You don't have permission to edit this form.")
-        return redirect("quiz_app:form_list")
+    form_obj = get_object_or_404_with_school(Form, request, pk=form_id)
+    school = form_obj.school
     
     if request.method == "GET":
         # Return form for modal
@@ -248,20 +246,7 @@ def form_delete_view(request, form_id):
     
     school = request.user.school
     
-    # Superadmin can access any form, regular admin only their school
-    if request.user.role == "superadmin":
-        form_obj = get_object_or_404(Form, pk=form_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:form_list")
-        form_obj = get_object_or_404(Form, pk=form_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and form_obj.school != school:
-        return JsonResponse({'error': 'Form not found'}, status=404)
+    form_obj = get_object_or_404_with_school(Form, request, pk=form_id)
     
     try:
         # Check if form has students
@@ -344,11 +329,23 @@ def learning_area_create_view(request):
         # Return form for modal
         html = render(request, 'school_structure/partials/learning_area_form.html', {
             'learning_area': None,
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
     
     # POST - Create learning area
+    school = get_write_school(request)
+    if school is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Select a valid target school.',
+        }, status=400)
+
     try:
         with transaction.atomic():
             # Get form data
@@ -417,23 +414,10 @@ def learning_area_edit_view(request, learning_area_id):
     
     school = request.user.school
     
-    # Superadmin can access any learning area, regular admin only their school
-    if request.user.role == "superadmin":
-        learning_area = get_object_or_404(LearningArea, pk=learning_area_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:learning_area_list")
-        learning_area = get_object_or_404(LearningArea, pk=learning_area_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and learning_area.school != school:
-        if request.method == "GET":
-            return JsonResponse({'error': 'Learning area not found'}, status=404)
-        messages.error(request, "You don't have permission to edit this learning area.")
-        return redirect("quiz_app:learning_area_list")
+    learning_area = get_object_or_404_with_school(
+        LearningArea, request, pk=learning_area_id
+    )
+    school = learning_area.school
     
     if request.method == "GET":
         # Return form for modal
@@ -491,20 +475,9 @@ def learning_area_delete_view(request, learning_area_id):
     
     school = request.user.school
     
-    # Superadmin can access any learning area, regular admin only their school
-    if request.user.role == "superadmin":
-        learning_area = get_object_or_404(LearningArea, pk=learning_area_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:learning_area_list")
-        learning_area = get_object_or_404(LearningArea, pk=learning_area_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and learning_area.school != school:
-        return JsonResponse({'error': 'Learning area not found'}, status=404)
+    learning_area = get_object_or_404_with_school(
+        LearningArea, request, pk=learning_area_id
+    )
     
     try:
         # Check if learning area has students
@@ -594,11 +567,23 @@ def department_create_view(request):
         html = render(request, 'school_structure/partials/department_form.html', {
             'department': None,
             'teachers': teachers,
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
     
     # POST - Create department
+    school = get_write_school(request)
+    if school is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Select a valid target school.',
+        }, status=400)
+
     try:
         with transaction.atomic():
             # Get form data
@@ -680,23 +665,8 @@ def department_edit_view(request, department_id):
     
     school = request.user.school
     
-    # Superadmin can access any department, regular admin only their school
-    if request.user.role == "superadmin":
-        department = get_object_or_404(Department, pk=department_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:department_list")
-        department = get_object_or_404(Department, pk=department_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and department.school != school:
-        if request.method == "GET":
-            return JsonResponse({'error': 'Department not found'}, status=404)
-        messages.error(request, "You don't have permission to edit this department.")
-        return redirect("quiz_app:department_list")
+    department = get_object_or_404_with_school(Department, request, pk=department_id)
+    school = department.school
     
     if request.method == "GET":
         # Get teachers for head of department dropdown
@@ -774,20 +744,7 @@ def department_delete_view(request, department_id):
     
     school = request.user.school
     
-    # Superadmin can access any department, regular admin only their school
-    if request.user.role == "superadmin":
-        department = get_object_or_404(Department, pk=department_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:department_list")
-        department = get_object_or_404(Department, pk=department_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and department.school != school:
-        return JsonResponse({'error': 'Department not found'}, status=404)
+    department = get_object_or_404_with_school(Department, request, pk=department_id)
     
     try:
         # Check if department has teachers
@@ -809,4 +766,3 @@ def department_delete_view(request, department_id):
             'success': False,
             'error': f'Error deleting department: {str(e)}'
         }, status=500)
-

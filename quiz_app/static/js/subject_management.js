@@ -179,6 +179,17 @@
             const subjectName = $(this).data('subject-name');
             deleteSubject(subjectId, subjectName);
         });
+
+        $(document).on('click', '.restore-subject-btn', function () {
+            restoreSubject($(this).data('restore-url'), $(this).data('subject-name'));
+        });
+
+        $('#statusFilter').on('change', function () {
+            const params = new URLSearchParams(window.location.search);
+            params.set('status', this.value);
+            params.delete('page');
+            window.location.search = params.toString();
+        });
     }
 
     /**
@@ -311,22 +322,22 @@
     }
 
     /**
-     * Delete a subject
+     * Archive a subject without removing its historical records
      */
     function deleteSubject(subjectId, subjectName) {
         Swal.fire({
             icon: 'warning',
-            title: 'Delete Subject?',
-            html: `Are you sure you want to delete <strong>${subjectName}</strong>?<br>This action cannot be undone.`,
+            title: 'Archive Subject?',
+            html: `Are you sure you want to archive <strong>${subjectName}</strong>? Active teaching assignments will be deactivated.`,
             showCancelButton: true,
-            confirmButtonText: 'Yes, delete it!',
+            confirmButtonText: 'Archive subject',
             cancelButtonText: 'Cancel',
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d'
         }).then((result) => {
             if (result.isConfirmed) {
                 Swal.fire({
-                    title: 'Deleting...',
+                    title: 'Archiving...',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -346,7 +357,7 @@
                         if (response.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Deleted!',
+                                title: 'Archived!',
                                 text: response.message,
                                 confirmButtonColor: '#28a745',
                                 timer: 2000,
@@ -359,14 +370,14 @@
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Error',
-                                text: response.error || 'Failed to delete subject.',
+                                text: response.error || 'Failed to archive subject.',
                                 confirmButtonColor: '#dc3545'
                             });
                         }
                     },
                     error: function (xhr) {
                         Swal.close();
-                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while deleting.';
+                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while archiving.';
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
@@ -376,6 +387,34 @@
                     }
                 });
             }
+        });
+    }
+
+    function restoreSubject(url, subjectName) {
+        Swal.fire({
+            icon: 'question',
+            title: 'Restore subject?',
+            text: `Restore ${subjectName}? Historical teaching assignments will remain inactive.`,
+            showCancelButton: true,
+            confirmButtonText: 'Restore subject'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: { 'X-CSRFToken': getCsrfToken() },
+                success: function (response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        Swal.fire('Error', response.error || 'Failed to restore subject.', 'error');
+                    }
+                },
+                error: function (xhr) {
+                    Swal.fire('Error', xhr.responseJSON?.error || 'Failed to restore subject.', 'error');
+                }
+            });
         });
     }
 
@@ -424,4 +463,3 @@
     }
 
 })(jQuery);
-

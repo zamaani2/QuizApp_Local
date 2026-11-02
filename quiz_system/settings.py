@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
+import secrets
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Optional: parse DATABASE_URL style connection strings when provided
 try:
@@ -34,11 +37,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-y0ak1d2)!f_l_gox($!r3rg((sm4b4)xqr3ybz&w9&v00t2t8y")
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "True") == "True"
+DEBUG = os.environ.get("DEBUG", "False").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("SECRET_KEY must be configured when DEBUG is off.")
+    SECRET_KEY = secrets.token_urlsafe(50)
 
 # ALLOWED_HOSTS: List of hostnames/IPs that Django will accept requests from
 # For hostname access, set this in .env file, e.g.:
@@ -89,6 +100,7 @@ MIDDLEWARE.extend(
         "django.middleware.common.CommonMiddleware",
         "django.middleware.csrf.CsrfViewMiddleware",
         "django.contrib.auth.middleware.AuthenticationMiddleware",
+        "quiz_app.middleware.TenantAccessMiddleware",
         "django.contrib.messages.middleware.MessageMiddleware",
         "django.middleware.clickjacking.XFrameOptionsMiddleware",
     ]
@@ -125,7 +137,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("DB_NAME", "quiz_system_db"),
         "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "4545"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", "4545" if DEBUG else ""),
         "HOST": os.environ.get("DB_HOST", "localhost"),
         "PORT": os.environ.get("DB_PORT", "5432"),
     }
@@ -133,10 +145,28 @@ DATABASES = {
 
 # Prefer DATABASE_URL when provided (e.g., Supabase pooled connection)
 database_url = os.environ.get("DATABASE_URL")
-if database_url and dj_database_url:
+if database_url:
+    if not dj_database_url:
+        raise ImproperlyConfigured(
+            "dj-database-url is required when DATABASE_URL is configured."
+        )
     DATABASES["default"] = dj_database_url.parse(
-        database_url, conn_max_age=600, ssl_require=True
+        database_url,
+        conn_max_age=600,
+        ssl_require=not database_url.lower().startswith("sqlite:"),
     )
+elif not DEBUG:
+    required_database_settings = ("DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST")
+    missing_database_settings = [
+        setting
+        for setting in required_database_settings
+        if not os.environ.get(setting)
+    ]
+    if missing_database_settings:
+        missing = ", ".join(missing_database_settings)
+        raise ImproperlyConfigured(
+            f"Configure DATABASE_URL or these database settings: {missing}."
+        )
 
 # For development, you can use SQLite by uncommenting below:
 # DATABASES = {
@@ -210,6 +240,8 @@ SUPERADMIN_LOGOUT_REDIRECT_URL = "quiz_app:superadmin_login"
 SESSION_COOKIE_AGE = 3600 * 8  # 8 hours
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

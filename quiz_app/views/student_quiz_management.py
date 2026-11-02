@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q, Count, Max, Avg
+from django.db.models import Q, Count, Max, Avg, Prefetch
 from django.db import transaction
 from django.utils import timezone
 from datetime import datetime
@@ -65,6 +65,7 @@ def student_quiz_list_view(request):
     # Get quizzes assigned to student's class
     quizzes = Quiz.objects.filter(
         classes=current_class,
+        classes__school=school,
         school=school,
         status='published',
         is_active=True
@@ -212,7 +213,7 @@ def student_quiz_detail_view(request, quiz_id):
         messages.error(request, "You are not assigned to any class.")
         return redirect("quiz_app:student_quiz_list")
     
-    if quiz.classes.exists() and current_class not in quiz.classes.all():
+    if not quiz.classes.filter(pk=current_class.pk, school=school).exists():
         messages.error(request, "This quiz is not assigned to your class.")
         return redirect("quiz_app:student_quiz_list")
     
@@ -220,7 +221,9 @@ def student_quiz_detail_view(request, quiz_id):
     attempts = QuizAttempt.objects.filter(
         quiz=quiz,
         student=student,
-        school=school
+        school=school,
+        quiz__school=school,
+        student__school=school,
     ).order_by('-started_at')
     
     # Calculate statistics
@@ -286,6 +289,22 @@ def get_client_ip(request):
     return ip.strip()
 
 
+def _submit_attempt_safely(attempt_id, student, school):
+    with transaction.atomic():
+        attempt = QuizAttempt.objects.select_for_update().select_related(
+            "quiz"
+        ).get(
+            pk=attempt_id,
+            student=student,
+            school=school,
+            quiz__school=school,
+            student__school=school,
+        )
+        if not attempt.is_submitted:
+            attempt.submit()
+    return attempt
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def student_quiz_start_view(request, quiz_id):
@@ -313,7 +332,7 @@ def student_quiz_start_view(request, quiz_id):
         messages.error(request, "You are not assigned to any class.")
         return redirect("quiz_app:student_quiz_list")
     
-    if quiz.classes.exists() and current_class not in quiz.classes.all():
+    if not quiz.classes.filter(pk=current_class.pk, school=school).exists():
         messages.error(request, "This quiz is not assigned to your class.")
         return redirect("quiz_app:student_quiz_list")
     
@@ -355,39 +374,56 @@ def student_quiz_start_view(request, quiz_id):
                 'quiz': quiz,
             })
     
-    # Check for existing in-progress attempt
-    existing_attempt = QuizAttempt.objects.filter(
-        quiz=quiz,
-        student=student,
-        school=school,
-        is_submitted=False,
-        is_completed=False
-    ).first()
-    
-    if existing_attempt:
-        # Redirect to resume existing attempt
-        messages.info(request, "Resuming your previous attempt.")
-        return redirect("quiz_app:student_quiz_take", attempt_id=existing_attempt.id)
-    
-    # Create new quiz attempt
     try:
         with transaction.atomic():
-            # Calculate attempt number using MAX to avoid race conditions
-            # Get the maximum attempt number for this quiz/student combination
+            student = Student.objects.select_for_update().get(
+                pk=student.pk, school_id=school.pk
+            )
+            quiz = Quiz.objects.select_for_update().get(
+                pk=quiz.pk,
+                school_id=school.pk,
+                status="published",
+                is_active=True,
+            )
+            current_class = student.get_current_class()
+            if not current_class or not quiz.classes.filter(
+                pk=current_class.pk, school_id=school.pk
+            ).exists():
+                messages.error(request, "This quiz is no longer assigned to your class.")
+                return redirect("quiz_app:student_quiz_list")
+
+            existing_attempt = QuizAttempt.objects.filter(
+                quiz=quiz,
+                student=student,
+                school=school,
+                is_submitted=False,
+                is_completed=False,
+            ).order_by("started_at").first()
+            if existing_attempt:
+                existing_attempt.capture_configuration() if not existing_attempt.configuration_snapshot else None
+                messages.info(request, "Resuming your previous attempt.")
+                return redirect(
+                    "quiz_app:student_quiz_take", attempt_id=existing_attempt.id
+                )
+
+            can_attempt, attempt_message = quiz.can_student_attempt(student)
+            now = timezone.now()
+            if (
+                not can_attempt
+                or (quiz.available_from and quiz.available_from > now)
+                or (quiz.available_until and quiz.available_until < now)
+            ):
+                messages.error(request, attempt_message or "This quiz is not available.")
+                return redirect("quiz_app:student_quiz_detail", quiz_id=quiz.pk)
+
             max_attempt = QuizAttempt.objects.filter(
                 quiz=quiz,
                 student=student,
-                school=school
+                school=school,
             ).aggregate(max_attempt=Max('attempt_number'))['max_attempt']
-            
-            # If no previous attempts, start at 1, otherwise increment
             attempt_number = (max_attempt + 1) if max_attempt else 1
-            
-            # Get IP address and user agent
             ip_address = get_client_ip(request)
             user_agent = request.META.get('HTTP_USER_AGENT', '')
-            
-            # Create attempt
             attempt = QuizAttempt.objects.create(
                 quiz=quiz,
                 student=student,
@@ -395,11 +431,10 @@ def student_quiz_start_view(request, quiz_id):
                 attempt_number=attempt_number,
                 academic_year=quiz.academic_year,
                 term=quiz.term,
-                total_questions=quiz.get_question_count(),
                 ip_address=ip_address,
                 user_agent=user_agent,
             )
-            
+            attempt.capture_configuration()
             messages.success(request, "Quiz started successfully. Good luck!")
             return redirect("quiz_app:student_quiz_take", attempt_id=attempt.id)
             
@@ -438,7 +473,7 @@ def student_quiz_resume_view(request, quiz_id):
         messages.error(request, "You are not assigned to any class.")
         return redirect("quiz_app:student_quiz_list")
     
-    if quiz.classes.exists() and current_class not in quiz.classes.all():
+    if not quiz.classes.filter(pk=current_class.pk, school=school).exists():
         messages.error(request, "This quiz is not assigned to your class.")
         return redirect("quiz_app:student_quiz_list")
     
@@ -447,6 +482,8 @@ def student_quiz_resume_view(request, quiz_id):
         quiz=quiz,
         student=student,
         school=school,
+        quiz__school=school,
+        student__school=school,
         is_submitted=False,
         is_completed=False
     ).order_by('-started_at').first()
@@ -456,19 +493,10 @@ def student_quiz_resume_view(request, quiz_id):
         return redirect("quiz_app:student_quiz_detail", quiz_id=quiz_id)
     
     # Check if time limit has expired - auto-submit if expired
-    if quiz.time_limit > 0:
-        elapsed = timezone.now() - in_progress_attempt.started_at
-        elapsed_minutes = elapsed.total_seconds() / 60
-        if elapsed_minutes > quiz.time_limit:
-            # Auto-submit the expired attempt
-            from django.db import transaction
-            with transaction.atomic():
-                in_progress_attempt.submit()
-                in_progress_attempt.calculate_score()
-                in_progress_attempt.save()
-            
-            messages.warning(request, "Time limit expired. Your quiz has been automatically submitted.")
-            return redirect("quiz_app:student_quiz_result_detail", attempt_id=in_progress_attempt.id)
+    if in_progress_attempt.is_time_expired():
+        _submit_attempt_safely(in_progress_attempt.pk, student, school)
+        messages.warning(request, "Time limit expired. Your quiz has been automatically submitted.")
+        return redirect("quiz_app:student_quiz_result_detail", attempt_id=in_progress_attempt.id)
     
     messages.info(request, "Resuming your previous attempt.")
     return redirect("quiz_app:student_quiz_take", attempt_id=in_progress_attempt.id)
@@ -493,7 +521,14 @@ def student_quiz_take_view(request, attempt_id):
     school = request.user.school
     
     # Get attempt
-    attempt = get_object_or_404(QuizAttempt, id=attempt_id, student=student, school=school)
+    attempt = get_object_or_404(
+        QuizAttempt,
+        id=attempt_id,
+        student=student,
+        school=school,
+        quiz__school=school,
+        student__school=school,
+    )
     
     # Check if attempt is already submitted
     if attempt.is_submitted:
@@ -503,56 +538,118 @@ def student_quiz_take_view(request, attempt_id):
     quiz = attempt.quiz
     
     # Check if time limit has expired and auto-submit if not already submitted
-    if quiz.time_limit > 0 and not attempt.is_submitted:
+    if not attempt.is_submitted:
         if attempt.is_time_expired():
-            # Auto-submit the quiz if time has expired
-            from django.db import transaction
-            with transaction.atomic():
-                attempt.submit()
-                # Calculate final score
-                attempt.calculate_score()
-                attempt.save()
+            _submit_attempt_safely(attempt.pk, student, school)
             
             messages.warning(request, "Time limit expired. Your quiz has been automatically submitted.")
             return redirect("quiz_app:student_quiz_result_detail", attempt_id=attempt_id)
     
     # Get questions ordered by order field
-    questions = quiz.questions.all().order_by('order')
+    questions = list(quiz.questions.filter(
+        school=school,
+    ).prefetch_related(
+        Prefetch(
+            'answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        )
+    ).order_by('order', 'created_at', 'pk'))
+    if not attempt.configuration_snapshot:
+        with transaction.atomic():
+            attempt = QuizAttempt.objects.select_for_update().get(pk=attempt.pk)
+            if not attempt.configuration_snapshot:
+                attempt.capture_configuration()
+    question_positions = {
+        question_id: position
+        for position, question_id in enumerate(attempt.question_order, start=1)
+    }
+    questions.sort(
+        key=lambda question: (
+            question_positions.get(question.pk, len(question_positions)),
+            question.pk,
+        )
+    )
+    answer_order = attempt.answer_order or {}
+    for position, question in enumerate(questions, start=1):
+        question.display_order = position
+        question_snapshot = attempt.configuration_snapshot.get(
+            "questions", {}
+        ).get(str(question.pk), {})
+        question.question_text = question_snapshot.get(
+            "question_text", question.question_text
+        )
+        question.marks = question_snapshot.get("marks", question.marks)
+        question.question_type = question_snapshot.get(
+            "question_type", question.question_type
+        )
+        choices = list(question.answer_choices.all())
+        choice_snapshots = question_snapshot.get("choices", {})
+        for choice in choices:
+            snapshot_choice = choice_snapshots.get(str(choice.pk), {})
+            choice.choice_text = snapshot_choice.get("text", choice.choice_text)
+        choice_positions = {
+            choice_id: choice_position
+            for choice_position, choice_id in enumerate(
+                answer_order.get(str(question.pk), []), start=1
+            )
+        }
+        if question.question_type == "ordering":
+            question.display_ordering_items = answer_order.get(str(question.pk), [])
+        question.display_choices = sorted(
+            choices,
+            key=lambda choice: (
+                choice_positions.get(choice.pk, len(choice_positions)),
+                choice.order,
+                choice.pk,
+            ),
+        )
     
     # Get existing responses - create a list of question IDs with responses for template
     existing_responses = {}
     existing_response_data = {}
-    for response in attempt.responses.all():
+    for response in attempt.responses.filter(
+        school=school,
+        question__school=school,
+        question__quiz_id=attempt.quiz_id,
+    ).filter(
+        Q(selected_choice__isnull=True) | Q(selected_choice__school=school)
+    ).select_related('selected_choice').prefetch_related('selected_choices'):
+        response.selected_choice_ids = {
+            choice.pk for choice in response.selected_choices.all()
+        }
         existing_responses[response.question.id] = response
         existing_response_data[response.question.id] = {
             'text_answer': response.text_answer or '',
             'selected_choice_id': response.selected_choice.id if response.selected_choice else None,
+            'selected_choice_ids': list(response.selected_choice_ids),
         }
     
     # Calculate time remaining if time limit exists
     time_remaining = None
     time_remaining_seconds = None
-    if quiz.time_limit > 0:
+    attempt_time_limit = attempt.configuration_snapshot.get("quiz", {}).get(
+        "time_limit", quiz.time_limit
+    )
+    if attempt_time_limit > 0:
         elapsed = timezone.now() - attempt.started_at
         elapsed_minutes = elapsed.total_seconds() / 60
-        time_remaining_minutes = max(0, quiz.time_limit - elapsed_minutes)
+        time_remaining_minutes = max(0, attempt_time_limit - elapsed_minutes)
         time_remaining_seconds = int(time_remaining_minutes * 60)
         time_remaining = f"{int(time_remaining_minutes)}:{int((time_remaining_minutes % 1) * 60):02d}"
         
         # If time has already expired (shouldn't happen due to check above, but just in case)
         if time_remaining_seconds <= 0:
-            # Auto-submit immediately
-            from django.db import transaction
-            with transaction.atomic():
-                attempt.submit()
-                attempt.calculate_score()
-                attempt.save()
+            _submit_attempt_safely(attempt.pk, student, school)
             messages.warning(request, "Time limit expired. Your quiz has been automatically submitted.")
             return redirect("quiz_app:student_quiz_result_detail", attempt_id=attempt_id)
     
     # Get answered questions count
-    answered_count = attempt.responses.count()
-    total_questions = questions.count()
+    answered_count = attempt.responses.filter(
+        school=school,
+        question__school=school,
+        question__quiz_id=attempt.quiz_id,
+    ).count()
+    total_questions = len(questions)
     
     context = {
         'attempt': attempt,
@@ -585,28 +682,49 @@ def student_quiz_save_view(request, attempt_id):
     student = request.user.student_profile
     school = request.user.school
     
-    # Get attempt
-    try:
-        attempt = QuizAttempt.objects.get(id=attempt_id, student=student, school=school)
-    except QuizAttempt.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Attempt not found'}, status=404)
-    
-    # Check if already submitted
-    if attempt.is_submitted:
-        return JsonResponse({'success': False, 'error': 'Quiz already submitted'}, status=400)
-    
-    # Get question ID and response data
     question_id = request.POST.get('question_id')
     if not question_id:
         return JsonResponse({'success': False, 'error': 'Question ID required'}, status=400)
-    
-    try:
-        question = attempt.quiz.questions.get(id=question_id)
-    except Question.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Question not found'}, status=404)
-    
+
     try:
         with transaction.atomic():
+            try:
+                attempt = QuizAttempt.objects.select_for_update().select_related(
+                    'quiz'
+                ).get(
+                    id=attempt_id,
+                    student=student,
+                    school=school,
+                    quiz__school=school,
+                    student__school=school,
+                )
+            except QuizAttempt.DoesNotExist:
+                return JsonResponse(
+                    {'success': False, 'error': 'Attempt not found'}, status=404
+                )
+
+            if attempt.is_submitted:
+                return JsonResponse(
+                    {'success': False, 'error': 'Quiz already submitted'}, status=400
+                )
+
+            if attempt.is_time_expired():
+                attempt.submit()
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Time limit expired. Quiz has been submitted.',
+                    'submitted': True,
+                }, status=400)
+
+            try:
+                question = attempt.quiz.questions.get(
+                    id=question_id, school=school
+                )
+            except Question.DoesNotExist:
+                return JsonResponse(
+                    {'success': False, 'error': 'Question not found'}, status=404
+                )
+
             # Get or create response
             response, created = QuizResponse.objects.get_or_create(
                 attempt=attempt,
@@ -616,20 +734,30 @@ def student_quiz_save_view(request, attempt_id):
             
             # Update response based on question type
             if question.question_type in ['multiple_choice', 'true_false']:
-                choice_id = request.POST.get('choice_id')
-                if choice_id:
-                    try:
-                        choice = question.answer_choices.get(id=choice_id)
-                        response.selected_choice = choice
-                        response.selected_choices.clear()
-                        response.selected_choices.add(choice)
-                    except AnswerChoice.DoesNotExist:
-                        return JsonResponse({'success': False, 'error': 'Invalid choice'}, status=400)
-                else:
-                    response.selected_choice = None
-                    response.selected_choices.clear()
+                choice_ids = request.POST.getlist('choice_ids')
+                if not choice_ids and request.POST.get('choice_id'):
+                    choice_ids = [request.POST.get('choice_id')]
+                choices = list(
+                    question.answer_choices.filter(
+                        id__in=choice_ids, school=school
+                    )
+                )
+                if len({str(choice.pk) for choice in choices}) != len(set(choice_ids)):
+                    return JsonResponse(
+                        {'success': False, 'error': 'Invalid choice'}, status=400
+                    )
+                if question.question_type == "true_false" and len(choices) > 1:
+                    return JsonResponse(
+                        {'success': False, 'error': 'Select only one answer.'},
+                        status=400,
+                    )
+                response.selected_choice = choices[0] if len(choices) == 1 else None
+                response.selected_choices.set(choices)
             
             elif question.question_type in ['short_answer', 'fill_blank', 'essay']:
+                text_answer = request.POST.get('text_answer', '').strip()
+                response.text_answer = text_answer
+            elif question.question_type in ['matching', 'ordering']:
                 text_answer = request.POST.get('text_answer', '').strip()
                 response.text_answer = text_answer
             
@@ -664,51 +792,25 @@ def student_quiz_submit_view(request, attempt_id):
     school = request.user.school
     
     # Get attempt
-    attempt = get_object_or_404(QuizAttempt, id=attempt_id, student=student, school=school)
-    
-    # Check if already submitted
-    if attempt.is_submitted:
-        messages.info(request, "This quiz has already been submitted.")
-        return redirect("quiz_app:student_quiz_result_detail", attempt_id=attempt_id)
-    
-    # Check time limit - allow submission even if expired (for auto-submit)
-    time_expired = False
-    if attempt.quiz.time_limit > 0:
-        elapsed = timezone.now() - attempt.started_at
-        elapsed_minutes = elapsed.total_seconds() / 60
-        if elapsed_minutes > attempt.quiz.time_limit:
-            time_expired = True
-            # Don't block submission, just note that time expired
+    attempt = get_object_or_404(
+        QuizAttempt,
+        id=attempt_id,
+        student=student,
+        school=school,
+        quiz__school=school,
+        student__school=school,
+    )
     
     try:
-        with transaction.atomic():
-            # Mark as completed and submitted
-            attempt.is_completed = True
-            attempt.completed_at = timezone.now()
-            attempt.submitted_at = timezone.now()
-            attempt.is_submitted = True
-            
-            # Calculate time taken
-            if attempt.completed_at and attempt.started_at:
-                attempt.time_taken = attempt.completed_at - attempt.started_at
-            
-            # Calculate score
-            attempt.calculate_score()
-            
-            # Check if needs grading (essay questions)
-            essay_questions = attempt.quiz.questions.filter(question_type='essay')
-            if essay_questions.exists():
-                essay_responses = attempt.responses.filter(question__question_type='essay')
-                if essay_responses.exists():
-                    attempt.needs_grading = True
-            
-            attempt.save()
-            
-            if time_expired:
-                messages.warning(request, "Time limit expired. Quiz has been submitted with your current answers.")
-            else:
-                messages.success(request, "Quiz submitted successfully!")
-            return redirect("quiz_app:student_quiz_result_detail", attempt_id=attempt_id)
+        already_submitted = attempt.is_submitted
+        attempt = _submit_attempt_safely(attempt_id, student, school)
+        if already_submitted:
+            messages.info(request, "This quiz has already been submitted.")
+        elif attempt.is_time_expired():
+            messages.warning(request, "Time limit expired. Quiz submitted with current answers.")
+        else:
+            messages.success(request, "Quiz submitted successfully!")
+        return redirect("quiz_app:student_quiz_result_detail", attempt_id=attempt_id)
             
     except Exception as e:
         messages.error(request, f"An error occurred while submitting the quiz: {str(e)}")
@@ -736,7 +838,9 @@ def student_quiz_attempts_view(request):
     # Get all attempts for this student
     attempts = QuizAttempt.objects.filter(
         student=student,
-        school=school
+        school=school,
+        quiz__school=school,
+        student__school=school,
     ).select_related('quiz', 'quiz__subject', 'quiz__teacher', 'academic_year', 'term').order_by('-submitted_at', '-started_at')
     
     # Filter by quiz
@@ -868,18 +972,32 @@ def student_quiz_result_detail_view(request, attempt_id):
         pk=attempt_id,
         student=student,
         school=school,
+        quiz__school=school,
+        student__school=school,
         is_submitted=True
     )
     
     quiz = attempt.quiz
     
     # Get all responses ordered by question order
-    responses = attempt.responses.select_related(
+    responses = attempt.responses.filter(
+        school=school,
+        question__school=school,
+        question__quiz_id=attempt.quiz_id,
+    ).filter(
+        Q(selected_choice__isnull=True) | Q(selected_choice__school=school)
+    ).select_related(
         'question'
     ).prefetch_related(
-        'question__answer_choices',
+        Prefetch(
+            'question__answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
         'selected_choice',
-        'selected_choices'
+        Prefetch(
+            'selected_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
     ).order_by('question__order')
     
     # Create a dictionary of responses by question ID for easy lookup
@@ -888,7 +1006,12 @@ def student_quiz_result_detail_view(request, attempt_id):
         responses_dict[response.question.id] = response
     
     # Get all questions to show unanswered ones
-    all_questions = quiz.questions.all().order_by('order')
+    all_questions = quiz.questions.filter(school=school).prefetch_related(
+        Prefetch(
+            'answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        )
+    ).order_by('order')
     answered_question_ids = set(responses.values_list('question_id', flat=True))
     
     context = {
@@ -898,6 +1021,7 @@ def student_quiz_result_detail_view(request, attempt_id):
         'responses_dict': responses_dict,
         'all_questions': all_questions,
         'answered_question_ids': answered_question_ids,
+        'can_review': quiz.show_results_immediately and quiz.allow_review,
     }
     
     return render(request, 'quiz/student/result_detail.html', context)
@@ -926,22 +1050,41 @@ def student_quiz_result_print_view(request, attempt_id):
         pk=attempt_id,
         student=student,
         school=school,
+        quiz__school=school,
+        student__school=school,
         is_submitted=True
     )
     
     quiz = attempt.quiz
     
     # Get all responses ordered by question order
-    responses = attempt.responses.select_related(
+    responses = attempt.responses.filter(
+        school=school,
+        question__school=school,
+        question__quiz_id=attempt.quiz_id,
+    ).filter(
+        Q(selected_choice__isnull=True) | Q(selected_choice__school=school)
+    ).select_related(
         'question'
     ).prefetch_related(
-        'question__answer_choices',
+        Prefetch(
+            'question__answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
         'selected_choice',
-        'selected_choices'
+        Prefetch(
+            'selected_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
     ).order_by('question__order')
     
     # Get all questions to show unanswered ones
-    all_questions = quiz.questions.all().order_by('order')
+    all_questions = quiz.questions.filter(school=school).prefetch_related(
+        Prefetch(
+            'answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        )
+    ).order_by('order')
     answered_question_ids = set(responses.values_list('question_id', flat=True))
     
     # School information (school is already a SchoolInformation instance)
@@ -954,6 +1097,9 @@ def student_quiz_result_print_view(request, attempt_id):
         'responses': responses,
         'all_questions': all_questions,
         'answered_question_ids': answered_question_ids,
+        'student_view': True,
+        'can_review': quiz.show_results_immediately and quiz.allow_review,
+        'show_correct_answers': quiz.show_correct_answers,
     }]
     
     context = {
@@ -963,4 +1109,3 @@ def student_quiz_result_print_view(request, attempt_id):
     }
     
     return render(request, 'quiz/results/unified_result_print.html', context)
-

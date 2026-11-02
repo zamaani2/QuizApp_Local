@@ -1,5 +1,12 @@
 # Multi-Tenancy Audit Report
 
+> **Historical report — not a current security assurance.** The conclusions
+> below have not been revalidated and should not be used to claim complete
+> school isolation. `TenantAccessMiddleware` now fails closed for
+> unauthenticated or invalid school identities on application views, but
+> per-view role authorization, object/query scoping, submitted relationship
+> validation, and endpoint-level cross-school tests are still outstanding.
+
 This report audits all views in the `quiz_app/views/` directory to verify proper implementation of school-based multi-tenancy.
 
 ## Audit Methodology

@@ -21,6 +21,17 @@
       <form id="bulkImportForm" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="modal-body">
+          {% if user.role == "superadmin" %}
+          <div class="mb-3">
+            <label for="school_id" class="form-label">Target School <span class="text-danger">*</span></label>
+            <select class="form-select" id="school_id" name="school_id" required>
+              <option value="">Select School</option>
+              {% for school in schools %}
+              <option value="{{ school.id }}">{{ school.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
           <!-- Step 1: File Upload -->
           <div id="step1" class="import-step">
             <div class="alert alert-info">

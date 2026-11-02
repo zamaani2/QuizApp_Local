@@ -392,6 +392,7 @@
       <!-- Questions and Answers -->
       <div class="questions-section">
         <h3 class="section-title">Questions and Answers</h3>
+        {% if not attempt_data.student_view or attempt_data.can_review %}
         {% for question in attempt_data.all_questions %}
         <div class="question-item">
           <div class="question-header">
@@ -432,7 +433,9 @@
           </div>
 
           <!-- Correct Answer (if incorrect) -->
-          {% if not response.is_correct %} {% if question.question_type == 'multiple_choice' or question.question_type == 'true_false' or question.question_type == 'multiple_select' %}
+          {% if not response.is_correct %}
+          {% if not attempt_data.student_view or attempt_data.show_correct_answers %}
+          {% if question.question_type == 'multiple_choice' or question.question_type == 'true_false' or question.question_type == 'multiple_select' %}
           <div class="answer-box correct" style="margin-top: 4px">
             <div class="answer-label">CORRECT ANSWER:</div>
             <div class="answer-content">
@@ -444,15 +447,22 @@
             <div class="answer-label">CORRECT ANSWER:</div>
             <div class="answer-content">{{ question.correct_answer_text }}</div>
           </div>
-          {% endif %} {% endif %}
+          {% endif %}
+          {% endif %}
+          {% endif %}
 
           <!-- Explanation -->
           {% if question.explanation %}
+          {% if not attempt_data.student_view or attempt_data.show_correct_answers %}
           <div class="explanation">
             <strong>EXPLANATION:</strong> {{ question.explanation|truncatewords:30 }}
           </div>
-          {% endif %} {% endwith %} {% endif %} {% endfor %} {% else %}
-          <!-- Unanswered Question -->
+          {% endif %}
+          {% endif %}
+          {% endwith %}
+          {% endif %}
+          {% endfor %}
+          {% else %}
           <div class="answer-box unanswered">
             <div class="answer-label">STUDENT ANSWER:</div>
             <div class="answer-content">
@@ -466,6 +476,9 @@
           {% endif %}
         </div>
         {% endfor %}
+        {% else %}
+          <p>Score summary only; answer review is not available for this quiz.</p>
+        {% endif %}
       </div>
 
       <!-- Footer -->

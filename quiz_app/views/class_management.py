@@ -14,7 +14,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q
+from django.db.models import Count, F, Q
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
@@ -25,9 +25,12 @@ from ..models import (
     LearningArea,
     AcademicYear,
     Subject,
+    ClassTeacher,
     StudentClass,
+    TeacherSubjectAssignment,
     SchoolInformation,
 )
+from ..utils.tenant_utils import get_object_or_404_with_school, get_write_school
 
 
 @login_required
@@ -45,6 +48,14 @@ def class_list_view(request):
     
     if school:
         classes = classes.filter(school=school)
+    status_filter = request.GET.get("status", "active")
+    if status_filter == "archived":
+        classes = classes.filter(is_active=False)
+    elif status_filter == "all":
+        pass
+    else:
+        status_filter = "active"
+        classes = classes.filter(is_active=True)
     
     # Search functionality
     search_query = request.GET.get('search', '')
@@ -70,7 +81,18 @@ def class_list_view(request):
         classes = classes.filter(academic_year_id=academic_year_filter)
     
     # Order by academic year and name
-    classes = classes.order_by('-academic_year__start_date', 'name')
+    classes = classes.select_related(
+        "form", "learning_area", "academic_year"
+    ).annotate(
+        current_student_count=Count(
+            "studentclass",
+            filter=Q(
+                studentclass__is_active=True,
+                studentclass__school_id=F("school_id"),
+                studentclass__student__school_id=F("school_id"),
+            ),
+        )
+    ).order_by('-academic_year__start_date', 'name')
     
     # Get filter options
     forms = Form.objects.all()
@@ -93,6 +115,7 @@ def class_list_view(request):
         'form_filter': form_filter,
         'learning_area_filter': learning_area_filter,
         'academic_year_filter': academic_year_filter,
+        'status_filter': status_filter,
     }
     
     return render(request, 'class/class_list.html', context)
@@ -134,11 +157,23 @@ def class_create_view(request):
             'forms': forms,
             'learning_areas': learning_areas,
             'academic_years': academic_years,
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
     
     # POST - Create class
+    school = get_write_school(request)
+    if school is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Select a valid target school.',
+        }, status=400)
+
     try:
         with transaction.atomic():
             # Get form data
@@ -180,7 +215,10 @@ def class_create_view(request):
                 try:
                     form = Form.objects.get(pk=form_id, school=school)
                 except Form.DoesNotExist:
-                    pass
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid form selected.',
+                    }, status=400)
             
             # Get learning area if provided
             learning_area = None
@@ -188,7 +226,10 @@ def class_create_view(request):
                 try:
                     learning_area = LearningArea.objects.get(pk=learning_area_id, school=school)
                 except LearningArea.DoesNotExist:
-                    pass
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid learning area selected.',
+                    }, status=400)
             
             # Create class
             class_obj = Class(
@@ -245,18 +286,8 @@ def class_edit_view(request, class_id):
         messages.error(request, "You don't have permission to perform this action.")
         return redirect("quiz_app:class_list")
     
-    school = request.user.school
-    
-    # Superadmin can access any class, regular admin only their school
-    if request.user.role == "superadmin":
-        class_obj = get_object_or_404(Class, pk=class_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:class_list")
-        class_obj = get_object_or_404(Class, pk=class_id, school=school)
+    class_obj = get_object_or_404_with_school(Class, request, pk=class_id)
+    school = class_obj.school
     
     if request.method == "GET":
         # Get options for dropdowns
@@ -315,7 +346,10 @@ def class_edit_view(request, class_id):
                 try:
                     class_obj.form = Form.objects.get(pk=form_id, school=school)
                 except Form.DoesNotExist:
-                    class_obj.form = None
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid form selected.',
+                    }, status=400)
             else:
                 class_obj.form = None
             
@@ -324,7 +358,10 @@ def class_edit_view(request, class_id):
                 try:
                     class_obj.learning_area = LearningArea.objects.get(pk=learning_area_id, school=school)
                 except LearningArea.DoesNotExist:
-                    class_obj.learning_area = None
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid learning area selected.',
+                    }, status=400)
             else:
                 class_obj.learning_area = None
             
@@ -363,41 +400,52 @@ def class_edit_view(request, class_id):
 @require_http_methods(["POST"])
 def class_delete_view(request, class_id):
     """
-    Delete a class.
+    Archive a class while preserving its historical records.
     """
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    school = request.user.school
-    
-    # Superadmin can access any class, regular admin only their school
-    if request.user.role == "superadmin":
-        class_obj = get_object_or_404(Class, pk=class_id)
-    else:
-        if not school:
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        class_obj = get_object_or_404(Class, pk=class_id, school=school)
-    
+    class_obj = get_object_or_404_with_school(Class, request, pk=class_id)
     try:
-        # Check if class has students
-        student_count = class_obj.studentclass_set.count()
-        if student_count > 0:
-            return JsonResponse({
-                'success': False,
-                'error': f'Cannot delete class. It has {student_count} student(s) assigned to it.'
-            }, status=400)
-        
-        class_name = class_obj.name
-        class_obj.delete()
+        with transaction.atomic():
+            class_obj = Class.objects.select_for_update().get(pk=class_obj.pk)
+            if class_obj.is_active:
+                StudentClass.objects.filter(
+                    assigned_class=class_obj, is_active=True
+                ).update(is_active=False)
+                TeacherSubjectAssignment.objects.filter(
+                    class_assigned=class_obj, is_active=True
+                ).update(is_active=False)
+                ClassTeacher.objects.filter(
+                    class_assigned=class_obj, is_active=True
+                ).update(is_active=False)
+                class_obj.is_active = False
+                class_obj.save(update_fields=["is_active"])
         return JsonResponse({
             'success': True,
-            'message': f'Class {class_name} deleted successfully.'
+            'message': f'Class {class_obj.name} archived successfully.'
         })
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': f'Error deleting class: {str(e)}'
+            'error': f'Error archiving class: {str(e)}'
         }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def class_restore_view(request, class_id):
+    if request.user.role not in ["admin", "superadmin"]:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    class_obj = get_object_or_404_with_school(Class, request, pk=class_id)
+    if not class_obj.is_active:
+        class_obj.is_active = True
+        class_obj.save(update_fields=["is_active"])
+    return JsonResponse({
+        "success": True,
+        "message": f"Class {class_obj.name} restored. Historical enrollments and assignments remain inactive.",
+    })
 
 
 @login_required
@@ -411,22 +459,28 @@ def class_detail_view(request, class_id):
         return redirect("quiz_app:dashboard")
     
     school = request.user.school
-    class_obj = get_object_or_404(Class, pk=class_id)
-    
-    # Ensure class belongs to same school
-    if school and class_obj.school != school:
-        messages.error(request, "You don't have permission to view this class.")
-        return redirect("quiz_app:class_list")
+    class_obj = get_object_or_404_with_school(Class, request, pk=class_id)
     
     # Get class subjects
-    class_subjects = ClassSubject.objects.filter(class_name=class_obj).order_by('subject__subject_name')
+    class_subjects = ClassSubject.objects.filter(
+        class_name=class_obj,
+        school=class_obj.school,
+        subject__school=class_obj.school,
+    ).order_by('subject__subject_name')
     
     # Get available subjects (not already assigned to this class for the same academic year)
     assigned_subject_ids = class_subjects.values_list('subject_id', flat=True)
-    available_subjects = Subject.objects.filter(school=school).exclude(pk__in=assigned_subject_ids).order_by('subject_name')
+    available_subjects = Subject.objects.filter(
+        school=class_obj.school
+    ).exclude(pk__in=assigned_subject_ids).order_by('subject_name')
     
     # Get students in this class
-    students = StudentClass.objects.filter(assigned_class=class_obj, is_active=True).select_related('student').order_by('student__full_name')
+    students = StudentClass.objects.filter(
+        assigned_class=class_obj,
+        is_active=True,
+        school=class_obj.school,
+        student__school=class_obj.school,
+    ).select_related('student').order_by('student__full_name')
     
     context = {
         'class_obj': class_obj,
@@ -447,15 +501,8 @@ def class_subject_add_view(request, class_id):
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    school = request.user.school
-    
-    # Superadmin can access any class, regular admin only their school
-    if request.user.role == "superadmin":
-        class_obj = get_object_or_404(Class, pk=class_id)
-    else:
-        if not school:
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        class_obj = get_object_or_404(Class, pk=class_id, school=school)
+    class_obj = get_object_or_404_with_school(Class, request, pk=class_id)
+    school = class_obj.school
     
     try:
         import json
@@ -481,7 +528,8 @@ def class_subject_add_view(request, class_id):
         existing = ClassSubject.objects.filter(
             class_name=class_obj,
             subject=subject,
-            academic_year=class_obj.academic_year
+            academic_year=class_obj.academic_year,
+            school=school,
         ).first()
         
         if existing:
@@ -524,19 +572,16 @@ def class_subject_remove_view(request, class_id, class_subject_id):
     
     school = request.user.school
     
-    # Superadmin can access any class, regular admin only their school
-    if request.user.role == "superadmin":
-        class_obj = get_object_or_404(Class, pk=class_id)
-    else:
-        if not school:
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        class_obj = get_object_or_404(Class, pk=class_id, school=school)
+    class_obj = get_object_or_404_with_school(Class, request, pk=class_id)
     
-    # ClassSubject filtering - ensure it belongs to the class which belongs to school
-    if request.user.role == "superadmin":
-        class_subject = get_object_or_404(ClassSubject, pk=class_subject_id, class_name=class_obj)
-    else:
-        class_subject = get_object_or_404(ClassSubject, pk=class_subject_id, class_name=class_obj, class_name__school=school)
+    class_subject = get_object_or_404_with_school(
+        ClassSubject,
+        request,
+        pk=class_subject_id,
+        school_field="school",
+        class_name=class_obj,
+        school=class_obj.school,
+    )
     
     try:
         subject_name = class_subject.subject.subject_name
@@ -550,4 +595,3 @@ def class_subject_remove_view(request, class_id, class_subject_id):
             'success': False,
             'error': f'Error removing subject: {str(e)}'
         }, status=500)
-

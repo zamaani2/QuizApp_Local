@@ -37,6 +37,16 @@ from ..models import (
 )
 
 
+def _quiz_form_error(request, error, quiz_id=None):
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': error}, status=400)
+
+    messages.error(request, error)
+    if quiz_id is not None:
+        return redirect("quiz_app:quiz_edit", quiz_id=quiz_id)
+    return redirect("quiz_app:quiz_create")
+
+
 @login_required
 @require_http_methods(["GET"])
 def quiz_list_view(request):
@@ -313,6 +323,36 @@ def quiz_create_view(request):
             category = None
             if category_id:
                 category = get_object_or_404(QuizCategory, pk=category_id, school=school)
+
+            class_ids = request.POST.getlist('classes')
+            classes = Class.objects.filter(pk__in=class_ids, school=school)
+            if len(set(class_ids)) != classes.count():
+                return _quiz_form_error(
+                    request, 'One or more selected classes are invalid.'
+                )
+
+            academic_year = None
+            term = None
+            academic_year_id = request.POST.get('academic_year')
+            term_id = request.POST.get('term')
+            if term_id and not academic_year_id:
+                return _quiz_form_error(
+                    request, 'Select an academic year for the selected term.'
+                )
+            if academic_year_id:
+                academic_year = AcademicYear.objects.filter(
+                    pk=academic_year_id, school=school
+                ).first()
+                if not academic_year:
+                    return _quiz_form_error(request, 'Invalid academic year selected.')
+                if term_id:
+                    term = Term.objects.filter(
+                        pk=term_id,
+                        academic_year=academic_year,
+                        school=school,
+                    ).first()
+                    if not term:
+                        return _quiz_form_error(request, 'Invalid term selected.')
             
             # Generate unique quiz_id
             quiz_id = f"QZ-{school.id:03d}{Quiz.objects.filter(school=school).count() + 1:05d}"
@@ -326,6 +366,8 @@ def quiz_create_view(request):
                 subject=subject,
                 category=category,
                 teacher=teacher,
+                academic_year=academic_year,
+                term=term,
                 difficulty=difficulty,
                 status=status,
                 time_limit=int(time_limit) if time_limit else 0,
@@ -345,21 +387,8 @@ def quiz_create_view(request):
             quiz.save()
             
             # Assign classes
-            class_ids = request.POST.getlist('classes')
             if class_ids:
-                classes = Class.objects.filter(pk__in=class_ids, school=school)
                 quiz.classes.set(classes)
-            
-            # Assign academic year and term
-            academic_year_id = request.POST.get('academic_year')
-            term_id = request.POST.get('term')
-            if academic_year_id:
-                academic_year = get_object_or_404(AcademicYear, pk=academic_year_id, school=school)
-                quiz.academic_year = academic_year
-                if term_id:
-                    term = get_object_or_404(Term, pk=term_id, academic_year=academic_year)
-                    quiz.term = term
-                quiz.save()
             
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
@@ -582,33 +611,55 @@ def quiz_edit_view(request, quiz_id):
                 quiz.category = category
             else:
                 quiz.category = None
+
+            class_ids = request.POST.getlist('classes')
+            classes = Class.objects.filter(pk__in=class_ids, school=school)
+            if len(set(class_ids)) != classes.count():
+                return _quiz_form_error(
+                    request,
+                    'One or more selected classes are invalid.',
+                    quiz_id=quiz_id,
+                )
+
+            academic_year = None
+            term = None
+            academic_year_id = request.POST.get('academic_year')
+            term_id = request.POST.get('term')
+            if term_id and not academic_year_id:
+                return _quiz_form_error(
+                    request,
+                    'Select an academic year for the selected term.',
+                    quiz_id=quiz_id,
+                )
+            if academic_year_id:
+                academic_year = AcademicYear.objects.filter(
+                    pk=academic_year_id, school=school
+                ).first()
+                if not academic_year:
+                    return _quiz_form_error(
+                        request, 'Invalid academic year selected.', quiz_id=quiz_id
+                    )
+                if term_id:
+                    term = Term.objects.filter(
+                        pk=term_id,
+                        academic_year=academic_year,
+                        school=school,
+                    ).first()
+                    if not term:
+                        return _quiz_form_error(
+                            request, 'Invalid term selected.', quiz_id=quiz_id
+                        )
+
+            quiz.academic_year = academic_year
+            quiz.term = term
             
             quiz.save()
             
             # Assign classes
-            class_ids = request.POST.getlist('classes')
             if class_ids:
-                classes = Class.objects.filter(pk__in=class_ids, school=school)
                 quiz.classes.set(classes)
             else:
                 quiz.classes.clear()
-            
-            # Assign academic year and term
-            academic_year_id = request.POST.get('academic_year')
-            term_id = request.POST.get('term')
-            if academic_year_id:
-                academic_year = get_object_or_404(AcademicYear, pk=academic_year_id, school=school)
-                quiz.academic_year = academic_year
-                if term_id:
-                    term = get_object_or_404(Term, pk=term_id, academic_year=academic_year)
-                    quiz.term = term
-                else:
-                    quiz.term = None
-            else:
-                quiz.academic_year = None
-                quiz.term = None
-            
-            quiz.save()
             
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
@@ -777,23 +828,23 @@ def get_terms_for_academic_year_view(request):
     if not academic_year_id:
         return JsonResponse({'error': 'Academic year ID is required.'}, status=400)
     
-    try:
-        academic_year = get_object_or_404(AcademicYear, pk=academic_year_id, school=school)
-        terms = Term.objects.filter(academic_year=academic_year).order_by('term_number')
-        
-        terms_data = [{
-            'id': term.id,
-            'name': term.name,
-            'term_number': term.term_number,
-        } for term in terms]
-        
-        return JsonResponse({
-            'success': True,
-            'terms': terms_data,
-        })
-    
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Error fetching terms: {str(e)}'
-        }, status=500)
+    academic_year = get_object_or_404(
+        AcademicYear,
+        pk=academic_year_id,
+        school=school,
+    )
+    terms = Term.objects.filter(
+        academic_year=academic_year,
+        school=school,
+    ).order_by('term_number')
+
+    terms_data = [{
+        'id': term.id,
+        'name': term.get_term_number_display(),
+        'term_number': term.term_number,
+    } for term in terms]
+
+    return JsonResponse({
+        'success': True,
+        'terms': terms_data,
+    })

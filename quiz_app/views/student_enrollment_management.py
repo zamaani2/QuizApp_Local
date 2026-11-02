@@ -12,8 +12,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q
-from django.db import transaction
+from django.db.models import F, Q
+from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
 
 from ..models import (
@@ -24,6 +24,7 @@ from ..models import (
     SchoolInformation,
     User,
 )
+from ..utils.tenant_utils import get_object_or_404_with_school
 
 
 @login_required
@@ -37,7 +38,11 @@ def student_enrollment_list_view(request):
         return redirect("quiz_app:dashboard")
 
     school = request.user.school
-    enrollments = StudentClass.objects.all()
+    enrollments = StudentClass.objects.filter(
+        school__isnull=False,
+        student__school_id=F("school_id"),
+        assigned_class__school_id=F("school_id"),
+    )
     
     if school:
         enrollments = enrollments.filter(school=school)
@@ -89,6 +94,11 @@ def student_enrollment_list_view(request):
         'student_filter': student_filter,
         'class_filter': class_filter,
         'active_filter': active_filter,
+        'target_schools': (
+            SchoolInformation.objects.filter(is_active=True).order_by("name")
+            if request.user.role == "superadmin"
+            else SchoolInformation.objects.none()
+        ),
     }
     
     return render(request, 'student_enrollment/enrollment_list.html', context)
@@ -147,26 +157,61 @@ def student_enrollment_create_view(request):
                 }, status=400)
             
             # Get related objects
+            class_queryset = Class.objects.filter(pk=class_id)
+            if request.user.role != "superadmin":
+                class_queryset = class_queryset.filter(school=school)
             try:
-                student = Student.objects.get(pk=student_id, school=school)
-                class_obj = Class.objects.get(pk=class_id, school=school)
-            except (Student.DoesNotExist, Class.DoesNotExist) as e:
+                class_obj = class_queryset.select_for_update().get()
+            except Class.DoesNotExist:
                 return JsonResponse({
                     'success': False,
                     'error': 'Invalid selection. Please ensure all selections belong to your school.'
                 }, status=400)
+            school = class_obj.school
+            if school is None or not school.is_active:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'The selected class has no school association.',
+                }, status=400)
+            try:
+                student = Student.objects.select_for_update().get(
+                    pk=student_id,
+                    school=school,
+                )
+            except Student.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid selection. Please ensure all selections belong to the selected class school.'
+                }, status=400)
             
             # Check if student already has an active assignment
-            existing_assignment = StudentClass.objects.filter(
+            existing_assignment = StudentClass.objects.select_for_update().filter(
                 student=student,
                 is_active=True,
-                school=school
+                school=school,
+                assigned_class__school=school,
             ).first()
             
             if existing_assignment:
+                if existing_assignment.assigned_class_id == class_obj.pk:
+                    return JsonResponse({
+                        'success': True,
+                        'message': f'Student {student.full_name} is already assigned to class {class_obj.name}.',
+                        'enrollment_id': existing_assignment.id,
+                    })
+                if class_obj.is_class_full():
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'The selected class has reached its capacity.',
+                    }, status=400)
                 # Deactivate existing assignment
                 existing_assignment.is_active = False
                 existing_assignment.save()
+            elif class_obj.is_class_full():
+                return JsonResponse({
+                    'success': False,
+                    'error': 'The selected class has reached its capacity.',
+                }, status=400)
             
             # Create enrollment
             enrollment = StudentClass(
@@ -198,6 +243,11 @@ def student_enrollment_create_view(request):
             'success': False,
             'error': ' '.join(error_messages)
         }, status=400)
+    except IntegrityError:
+        return JsonResponse({
+            'success': False,
+            'error': 'The student already has an active class enrollment.',
+        }, status=409)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -257,71 +307,114 @@ def student_enrollment_bulk_create_view(request):
                 'error': 'Please fill in all required fields.'
             }, status=400)
         
-        if not isinstance(student_ids, list) or len(student_ids) == 0:
+        if not isinstance(student_ids, list) or not student_ids:
             return JsonResponse({
                 'success': False,
                 'error': 'Please select at least one student.'
             }, status=400)
-        
-        # Get class
+
         try:
-            class_obj = Class.objects.get(pk=class_id, school=school)
-        except Class.DoesNotExist:
+            student_ids = [int(student_id) for student_id in student_ids]
+        except (TypeError, ValueError):
             return JsonResponse({
                 'success': False,
-                'error': 'Invalid class selected.'
+                'error': 'Invalid student IDs provided.',
             }, status=400)
-        
-        # Get students
-        students = Student.objects.filter(pk__in=student_ids, school=school)
-        
-        if students.count() != len(student_ids):
+        if len(student_ids) != len(set(student_ids)):
             return JsonResponse({
                 'success': False,
-                'error': 'One or more selected students are invalid.'
+                'error': 'Student IDs must be unique.',
             }, status=400)
-        
-        # Create enrollments
+
         created = 0
         skipped = 0
         errors = []
-        
+
         with transaction.atomic():
+            class_queryset = Class.objects.filter(pk=class_id)
+            if request.user.role != "superadmin":
+                class_queryset = class_queryset.filter(school=school)
+            try:
+                class_obj = class_queryset.select_for_update().get()
+            except Class.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid class selected.'
+                }, status=400)
+            school = class_obj.school
+            if school is None or not school.is_active:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'The selected class has no active school association.',
+                }, status=400)
+
+            students = list(
+                Student.objects.select_for_update()
+                .filter(pk__in=student_ids, school=school)
+                .order_by("pk")
+            )
+            if len(students) != len(student_ids):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'One or more selected students are invalid.'
+                }, status=400)
+
             for student in students:
                 try:
-                    # Check if student already has an active assignment
+                    with transaction.atomic():
+                        existing_assignment = StudentClass.objects.select_for_update().filter(
+                            student=student,
+                            is_active=True,
+                            school=school,
+                            assigned_class__school=school,
+                        ).first()
+
+                        if existing_assignment:
+                            if existing_assignment.assigned_class_id == class_obj.pk:
+                                skipped += 1
+                                continue
+                            if class_obj.is_class_full():
+                                errors.append(
+                                    f'{student.full_name}: The selected class has reached its capacity.'
+                                )
+                                continue
+                            existing_assignment.is_active = False
+                            existing_assignment.save()
+                        elif class_obj.is_class_full():
+                            errors.append(
+                                f'{student.full_name}: The selected class has reached its capacity.'
+                            )
+                            continue
+
+                        enrollment = StudentClass(
+                            student=student,
+                            assigned_class=class_obj,
+                            assigned_by=request.user,
+                            school=school,
+                        )
+                        enrollment.full_clean()
+                        enrollment.save()
+                        created += 1
+                except ValidationError as e:
+                    errors.append(f'{student.full_name}: {str(e)}')
+                except IntegrityError:
                     existing_assignment = StudentClass.objects.filter(
                         student=student,
                         is_active=True,
-                        school=school
-                    ).first()
-                    
-                    if existing_assignment:
-                        if existing_assignment.assigned_class == class_obj:
-                            skipped += 1
-                            continue
-                        else:
-                            # Deactivate existing assignment
-                            existing_assignment.is_active = False
-                            existing_assignment.save()
-                    
-                    # Create enrollment
-                    enrollment = StudentClass(
-                        student=student,
-                        assigned_class=class_obj,
-                        assigned_by=request.user,
                         school=school,
-                    )
-                    enrollment.full_clean()
-                    enrollment.save()
-                    created += 1
-                
-                except ValidationError as e:
-                    errors.append(f'{student.full_name}: {str(e)}')
-                except Exception as e:
-                    errors.append(f'{student.full_name}: {str(e)}')
-        
-        # Prepare response
+                        assigned_class__school=school,
+                    ).first()
+                    if (
+                        existing_assignment
+                        and existing_assignment.assigned_class_id == class_obj.pk
+                    ):
+                        skipped += 1
+                    else:
+                        errors.append(
+                            f'{student.full_name}: An active enrollment changed '
+                            'while this request was being processed.'
+                        )
+
         response_data = {
             'success': True,
             'created': created,
@@ -367,23 +460,22 @@ def student_enrollment_edit_view(request, enrollment_id):
     
     school = request.user.school
     
-    # Superadmin can access any enrollment, regular admin only their school
-    if request.user.role == "superadmin":
-        enrollment = get_object_or_404(StudentClass, pk=enrollment_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:enrollment_list")
-        enrollment = get_object_or_404(StudentClass, pk=enrollment_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and enrollment.school != school:
-        if request.method == "GET":
-            return JsonResponse({'error': 'Enrollment not found'}, status=404)
-        messages.error(request, "You don't have permission to edit this enrollment.")
-        return redirect("quiz_app:enrollment_list")
+    enrollment = get_object_or_404_with_school(
+        StudentClass, request, pk=enrollment_id
+    )
+    if (
+        enrollment.school_id is None
+        or enrollment.student.school_id != enrollment.school_id
+        or enrollment.assigned_class.school_id != enrollment.school_id
+    ):
+        return JsonResponse({'error': 'Enrollment has an invalid school association.'}, status=404)
+    school = enrollment.assigned_class.school
+    if (
+        school is None
+        or enrollment.school_id != school.pk
+        or enrollment.student.school_id != school.pk
+    ):
+        return JsonResponse({'error': 'Enrollment has an invalid school association.'}, status=404)
     
     if request.method == "GET":
         # Get options for dropdowns
@@ -409,6 +501,10 @@ def student_enrollment_edit_view(request, enrollment_id):
     # POST - Update enrollment
     try:
         with transaction.atomic():
+            enrollment = StudentClass.objects.select_for_update().get(
+                pk=enrollment.pk,
+                school=school,
+            )
             # Get form data
             student_id = request.POST.get('student', '')
             class_id = request.POST.get('assigned_class', '')
@@ -416,8 +512,14 @@ def student_enrollment_edit_view(request, enrollment_id):
             
             # Get related objects
             try:
-                student = Student.objects.get(pk=student_id, school=school)
-                class_obj = Class.objects.get(pk=class_id, school=school)
+                student = Student.objects.select_for_update().get(
+                    pk=student_id,
+                    school=school,
+                )
+                class_obj = Class.objects.select_for_update().get(
+                    pk=class_id,
+                    school=school,
+                )
             except (Student.DoesNotExist, Class.DoesNotExist):
                 return JsonResponse({
                     'success': False,
@@ -426,10 +528,11 @@ def student_enrollment_edit_view(request, enrollment_id):
             
             # If changing to active and student already has another active assignment
             if is_active:
-                existing_assignment = StudentClass.objects.filter(
+                existing_assignment = StudentClass.objects.select_for_update().filter(
                     student=student,
                     is_active=True,
-                    school=school
+                    school=school,
+                    assigned_class__school=school,
                 ).exclude(pk=enrollment.id).first()
                 
                 if existing_assignment:
@@ -481,20 +584,15 @@ def student_enrollment_delete_view(request, enrollment_id):
     
     school = request.user.school
     
-    # Superadmin can access any enrollment, regular admin only their school
-    if request.user.role == "superadmin":
-        enrollment = get_object_or_404(StudentClass, pk=enrollment_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:enrollment_list")
-        enrollment = get_object_or_404(StudentClass, pk=enrollment_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and enrollment.school != school:
-        return JsonResponse({'error': 'Enrollment not found'}, status=404)
+    enrollment = get_object_or_404_with_school(
+        StudentClass, request, pk=enrollment_id
+    )
+    if (
+        enrollment.school_id is None
+        or enrollment.student.school_id != enrollment.school_id
+        or enrollment.assigned_class.school_id != enrollment.school_id
+    ):
+        return JsonResponse({'error': 'Enrollment has an invalid school association.'}, status=404)
     
     try:
         student_name = enrollment.student.full_name
@@ -538,7 +636,26 @@ def student_enrollment_bulk_delete_view(request):
                 'error': 'Please select at least one enrollment to unassign.'
             }, status=400)
         
-        enrollments = StudentClass.objects.filter(pk__in=enrollment_ids, school=school)
+        if request.user.role == "superadmin":
+            target_school_id = data.get("target_school_id")
+            target_school = SchoolInformation.objects.filter(
+                pk=target_school_id,
+                is_active=True,
+            ).first()
+            if target_school is None:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Select a valid target school.',
+                }, status=400)
+        else:
+            target_school = school
+
+        enrollments = StudentClass.objects.filter(
+            pk__in=enrollment_ids,
+            school=target_school,
+            student__school_id=F("school_id"),
+            assigned_class__school_id=F("school_id"),
+        )
         
         if enrollments.count() != len(enrollment_ids):
             return JsonResponse({
@@ -565,4 +682,3 @@ def student_enrollment_bulk_delete_view(request):
             'success': False,
             'error': f'Error unassigning students: {str(e)}'
         }, status=500)
-

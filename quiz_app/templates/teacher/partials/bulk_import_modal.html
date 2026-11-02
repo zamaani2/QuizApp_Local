@@ -21,6 +21,17 @@
       <form id="bulkImportForm" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="modal-body">
+          {% if user.role == "superadmin" %}
+          <div class="mb-3">
+            <label for="school_id" class="form-label">Target School <span class="text-danger">*</span></label>
+            <select class="form-select" id="school_id" name="school_id" required>
+              <option value="">Select School</option>
+              {% for school in schools %}
+              <option value="{{ school.id }}">{{ school.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
           <div class="alert alert-info">
             <h6>
               <i class="bi bi-info-circle me-2"></i>CSV Format Requirements:

@@ -5,20 +5,22 @@ This module provides views for managing students including:
 - Listing students
 - Creating new students
 - Editing existing students
-- Deleting students
+- Archiving and restoring student profiles
 - Bulk import from CSV/Excel
 - Bulk delete
 """
 import csv
 import io
+from itertools import islice
 import os
 from datetime import date, datetime
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q
+from django.db.models import F, Prefetch, Q
 from django.core.paginator import Paginator
 from django.db import transaction, IntegrityError
 try:
@@ -27,6 +29,10 @@ try:
     OPENPYXL_AVAILABLE = True
 except ImportError:
     OPENPYXL_AVAILABLE = False
+
+MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024
+MAX_IMPORT_ROWS = 5000
+MAX_IMPORT_COLUMNS = 64
 
 from ..models import (
     Student,
@@ -40,6 +46,7 @@ from ..models import (
     TeacherSubjectAssignment,
     Teacher,
 )
+from ..utils.tenant_utils import get_object_or_404_with_school, get_write_school
 
 
 @login_required
@@ -59,6 +66,7 @@ def student_list_view(request):
     """
     school = request.user.school
     students = Student.objects.all()
+    status_filter = request.GET.get("status", "active")
     
     # Handle teacher access - only show students in classes they teach
     if request.user.role == "teacher":
@@ -72,11 +80,12 @@ def student_list_view(request):
         # Get all active class assignments for this teacher
         teacher_assignments = TeacherSubjectAssignment.objects.filter(
             teacher=teacher,
-            is_active=True
+            is_active=True,
+            school=school,
+            class_assigned__school=school,
+            subject__school=school,
+            academic_year__school=school,
         )
-        
-        if school:
-            teacher_assignments = teacher_assignments.filter(school=school)
         
         # Get the classes this teacher teaches
         teacher_classes = teacher_assignments.values_list('class_assigned', flat=True).distinct()
@@ -88,15 +97,24 @@ def student_list_view(request):
             # Filter students to only those in classes the teacher teaches
             students = students.filter(
                 studentclass__assigned_class__in=teacher_classes,
-                studentclass__is_active=True
+                studentclass__is_active=True,
+                studentclass__school=school,
+                studentclass__assigned_class__school=school,
+                school=school,
+                is_active=True,
             )
-            if school:
-                students = students.filter(school=school)
             students = students.distinct()
     elif request.user.role in ["admin", "superadmin"]:
         # Admin and superadmin see all students in their school
         if school:
             students = students.filter(school=school)
+        if status_filter == "archived":
+            students = students.filter(is_active=False)
+        elif status_filter == "all":
+            pass
+        else:
+            status_filter = "active"
+            students = students.filter(is_active=True)
     else:
         messages.error(request, "You don't have permission to access this page.")
         return redirect("quiz_app:dashboard")
@@ -150,10 +168,21 @@ def student_list_view(request):
     
     # Prefetch current class assignments with class and form to optimize queries
     # This allows us to get the form from the assignment instead of student.form
+    enrollment_queryset = StudentClass.objects.filter(
+        is_active=True,
+        student__school_id=F("school_id"),
+        assigned_class__school_id=F("school_id"),
+    ).select_related("assigned_class__form")
+    if school:
+        enrollment_queryset = enrollment_queryset.filter(school=school)
     students = students.prefetch_related(
-        'studentclass_set__assigned_class__form',
-        'studentclass_set__assigned_class'
+        Prefetch(
+            "studentclass_set",
+            queryset=enrollment_queryset,
+        ),
     ).select_related('form', 'learning_area')
+    paginator = Paginator(students, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
     
     # Get filter options
     forms = Form.objects.all()
@@ -170,14 +199,15 @@ def student_list_view(request):
         teacher = request.user.teacher_profile
         teacher_assignments = TeacherSubjectAssignment.objects.filter(
             teacher=teacher,
-            is_active=True
+            is_active=True,
+            school=school,
+            class_assigned__school=school,
+            subject__school=school,
+            academic_year__school=school,
         )
-        if school:
-            teacher_assignments = teacher_assignments.filter(school=school)
         teacher_classes = teacher_assignments.values_list('class_assigned', flat=True).distinct()
         classes = Class.objects.filter(id__in=teacher_classes)
-        if school:
-            classes = classes.filter(school=school)
+        classes = classes.filter(school=school)
         classes = classes.order_by('name')
     else:
         # Admin and superadmin see all classes
@@ -187,7 +217,9 @@ def student_list_view(request):
         classes = classes.order_by('name')
     
     context = {
-        'students': students,
+        'students': page_obj.object_list,
+        'page_obj': page_obj,
+        'paginator': paginator,
         'forms': forms,
         'learning_areas': learning_areas,
         'classes': classes,
@@ -196,6 +228,7 @@ def student_list_view(request):
         'learning_area_filter': learning_area_filter,
         'gender_filter': gender_filter,
         'class_filter': class_filter,
+        'status_filter': status_filter,
     }
     
     # Use different template for teachers
@@ -223,6 +256,11 @@ def student_create_view(request):
         return redirect("quiz_app:student_list")
     
     school = request.user.school
+    schools = (
+        SchoolInformation.objects.filter(is_active=True).order_by("name")
+        if request.user.role == "superadmin"
+        else SchoolInformation.objects.none()
+    )
     
     if request.method == "GET":
         # Return form for modal
@@ -236,11 +274,19 @@ def student_create_view(request):
             'forms': forms,
             'learning_areas': learning_areas,
             'student': None,
+            'schools': schools,
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
     
     # POST - Create student
+    school = get_write_school(request)
+    if school is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Select a valid target school.',
+        }, status=400)
+
     try:
         with transaction.atomic():
             # Get form data
@@ -276,17 +322,24 @@ def student_create_view(request):
                 try:
                     student.form = Form.objects.get(pk=form_id, school=school)
                 except Form.DoesNotExist:
-                    pass
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid form selected.',
+                    }, status=400)
             
             if learning_area_id:
                 try:
                     student.learning_area = LearningArea.objects.get(pk=learning_area_id, school=school)
                 except LearningArea.DoesNotExist:
-                    pass
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid learning area selected.',
+                    }, status=400)
             
             if profile_picture:
                 student.profile_picture = profile_picture
             
+            student.full_clean(exclude=["admission_number"])
             student.save()
             
             return JsonResponse({
@@ -296,6 +349,11 @@ def student_create_view(request):
                 'admission_number': student.admission_number,
             })
     
+    except ValidationError as e:
+        return JsonResponse({
+            'success': False,
+            'error': ' '.join(e.messages),
+        }, status=400)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -318,18 +376,8 @@ def student_edit_view(request, student_id):
         messages.error(request, "You don't have permission to perform this action.")
         return redirect("quiz_app:student_list")
     
-    school = request.user.school
-    
-    # Superadmin can access any student, regular admin only their school
-    if request.user.role == "superadmin":
-        student = get_object_or_404(Student, pk=student_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:student_list")
-        student = get_object_or_404(Student, pk=student_id, school=school)
+    student = get_object_or_404_with_school(Student, request, pk=student_id)
+    school = student.school
     
     if request.method == "GET":
         # Return form for modal
@@ -365,7 +413,10 @@ def student_edit_view(request, student_id):
                 try:
                     student.form = Form.objects.get(pk=form_id, school=school)
                 except Form.DoesNotExist:
-                    student.form = None
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid form selected.',
+                    }, status=400)
             else:
                 student.form = None
             
@@ -373,13 +424,17 @@ def student_edit_view(request, student_id):
                 try:
                     student.learning_area = LearningArea.objects.get(pk=learning_area_id, school=school)
                 except LearningArea.DoesNotExist:
-                    student.learning_area = None
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid learning area selected.',
+                    }, status=400)
             else:
                 student.learning_area = None
             
             if 'profile_picture' in request.FILES:
                 student.profile_picture = request.FILES['profile_picture']
             
+            student.full_clean(exclude=["admission_number"])
             student.save()
             
             return JsonResponse({
@@ -388,6 +443,11 @@ def student_edit_view(request, student_id):
                 'student_id': student.id,
             })
     
+    except ValidationError as e:
+        return JsonResponse({
+            'success': False,
+            'error': ' '.join(e.messages),
+        }, status=400)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -399,32 +459,45 @@ def student_edit_view(request, student_id):
 @require_http_methods(["POST"])
 def student_delete_view(request, student_id):
     """
-    Delete a student.
+    Archive a student without deleting academic history.
     """
+    return _set_student_archive_state(request, student_id, is_active=False)
+
+
+@login_required
+@require_http_methods(["POST"])
+def student_restore_view(request, student_id):
+    """Restore a previously archived student profile."""
+    return _set_student_archive_state(request, student_id, is_active=True)
+
+
+def _set_student_archive_state(request, student_id, *, is_active):
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
-    
-    school = request.user.school
-    
-    # Superadmin can access any student, regular admin only their school
-    if request.user.role == "superadmin":
-        student = get_object_or_404(Student, pk=student_id)
-    else:
-        if not school:
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        student = get_object_or_404(Student, pk=student_id, school=school)
-    
+
+    student = get_object_or_404_with_school(Student, request, pk=student_id)
+
     try:
-        student_name = student.full_name
-        student.delete()
+        with transaction.atomic():
+            student = Student.objects.select_for_update().get(pk=student.pk)
+            updated = _set_student_archive_state_for_record(
+                student,
+                is_active=is_active,
+            )
+
+        action = (
+            ("restored" if is_active else "archived")
+            if updated
+            else ("already active" if is_active else "already archived")
+        )
         return JsonResponse({
             'success': True,
-            'message': f'Student {student_name} deleted successfully.'
+            'message': f'Student {student.full_name} {action} successfully.'
         })
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': f'Error deleting student: {str(e)}'
+            'error': f'Error updating student archive status: {str(e)}'
         }, status=500)
 
 
@@ -432,10 +505,10 @@ def student_delete_view(request, student_id):
 @require_http_methods(["GET", "POST"])
 def student_bulk_delete_view(request):
     """
-    Bulk delete students.
+    Bulk archive or restore students.
     
-    GET: Returns bulk delete modal
-    POST: Deletes multiple students by IDs
+    GET: Returns the archive/restore modal
+    POST: Updates profile and linked account state for selected students
     """
     if request.user.role not in ["admin", "superadmin"]:
         if request.method == "GET":
@@ -443,7 +516,16 @@ def student_bulk_delete_view(request):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     if request.method == "GET":
-        html = render(request, 'student/partials/bulk_delete_modal.html').content.decode('utf-8')
+        html = render(request, 'student/partials/bulk_delete_modal.html', {
+            'archive_action': (
+                "restore" if request.GET.get("status") == "archived" else "archive"
+            ),
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
+        }).content.decode('utf-8')
         return JsonResponse({'html': html})
     
     # POST - Bulk delete
@@ -451,32 +533,64 @@ def student_bulk_delete_view(request):
         import json
         data = json.loads(request.body)
         student_ids = data.get('student_ids', [])
-        
-        if not student_ids:
+        action = data.get("action", "archive")
+        if action not in {"archive", "restore"}:
             return JsonResponse({
                 'success': False,
-                'error': 'No students selected.'
+                'error': 'Choose a valid archive action.',
             }, status=400)
         
-        school = request.user.school
-        students = Student.objects.filter(pk__in=student_ids)
-        
-        if school:
-            students = students.filter(school=school)
-        
-        count = students.count()
-        if count == 0:
+        if not isinstance(student_ids, list) or not student_ids:
             return JsonResponse({
                 'success': False,
-                'error': 'No valid students found to delete.'
+                'error': 'Select one or more valid students.'
+            }, status=400)
+
+        try:
+            student_ids = [int(student_id) for student_id in student_ids]
+        except (TypeError, ValueError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid student IDs provided.'
+            }, status=400)
+
+        if len(student_ids) != len(set(student_ids)):
+            return JsonResponse({
+                'success': False,
+                'error': 'Student IDs must be unique.'
+            }, status=400)
+        
+        school = get_write_school(request, data.get('school_id'))
+        if school is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'Select a valid target school.',
+            }, status=400)
+        students = Student.objects.filter(pk__in=student_ids)
+        students = students.filter(school=school)
+        
+        count = students.count()
+        if count != len(student_ids):
+            return JsonResponse({
+                'success': False,
+                'error': 'One or more selected students are invalid.'
             }, status=400)
         
         with transaction.atomic():
-            students.delete()
+            students = list(students.select_for_update().order_by("pk"))
+            updated_count = sum(
+                _set_student_archive_state_for_record(
+                    student,
+                    is_active=(action == "restore"),
+                )
+                for student in students
+            )
         
+        action_message = "restored" if action == "restore" else "archived"
         return JsonResponse({
             'success': True,
-            'message': f'{count} student(s) deleted successfully.'
+            'updated': updated_count,
+            'message': f'{updated_count} student(s) {action_message} successfully.'
         })
     
     except Exception as e:
@@ -484,6 +598,39 @@ def student_bulk_delete_view(request):
             'success': False,
             'error': f'Error deleting students: {str(e)}'
         }, status=500)
+
+
+def _set_student_archive_state_for_record(student, *, is_active):
+    account = User.objects.select_for_update().filter(
+        student_profile=student
+    ).first()
+    if is_active and not student.is_active:
+        student.is_active = True
+        student.save(update_fields=["is_active", "updated_at"])
+        if account and student.account_active_before_archive is not None:
+            account.is_active = student.account_active_before_archive
+            account.save(update_fields=["is_active"])
+        student.account_active_before_archive = None
+        student.save(update_fields=["account_active_before_archive", "updated_at"])
+        return True
+    elif not is_active and student.is_active:
+        student.account_active_before_archive = account.is_active if account else None
+        student.is_active = False
+        student.save(
+            update_fields=["is_active", "account_active_before_archive", "updated_at"]
+        )
+        if student.school_id is not None:
+            StudentClass.objects.filter(
+                student=student,
+                school_id=student.school_id,
+                assigned_class__school_id=student.school_id,
+                is_active=True,
+            ).update(is_active=False)
+        if account:
+            account.is_active = False
+            account.save(update_fields=["is_active"])
+        return True
+    return False
 
 
 @login_required
@@ -667,6 +814,10 @@ def _read_file_headers(uploaded_file):
     Returns list of headers.
     """
     file_name = uploaded_file.name.lower()
+    if uploaded_file.size > MAX_IMPORT_FILE_SIZE:
+        raise ValueError("File exceeds the 5 MB import limit.")
+    if file_name.endswith(".xls"):
+        raise ValueError("Only CSV and XLSX files are supported.")
     
     # Check if it's an Excel file
     if file_name.endswith(('.xlsx', '.xls')):
@@ -687,6 +838,9 @@ def _read_file_headers(uploaded_file):
                 headers.append(str(cell.value))
             else:
                 break
+        if len(headers) > MAX_IMPORT_COLUMNS:
+            wb.close()
+            raise ValueError("File exceeds the 64-column import limit.")
         
         wb.close()
         uploaded_file.seek(0)  # Reset file pointer for later use
@@ -761,6 +915,11 @@ def student_bulk_import_view(request):
         html = render(request, 'student/partials/bulk_import_modal.html', {
             'classes': classes,
             'current_academic_year': current_academic_year,
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
@@ -776,10 +935,26 @@ def student_bulk_import_view(request):
             }, status=400)
         
         uploaded_file = request.FILES['csv_file']
-        school = request.user.school
+        if uploaded_file.size > MAX_IMPORT_FILE_SIZE:
+            return JsonResponse({
+                'success': False,
+                'error': 'File exceeds the 5 MB import limit.',
+            }, status=413)
+
+        school = get_write_school(request)
+        if school is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'Select a valid target school.',
+            }, status=400)
         
         # Determine file type and read accordingly
         file_name = uploaded_file.name.lower()
+        if file_name.endswith(".xls"):
+            return JsonResponse({
+                'success': False,
+                'error': 'Only CSV and XLSX files are supported.',
+            }, status=400)
         
         if file_name.endswith(('.xlsx', '.xls')):
             # Handle Excel file
@@ -802,11 +977,23 @@ def student_bulk_import_view(request):
                     headers.append(str(cell.value))
                 else:
                     break
+            if len(headers) > MAX_IMPORT_COLUMNS:
+                wb.close()
+                return JsonResponse({
+                    'success': False,
+                    'error': 'File exceeds the 64-column import limit.',
+                }, status=400)
             
             # Convert Excel rows to dictionary format
             rows = []
             for row in ws.iter_rows(min_row=2, values_only=True):
                 if any(cell for cell in row):  # Skip empty rows
+                    if len(rows) >= MAX_IMPORT_ROWS:
+                        wb.close()
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'File exceeds the {MAX_IMPORT_ROWS}-row import limit.',
+                        }, status=413)
                     row_dict = {}
                     for idx, header in enumerate(headers):
                         if idx < len(row):
@@ -821,6 +1008,18 @@ def student_bulk_import_view(request):
             # Handle CSV file
             file_data = uploaded_file.read().decode('utf-8')
             csv_reader = csv.DictReader(io.StringIO(file_data))
+            if len(csv_reader.fieldnames or []) > MAX_IMPORT_COLUMNS:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'File exceeds the 64-column import limit.',
+                }, status=400)
+            rows = list(islice(csv_reader, MAX_IMPORT_ROWS + 1))
+            if len(rows) > MAX_IMPORT_ROWS:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'File exceeds the {MAX_IMPORT_ROWS}-row import limit.',
+                }, status=413)
+            csv_reader = iter(rows)
         
         # Get column mappings from POST data
         column_mappings_json = request.POST.get('column_mappings', '{}')
@@ -962,6 +1161,10 @@ def student_bulk_import_view(request):
                         student.email = email
                     else:
                         student.email = None
+
+                    student.full_clean(
+                        exclude=["admission_number"] if not admission_number else None
+                    )
                     
                     # Save student with retry for auto-generated admission numbers (handle potential uniqueness conflicts)
                     max_retries = 5
@@ -1126,12 +1329,9 @@ def student_detail_view(request, student_id):
     
     # Handle admin and superadmin access
     elif request.user.role == "superadmin":
-        student = get_object_or_404(Student, pk=student_id)
+        student = get_object_or_404_with_school(Student, request, pk=student_id)
     elif request.user.role == "admin":
-        if not school:
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:student_list")
-        student = get_object_or_404(Student, pk=student_id, school=school)
+        student = get_object_or_404_with_school(Student, request, pk=student_id)
     else:
         messages.error(request, "You don't have permission to access this page.")
         return redirect("quiz_app:dashboard")
@@ -1141,4 +1341,3 @@ def student_detail_view(request, student_id):
     }
     
     return render(request, 'student/student_detail.html', context)
-

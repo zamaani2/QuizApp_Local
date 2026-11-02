@@ -43,11 +43,11 @@
             type="button"
             class="btn btn-danger btn-sm"
             id="bulkDeleteBtn"
-            data-modal-url="{% url 'quiz_app:teacher_bulk_delete' %}"
-            data-modal-title="Bulk Delete Teachers"
+            data-modal-url="{% url 'quiz_app:teacher_bulk_delete' %}?status={{ status_filter }}"
+            data-modal-title="{% if status_filter == 'archived' %}Bulk Restore Teachers{% else %}Bulk Archive Teachers{% endif %}"
             disabled
           >
-            <i class="bi bi-trash me-1"></i>Delete Selected
+            {% if status_filter == 'archived' %}<i class="bi bi-arrow-counterclockwise me-1"></i>Restore Selected{% else %}<i class="bi bi-archive me-1"></i>Archive Selected{% endif %}
           </button>
         </div>
       </div>
@@ -78,6 +78,13 @@
               <option value="">All Genders</option>
               <option value="M" {% if gender_filter == 'M' %}selected{% endif %}>Male</option>
               <option value="F" {% if gender_filter == 'F' %}selected{% endif %}>Female</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+              <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Teachers</option>
+              <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived Teachers</option>
+              <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Teachers</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -129,6 +136,7 @@
                 />
                 {% endif %}
                 {{ teacher.full_name }}
+                {% if not teacher.is_active %}<span class="badge bg-secondary ms-1">Archived</span>{% endif %}
               </td>
               <td>{{ teacher.department.name|default:"-" }}</td>
               <td>
@@ -160,21 +168,51 @@
                   >
                     <i class="bi bi-pencil"></i>
                   </button>
+                  {% if teacher.is_active %}
                   <button
                     type="button"
-                    class="btn btn-sm btn-danger delete-teacher-btn"
+                    class="btn btn-sm btn-warning delete-teacher-btn"
                     data-teacher-id="{{ teacher.id }}"
                     data-teacher-name="{{ teacher.full_name }}"
-                    title="Delete"
+                    title="Archive teacher"
                   >
-                    <i class="bi bi-trash"></i>
+                    <i class="bi bi-archive"></i>
                   </button>
+                  {% else %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-success restore-teacher-btn"
+                    data-teacher-id="{{ teacher.id }}"
+                    data-teacher-name="{{ teacher.full_name }}"
+                    data-restore-url="{% url 'quiz_app:teacher_restore' teacher.id %}"
+                    title="Restore teacher"
+                  >
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                  </button>
+                  {% endif %}
                 </div>
               </td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Teacher list pages">
+          <ul class="pagination justify-content-center mt-3">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search_query|urlencode }}&department={{ department_filter|urlencode }}&gender={{ gender_filter|urlencode }}&status={{ status_filter|urlencode }}">Previous</a>
+            </li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search_query|urlencode }}&department={{ department_filter|urlencode }}&gender={{ gender_filter|urlencode }}&status={{ status_filter|urlencode }}">Next</a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -188,4 +226,3 @@
 {% block extra_js %}
 <script src="{% static 'js/teacher_management.js' %}"></script>
 {% endblock extra_js %}
-

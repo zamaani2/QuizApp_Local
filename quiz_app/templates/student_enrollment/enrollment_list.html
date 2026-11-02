@@ -21,6 +21,19 @@
           <i class="bi bi-people-fill me-2"></i>All Student Class Enrollments
         </h3>
         <div class="card-tools">
+          {% if user.role == "superadmin" %}
+          <select
+            class="form-select form-select-sm d-inline-block me-2"
+            id="bulkUnassignSchool"
+            aria-label="Target school for bulk unassignment"
+            style="width: auto"
+          >
+            <option value="">Select target school</option>
+            {% for school in target_schools %}
+            <option value="{{ school.id }}">{{ school.name }}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
           <button
             type="button"
             class="btn btn-primary btn-sm"
@@ -198,4 +211,3 @@
 {% block extra_js %}
 <script src="{% static 'js/student_enrollment_management.js' %}"></script>
 {% endblock extra_js %}
-

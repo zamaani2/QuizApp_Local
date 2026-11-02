@@ -14,7 +14,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q, Max
+from django.db.models import Q, Max, Prefetch
 from django.db import transaction
 from django.core.exceptions import ValidationError
 import json
@@ -56,7 +56,14 @@ def question_list_view(request, quiz_id):
         teacher = quiz.teacher  # Use quiz's teacher for context
     
     # Get questions with answer choices
-    questions = quiz.questions.all().prefetch_related('answer_choices').order_by('order', 'created_at')
+    questions = quiz.questions.filter(
+        school=school,
+    ).prefetch_related(
+        Prefetch(
+            'answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        )
+    ).order_by('order', 'created_at')
     
     context = {
         'quiz': quiz,
@@ -183,12 +190,39 @@ def question_create_view(request, quiz_id):
                             school=school,
                         )
             
-            elif question_type in ['short_answer', 'fill_blank']:
-                # Get correct answer text
+            elif question_type in [
+                'short_answer', 'fill_blank', 'matching', 'ordering'
+            ]:
                 correct_answer = request.POST.get('correct_answer', '').strip()
-                if correct_answer:
-                    question.correct_answer_text = correct_answer
-                    question.save()
+                if question_type in ['matching', 'ordering'] and not correct_answer:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'A correct answer is required for this question type.',
+                    }, status=400)
+                if question_type == 'ordering':
+                    ordering_items = [
+                        item.strip()
+                        for item in correct_answer.split(';')
+                        if item.strip()
+                    ]
+                    normalized_items = [item.casefold() for item in ordering_items]
+                    if len(ordering_items) < 2 or len(set(normalized_items)) != len(ordering_items):
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Ordering questions require at least two distinct items separated by semicolons.',
+                        }, status=400)
+                    correct_answer = "; ".join(ordering_items)
+                if question_type == 'matching' and any(
+                    "=" not in pair
+                    for pair in correct_answer.split(";")
+                    if pair.strip()
+                ):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Each matching pair must use the left=right format.',
+                    }, status=400)
+                question.correct_answer_text = correct_answer or None
+                question.save()
             
             # Recalculate quiz total marks
             quiz.calculate_total_marks()
@@ -505,9 +539,37 @@ def question_edit_view(request, quiz_id, question_id):
                 if deleted_count > 0:
                     logger.debug(f"Deleted {deleted_count} choice(s) that were removed from form")
             
-            elif question.question_type in ['short_answer', 'fill_blank']:
-                # Update correct answer text
+            elif question.question_type in [
+                'short_answer', 'fill_blank', 'matching', 'ordering'
+            ]:
                 correct_answer = request.POST.get('correct_answer', '').strip()
+                if question.question_type in ['matching', 'ordering'] and not correct_answer:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'A correct answer is required for this question type.',
+                    }, status=400)
+                if question.question_type == 'ordering':
+                    ordering_items = [
+                        item.strip()
+                        for item in correct_answer.split(';')
+                        if item.strip()
+                    ]
+                    normalized_items = [item.casefold() for item in ordering_items]
+                    if len(ordering_items) < 2 or len(set(normalized_items)) != len(ordering_items):
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Ordering questions require at least two distinct items separated by semicolons.',
+                        }, status=400)
+                    correct_answer = "; ".join(ordering_items)
+                if question.question_type == 'matching' and any(
+                    "=" not in pair
+                    for pair in correct_answer.split(";")
+                    if pair.strip()
+                ):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Each matching pair must use the left=right format.',
+                    }, status=400)
                 question.correct_answer_text = correct_answer if correct_answer else None
                 question.save()
             
@@ -543,12 +605,14 @@ def question_delete_view(request, quiz_id, question_id):
     if request.user.role not in ["teacher", "admin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    if not request.user.teacher_profile:
+    if request.user.role == "teacher" and not request.user.teacher_profile:
         return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    quiz = get_object_or_404(Quiz, pk=quiz_id, teacher=teacher, school=school)
+    quiz_filters = {'pk': quiz_id, 'school': school}
+    if request.user.role == "teacher":
+        quiz_filters['teacher'] = request.user.teacher_profile
+    quiz = get_object_or_404(Quiz, **quiz_filters)
     question = get_object_or_404(Question, pk=question_id, quiz=quiz, school=school)
     
     try:
@@ -586,27 +650,66 @@ def question_reorder_view(request, quiz_id):
     if request.user.role not in ["teacher", "admin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    if not request.user.teacher_profile:
+    if request.user.role == "teacher" and not request.user.teacher_profile:
         return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    quiz = get_object_or_404(Quiz, pk=quiz_id, teacher=teacher, school=school)
+    quiz_filters = {'pk': quiz_id, 'school': school}
+    if request.user.role == "teacher":
+        quiz_filters['teacher'] = request.user.teacher_profile
+    quiz = get_object_or_404(Quiz, **quiz_filters)
     
     try:
         data = json.loads(request.body)
-        question_orders = data.get('question_orders', [])  # List of {question_id: order}
+        question_orders = data.get('question_orders', [])
+        if not isinstance(question_orders, list):
+            return JsonResponse({
+                'success': False,
+                'error': 'Question orders must be a list.',
+            }, status=400)
+
+        parsed_orders = []
+        seen_ids = set()
+        for item in question_orders:
+            if not isinstance(item, dict):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid question order entry.',
+                }, status=400)
+            try:
+                question_id = int(item.get('question_id'))
+                order = int(item.get('order'))
+            except (TypeError, ValueError):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Question IDs and order values must be integers.',
+                }, status=400)
+            if order < 1 or question_id in seen_ids:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Question orders must be positive and IDs unique.',
+                }, status=400)
+            seen_ids.add(question_id)
+            parsed_orders.append((question_id, order))
+
+        valid_question_ids = set(
+            Question.objects.filter(
+                quiz=quiz, school=school, pk__in=seen_ids
+            ).values_list('pk', flat=True)
+        )
+        if valid_question_ids != seen_ids:
+            return JsonResponse({
+                'success': False,
+                'error': 'One or more questions do not belong to this quiz.',
+            }, status=400)
         
         with transaction.atomic():
-            for item in question_orders:
-                question_id = item.get('question_id')
-                order = item.get('order')
-                if question_id and order:
-                    Question.objects.filter(
-                        pk=question_id,
-                        quiz=quiz,
-                        school=school
-                    ).update(order=order)
+            for question_id, order in parsed_orders:
+                Question.objects.filter(
+                    pk=question_id,
+                    quiz=quiz,
+                    school=school,
+                ).update(order=order)
         
         return JsonResponse({
             'success': True,
@@ -629,12 +732,14 @@ def question_duplicate_view(request, quiz_id, question_id):
     if request.user.role not in ["teacher", "admin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    if not request.user.teacher_profile:
+    if request.user.role == "teacher" and not request.user.teacher_profile:
         return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    quiz = get_object_or_404(Quiz, pk=quiz_id, teacher=teacher, school=school)
+    quiz_filters = {'pk': quiz_id, 'school': school}
+    if request.user.role == "teacher":
+        quiz_filters['teacher'] = request.user.teacher_profile
+    quiz = get_object_or_404(Quiz, **quiz_filters)
     question = get_object_or_404(Question, pk=question_id, quiz=quiz, school=school)
     
     try:
@@ -1208,13 +1313,15 @@ def question_import_template_view(request, quiz_id, format_type='csv'):
         messages.error(request, "You don't have permission to perform this action.")
         return redirect("quiz_app:quiz_list")
     
-    if not request.user.teacher_profile:
+    if request.user.role == "teacher" and not request.user.teacher_profile:
         messages.error(request, "Teacher profile not found. Please contact administrator.")
         return redirect("quiz_app:quiz_list")
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    quiz = get_object_or_404(Quiz, pk=quiz_id, teacher=teacher, school=school)
+    quiz_filters = {'pk': quiz_id, 'school': school}
+    if request.user.role == "teacher":
+        quiz_filters['teacher'] = request.user.teacher_profile
+    quiz = get_object_or_404(Quiz, **quiz_filters)
     
     if format_type == 'csv':
         # Create CSV template
@@ -1442,14 +1549,16 @@ def question_bulk_delete_view(request, quiz_id):
             return JsonResponse({'error': 'Permission denied'}, status=403)
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    if not request.user.teacher_profile:
+    if request.user.role == "teacher" and not request.user.teacher_profile:
         if request.method == "GET":
             return JsonResponse({'error': 'Teacher profile not found'}, status=404)
         return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    quiz = get_object_or_404(Quiz, pk=quiz_id, teacher=teacher, school=school)
+    quiz_filters = {'pk': quiz_id, 'school': school}
+    if request.user.role == "teacher":
+        quiz_filters['teacher'] = request.user.teacher_profile
+    quiz = get_object_or_404(Quiz, **quiz_filters)
     
     if request.method == "GET":
         # Check if this is an AJAX request for modal
@@ -1481,6 +1590,12 @@ def question_bulk_delete_view(request, quiz_id):
                 'success': False,
                 'error': 'Invalid question IDs provided.'
             }, status=400)
+
+        if len(question_ids) != len(set(question_ids)):
+            return JsonResponse({
+                'success': False,
+                'error': 'Question IDs must be unique.',
+            }, status=400)
         
         questions = Question.objects.filter(
             pk__in=question_ids,
@@ -1489,10 +1604,10 @@ def question_bulk_delete_view(request, quiz_id):
         )
         
         count = questions.count()
-        if count == 0:
+        if count == 0 or count != len(question_ids):
             return JsonResponse({
                 'success': False,
-                'error': 'No valid questions found to delete.'
+                'error': 'One or more questions do not belong to this quiz.'
             }, status=400)
         
         with transaction.atomic():
@@ -1512,4 +1627,3 @@ def question_bulk_delete_view(request, quiz_id):
             'success': False,
             'error': f'Error deleting questions: {str(e)}'
         }, status=500)
-

@@ -198,20 +198,30 @@ def school_edit_view(request, school_id=None):
                 try:
                     school.current_academic_year = AcademicYear.objects.get(pk=current_academic_year_id, school=school)
                 except AcademicYear.DoesNotExist:
-                    school.current_academic_year = None
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid academic year selected.',
+                    }, status=400)
             else:
                 school.current_academic_year = None
             
             if current_term_id:
                 try:
-                    term = Term.objects.get(pk=current_term_id)
-                    # Ensure term belongs to the school's academic year
-                    if term.academic_year.school == school:
-                        school.current_term = term
-                    else:
-                        school.current_term = None
+                    term = Term.objects.get(pk=current_term_id, school=school)
                 except Term.DoesNotExist:
-                    school.current_term = None
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Invalid term selected.',
+                    }, status=400)
+                if (
+                    school.current_academic_year_id
+                    and term.academic_year_id != school.current_academic_year_id
+                ):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Selected term must belong to the current academic year.',
+                    }, status=400)
+                school.current_term = term
             else:
                 school.current_term = None
             
@@ -362,4 +372,3 @@ def school_create_view(request):
             'success': False,
             'error': f'Error creating school: {str(e)}'
         }, status=500)
-

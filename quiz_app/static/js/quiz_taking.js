@@ -74,8 +74,11 @@
         // Answer input handlers
         $('.answer-choice').on('change', function () {
             const questionId = $(this).data('question-id');
-            const choiceId = $(this).data('choice-id');
-            saveAnswer(questionId, { choice_id: choiceId });
+            const choiceIds = $(this).closest('.question-card')
+                .find('.answer-choice:checked')
+                .map(function () { return $(this).data('choice-id'); })
+                .get();
+            saveAnswer(questionId, { choice_ids: choiceIds });
         });
 
         // Text answer handlers (with debounce)
@@ -254,7 +257,12 @@
         formData.append('question_id', questionId);
         formData.append('csrfmiddlewaretoken', $('[name=csrfmiddlewaretoken]').val());
 
-        if (answerData.choice_id) {
+        if (answerData.choice_ids) {
+            answerData.choice_ids.forEach(function (choiceId) {
+                formData.append('choice_ids', choiceId);
+            });
+            formData.append('choice_id', answerData.choice_ids[0] || '');
+        } else if (answerData.choice_id) {
             formData.append('choice_id', answerData.choice_id);
         } else if (answerData.text_answer !== undefined) {
             formData.append('text_answer', answerData.text_answer);
@@ -294,9 +302,11 @@
             const answerData = {};
 
             // Check for choice answer
-            const selectedChoice = $(this).find('.answer-choice:checked');
-            if (selectedChoice.length) {
-                answerData.choice_id = selectedChoice.data('choice-id');
+            const selectedChoices = $(this).find('.answer-choice:checked');
+            if (selectedChoices.length) {
+                answerData.choice_ids = selectedChoices.map(function () {
+                    return $(this).data('choice-id');
+                }).get();
             }
 
             // Check for text answer
@@ -326,9 +336,11 @@
             const questionId = currentQuestion.data('question-id');
             const answerData = {};
 
-            const selectedChoice = currentQuestion.find('.answer-choice:checked');
-            if (selectedChoice.length) {
-                answerData.choice_id = selectedChoice.data('choice-id');
+            const selectedChoices = currentQuestion.find('.answer-choice:checked');
+            if (selectedChoices.length) {
+                answerData.choice_ids = selectedChoices.map(function () {
+                    return $(this).data('choice-id');
+                }).get();
             }
 
             const textAnswer = currentQuestion.find('.answer-text');
@@ -453,4 +465,3 @@
     }
 
 })();
-

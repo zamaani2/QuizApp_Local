@@ -333,6 +333,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function confirmBulkPasswordReset(selectedUsers) {
         const userIds = Array.from(selectedUsers).map(cb => cb.value);
         const defaultPassword = document.getElementById('defaultPassword').value || '0000';
+        const targetSchool = document.getElementById('bulkPasswordResetSchoolId');
+        if (targetSchool && !targetSchool.value) {
+            showToast('Warning', 'Choose the school that owns the selected users.', 'warning');
+            return;
+        }
 
         fetch('/users/bulk-password-reset/', {
             method: 'POST',
@@ -343,7 +348,8 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             body: JSON.stringify({
                 user_ids: userIds,
-                default_password: defaultPassword
+                default_password: defaultPassword,
+                school_id: targetSchool ? targetSchool.value : null
             })
         })
             .then(response => response.json())

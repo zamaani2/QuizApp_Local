@@ -102,10 +102,10 @@ def superadmin_admin_create_view(request):
             is_active = request.POST.get('is_active', '') == 'on'
             
             # Validation
-            if not all([username, email, full_name, school_id]):
+            if not all([username, email, full_name, school_id, password]):
                 return JsonResponse({
                     'success': False,
-                    'error': 'Please fill in all required fields.'
+                    'error': 'Username, email, full name, school, and password are required.'
                 }, status=400)
             
             # Check if username already exists
@@ -130,10 +130,6 @@ def superadmin_admin_create_view(request):
                     'success': False,
                     'error': 'Invalid school selected.'
                 }, status=400)
-            
-            # Set default password if not provided
-            if not password:
-                password = "0000"  # Default password
             
             # Create admin user
             admin = User.objects.create_user(
@@ -297,7 +293,6 @@ def superadmin_admin_detail_view(request, admin_id):
     }
     
     return render(request, 'superadmin/admin_detail.html', context)
-
 
 
 

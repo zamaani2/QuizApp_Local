@@ -9,7 +9,7 @@
     <div class="modal-content">
       <div class="modal-header bg-danger text-white">
         <h5 class="modal-title" id="bulkDeleteModalLabel">
-          <i class="bi bi-exclamation-triangle me-2"></i>Bulk Delete Students
+          <i class="bi bi-archive me-2"></i>{% if archive_action == "restore" %}Bulk Restore Students{% else %}Bulk Archive Students{% endif %}
         </h5>
         <button
           type="button"
@@ -19,13 +19,25 @@
         ></button>
       </div>
       <div class="modal-body">
-        <div class="alert alert-danger">
-          <i class="bi bi-exclamation-triangle me-2"></i>
-          <strong>Warning!</strong> This action cannot be undone. You are about
-          to delete <span id="selectedCount">0</span> student(s).
+        {% if user.role == "superadmin" %}
+        <div class="mb-3">
+          <label for="bulkDeleteSchoolId" class="form-label">Target School <span class="text-danger">*</span></label>
+          <select class="form-select" id="bulkDeleteSchoolId" required>
+            <option value="">Select School</option>
+            {% for school in schools %}
+            <option value="{{ school.id }}">{{ school.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <input type="hidden" id="archiveAction" value="{{ archive_action }}">
+        <div class="alert alert-warning">
+          <i class="bi bi-archive me-2"></i>
+          <strong>Note:</strong> {% if archive_action == "restore" %}Restore{% else %}Archive{% endif %}
+          <span id="selectedCount">0</span> student(s). Academic history is retained.
         </div>
         <p>
-          Are you sure you want to proceed with deleting the selected students?
+          {% if archive_action == "restore" %}Restore the selected student profiles? Related class enrollments will remain inactive.{% else %}Archive the selected student profiles and deactivate their active class enrollments?{% endif %}
         </p>
         <div id="selectedStudentsList" class="mt-3">
           <!-- Selected students will be listed here -->
@@ -35,8 +47,8 @@
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
           Cancel
         </button>
-        <button type="button" class="btn btn-danger" id="confirmBulkDeleteBtn">
-          <i class="bi bi-trash me-1"></i>Delete Selected
+        <button type="button" class="btn btn-warning" id="confirmBulkDeleteBtn">
+          <i class="bi bi-archive me-1"></i>{% if archive_action == "restore" %}Restore Selected{% else %}Archive Selected{% endif %}
         </button>
       </div>
     </div>

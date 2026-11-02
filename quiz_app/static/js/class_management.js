@@ -236,6 +236,17 @@
             deleteClass(classId, className);
         });
 
+        $(document).on('click', '.restore-class-btn', function () {
+            restoreClass($(this).data('restore-url'), $(this).data('class-name'));
+        });
+
+        $('#statusFilter').on('change', function () {
+            const params = new URLSearchParams(window.location.search);
+            params.set('status', this.value);
+            params.delete('page');
+            window.location.search = params.toString();
+        });
+
         // Add subject to class button (on detail page)
         $('#confirmAddSubjectBtn').on('click', function () {
             addSubjectToClass();
@@ -379,22 +390,22 @@
     }
 
     /**
-     * Delete a class
+     * Archive a class without removing its historical records
      */
     function deleteClass(classId, className) {
         Swal.fire({
             icon: 'warning',
-            title: 'Delete Class?',
-            html: `Are you sure you want to delete <strong>${className}</strong>?<br>This action cannot be undone.`,
+            title: 'Archive Class?',
+            html: `Are you sure you want to archive <strong>${className}</strong>? Current enrollments and teaching assignments will be deactivated.`,
             showCancelButton: true,
-            confirmButtonText: 'Yes, delete it!',
+            confirmButtonText: 'Archive class',
             cancelButtonText: 'Cancel',
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d'
         }).then((result) => {
             if (result.isConfirmed) {
                 Swal.fire({
-                    title: 'Deleting...',
+                    title: 'Archiving...',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -414,7 +425,7 @@
                         if (response.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Deleted!',
+                                title: 'Archived!',
                                 text: response.message,
                                 confirmButtonColor: '#28a745',
                                 timer: 2000,
@@ -427,14 +438,14 @@
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Error',
-                                text: response.error || 'Failed to delete class.',
+                                text: response.error || 'Failed to archive class.',
                                 confirmButtonColor: '#dc3545'
                             });
                         }
                     },
                     error: function (xhr) {
                         Swal.close();
-                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while deleting.';
+                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while archiving.';
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
@@ -444,6 +455,34 @@
                     }
                 });
             }
+        });
+    }
+
+    function restoreClass(url, className) {
+        Swal.fire({
+            icon: 'question',
+            title: 'Restore class?',
+            text: `Restore ${className}? Historical enrollments and assignments will remain inactive.`,
+            showCancelButton: true,
+            confirmButtonText: 'Restore class'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: { 'X-CSRFToken': getCsrfToken() },
+                success: function (response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        Swal.fire('Error', response.error || 'Failed to restore class.', 'error');
+                    }
+                },
+                error: function (xhr) {
+                    Swal.fire('Error', xhr.responseJSON?.error || 'Failed to restore class.', 'error');
+                }
+            });
         });
     }
 
@@ -660,4 +699,3 @@
     }
 
 })(jQuery);
-

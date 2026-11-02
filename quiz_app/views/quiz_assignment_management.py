@@ -63,7 +63,7 @@ def quiz_assignment_list_view(request, quiz_id):
         available_classes = Class.objects.filter(school=school).order_by('name')
     
     # Get assigned classes
-    assigned_classes = quiz.classes.all().order_by('name')
+    assigned_classes = quiz.classes.filter(school=school).order_by('name')
     
     # Get unassigned classes (available but not yet assigned to quiz)
     unassigned_classes = available_classes.exclude(id__in=assigned_classes.values_list('id', flat=True))
@@ -121,7 +121,7 @@ def quiz_assignment_create_view(request, quiz_id):
     if request.method == "GET":
         # Initialize variables
         unassigned_classes = Class.objects.none()
-        assigned_classes = quiz.classes.all()
+        assigned_classes = quiz.classes.filter(school=school)
         
         try:
             # Get available classes
@@ -149,7 +149,9 @@ def quiz_assignment_create_view(request, quiz_id):
                 available_class_ids = list(available_classes.values_list('id', flat=True))
             
             # Get already assigned classes
-            assigned_class_ids = list(quiz.classes.values_list('id', flat=True))
+            assigned_class_ids = list(
+                quiz.classes.filter(school=school).values_list('id', flat=True)
+            )
             
             # Get unassigned classes (available but not yet assigned to quiz)
             if assigned_class_ids and available_class_ids:
@@ -160,7 +162,7 @@ def quiz_assignment_create_view(request, quiz_id):
                 unassigned_classes = Class.objects.none()
             
             # Get assigned classes queryset
-            assigned_classes = quiz.classes.all()
+            assigned_classes = quiz.classes.filter(school=school)
             
         except Exception as e:
             # Log the error and return a proper error response
@@ -289,13 +291,17 @@ def quiz_assignment_delete_view(request, quiz_id, class_id):
     if request.user.role not in ["teacher", "admin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    if not request.user.teacher_profile:
+    if request.user.role == "teacher" and not request.user.teacher_profile:
         return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    quiz = get_object_or_404(Quiz, pk=quiz_id, teacher=teacher, school=school)
+    quiz_filters = {'pk': quiz_id, 'school': school}
+    if request.user.role == "teacher":
+        quiz_filters['teacher'] = request.user.teacher_profile
+    quiz = get_object_or_404(Quiz, **quiz_filters)
     class_obj = get_object_or_404(Class, pk=class_id, school=school)
+    if not quiz.classes.filter(pk=class_obj.pk, school=school).exists():
+        return JsonResponse({'error': 'Class is not assigned to this quiz'}, status=404)
     
     try:
         # Remove class from quiz
@@ -334,14 +340,16 @@ def quiz_assignment_bulk_delete_view(request, quiz_id):
             return JsonResponse({'error': 'Permission denied'}, status=403)
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    if not request.user.teacher_profile:
+    if request.user.role == "teacher" and not request.user.teacher_profile:
         if request.method == "GET":
             return JsonResponse({'error': 'Teacher profile not found'}, status=404)
         return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    quiz = get_object_or_404(Quiz, pk=quiz_id, teacher=teacher, school=school)
+    quiz_filters = {'pk': quiz_id, 'school': school}
+    if request.user.role == "teacher":
+        quiz_filters['teacher'] = request.user.teacher_profile
+    quiz = get_object_or_404(Quiz, **quiz_filters)
     
     if request.method == "GET":
         # Check if this is an AJAX request for modal
@@ -374,17 +382,24 @@ def quiz_assignment_bulk_delete_view(request, quiz_id):
                 'success': False,
                 'error': 'Invalid class IDs provided.'
             }, status=400)
-        
-        classes = Class.objects.filter(
-            pk__in=class_ids,
-            school=school
-        )
-        
-        count = classes.count()
-        if count == 0:
+
+        if len(class_ids) != len(set(class_ids)):
             return JsonResponse({
                 'success': False,
-                'error': 'No valid classes found to unassign.'
+                'error': 'Class IDs must be unique.',
+            }, status=400)
+
+        classes = Class.objects.filter(
+            pk__in=class_ids,
+            school=school,
+            assigned_quizzes=quiz,
+        )
+
+        count = classes.count()
+        if count == 0 or count != len(class_ids):
+            return JsonResponse({
+                'success': False,
+                'error': 'One or more classes are invalid or not assigned to this quiz.'
             }, status=400)
         
         with transaction.atomic():
@@ -414,18 +429,17 @@ def quiz_assignment_overview_view(request):
         messages.error(request, "You don't have permission to access this page.")
         return redirect("quiz_app:dashboard")
     
-    if not request.user.teacher_profile:
+    if request.user.role == "teacher" and not request.user.teacher_profile:
         messages.error(request, "Teacher profile not found. Please contact administrator.")
         return redirect("quiz_app:dashboard")
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    
-    # Get all quizzes created by this teacher
-    quizzes = Quiz.objects.filter(
-        teacher=teacher,
-        school=school
-    ).select_related('subject', 'academic_year', 'term').prefetch_related('classes', 'questions').order_by('-created_at')
+    quizzes = Quiz.objects.filter(school=school)
+    if request.user.role == "teacher":
+        quizzes = quizzes.filter(teacher=request.user.teacher_profile)
+    quizzes = quizzes.select_related(
+        'subject', 'academic_year', 'term'
+    ).prefetch_related('classes', 'questions').order_by('-created_at')
     
     # Search functionality
     search_query = request.GET.get('search', '')
@@ -455,7 +469,7 @@ def quiz_assignment_overview_view(request):
     
     # Annotate each quiz with assignment info
     for quiz in quizzes:
-        quiz.assigned_classes_count = quiz.classes.count()
+        quiz.assigned_classes_count = quiz.classes.filter(school=school).count()
         quiz.total_questions = quiz.questions.count()
     
     context = {
@@ -536,4 +550,3 @@ def class_quiz_list_view(request, class_id):
     }
     
     return render(request, 'quiz/assignment/class_quiz_list.html', context)
-

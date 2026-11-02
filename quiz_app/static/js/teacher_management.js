@@ -165,6 +165,9 @@
                 autoWidth: false,
                 columns: columns,
                 responsive: true,
+                paging: false,
+                info: false,
+                lengthChange: false,
                 pageLength: 25,
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
                 order: [[2, 'asc']],
@@ -225,7 +228,7 @@
         }, 300));
 
         // Filter dropdowns
-        $('#departmentFilter, #genderFilter').on('change', function () {
+        $('#departmentFilter, #genderFilter, #statusFilter').on('change', function () {
             applyFilters();
         });
 
@@ -233,6 +236,7 @@
         $('#clearFiltersBtn').on('click', function () {
             $('#searchInput').val('');
             $('#departmentFilter, #genderFilter').val('');
+            $('#statusFilter').val('active');
             if ($.fn.DataTable) {
                 $('#teachersTable').DataTable().search('').draw();
             }
@@ -244,6 +248,12 @@
             const teacherId = $(this).data('teacher-id');
             const teacherName = $(this).data('teacher-name');
             deleteTeacher(teacherId, teacherName);
+        });
+        $(document).on('click', '.restore-teacher-btn', function () {
+            restoreTeacher(
+                $(this).data('restore-url'),
+                $(this).data('teacher-name')
+            );
         });
 
         // Bulk delete button
@@ -412,17 +422,17 @@
     function deleteTeacher(teacherId, teacherName) {
         Swal.fire({
             icon: 'warning',
-            title: 'Delete Teacher?',
-            html: `Are you sure you want to delete <strong>${teacherName}</strong>?<br>This action cannot be undone.`,
+            title: 'Archive Teacher?',
+            html: `Archive <strong>${teacherName}</strong>? The account will be disabled and active assignments deactivated; academic history will be retained.`,
             showCancelButton: true,
-            confirmButtonText: 'Yes, delete it!',
+            confirmButtonText: 'Archive Teacher',
             cancelButtonText: 'Cancel',
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d'
         }).then((result) => {
             if (result.isConfirmed) {
                 Swal.fire({
-                    title: 'Deleting...',
+                    title: 'Archiving...',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -442,7 +452,7 @@
                         if (response.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Deleted!',
+                                title: 'Archived',
                                 text: response.message,
                                 confirmButtonColor: '#28a745',
                                 timer: 2000,
@@ -455,14 +465,14 @@
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Error',
-                                text: response.error || 'Failed to delete teacher.',
+                                text: response.error || 'Failed to archive teacher.',
                                 confirmButtonColor: '#dc3545'
                             });
                         }
                     },
                     error: function (xhr) {
                         Swal.close();
-                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while deleting.';
+                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while archiving.';
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
@@ -472,6 +482,42 @@
                     }
                 });
             }
+        });
+    }
+
+    function restoreTeacher(url, teacherName) {
+        Swal.fire({
+            icon: 'question',
+            title: 'Restore Teacher?',
+            text: `Restore ${teacherName}? Previous assignments will remain inactive.`,
+            showCancelButton: true,
+            confirmButtonText: 'Restore Teacher',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#198754'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+            $.ajax({
+                url: url,
+                type: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function (response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        Swal.fire('Error', response.error || 'Failed to restore teacher.', 'error');
+                    }
+                },
+                error: function (xhr) {
+                    Swal.fire(
+                        'Error',
+                        xhr.responseJSON?.error || 'An error occurred while restoring.',
+                        'error'
+                    );
+                }
+            });
         });
     }
 
@@ -653,20 +699,30 @@
      */
     function performBulkDelete() {
         const teacherIds = Array.from(selectedTeachers);
+        const targetSchool = document.getElementById('bulkDeleteSchoolId');
+        if (targetSchool && !targetSchool.value) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Select a School',
+                text: 'Choose the school that owns the selected teachers.',
+                confirmButtonColor: '#3085d6'
+            });
+            return;
+        }
 
         Swal.fire({
             icon: 'warning',
-            title: 'Confirm Delete',
-            html: `Are you sure you want to delete <strong>${teacherIds.length}</strong> teacher(s)?<br>This action cannot be undone.`,
+            title: $('#archiveAction').val() === 'restore' ? 'Confirm Restore' : 'Confirm Archive',
+            html: `${$('#archiveAction').val() === 'restore' ? 'Restore' : 'Archive'} <strong>${teacherIds.length}</strong> teacher(s)?`,
             showCancelButton: true,
-            confirmButtonText: 'Yes, delete them!',
+            confirmButtonText: $('#archiveAction').val() === 'restore' ? 'Restore Selected' : 'Archive Selected',
             cancelButtonText: 'Cancel',
-            confirmButtonColor: '#dc3545',
+            confirmButtonColor: $('#archiveAction').val() === 'restore' ? '#198754' : '#ffc107',
             cancelButtonColor: '#6c757d'
         }).then((result) => {
             if (result.isConfirmed) {
                 Swal.fire({
-                    title: 'Deleting...',
+                    title: $('#archiveAction').val() === 'restore' ? 'Restoring...' : 'Archiving...',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -677,7 +733,11 @@
                     url: '/teachers/bulk-delete/',
                     type: 'POST',
                     contentType: 'application/json',
-                    data: JSON.stringify({ teacher_ids: teacherIds }),
+                    data: JSON.stringify({
+                        teacher_ids: teacherIds,
+                        school_id: targetSchool ? targetSchool.value : null,
+                        action: $('#archiveAction').val()
+                    }),
                     headers: {
                         'X-CSRFToken': getCsrfToken(),
                         'X-Requested-With': 'XMLHttpRequest'
@@ -688,7 +748,7 @@
                         if (response.success) {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Deleted!',
+                                title: 'Updated',
                                 text: response.message,
                                 confirmButtonColor: '#28a745',
                                 timer: 2000,
@@ -702,14 +762,14 @@
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Error',
-                                text: response.error || 'Failed to delete teachers.',
+                                text: response.error || 'Failed to update teachers.',
                                 confirmButtonColor: '#dc3545'
                             });
                         }
                     },
                     error: function (xhr) {
                         Swal.close();
-                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while deleting.';
+                        const errorMsg = xhr.responseJSON?.error || 'An error occurred while updating teachers.';
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
@@ -746,11 +806,13 @@
     function applyFilters() {
         const departmentFilter = $('#departmentFilter').val();
         const genderFilter = $('#genderFilter').val();
+        const statusFilter = $('#statusFilter').val();
 
         // Build URL with filters
         const params = new URLSearchParams();
         if (departmentFilter) params.append('department', departmentFilter);
         if (genderFilter) params.append('gender', genderFilter);
+        if (statusFilter) params.append('status', statusFilter);
 
         const searchQuery = $('#searchInput').val();
         if (searchQuery) params.append('search', searchQuery);
@@ -785,4 +847,3 @@
     }
 
 })(jQuery);
-

@@ -54,10 +54,10 @@ def superadmin_dashboard_view(request):
         
         # User statistics (all schools)
         stats["total_users"] = User.objects.count()
-        stats["total_admins"] = User.objects.filter(role="admin", is_superadmin=False).count()
+        stats["total_admins"] = User.objects.filter(role="admin").count()
         stats["total_teachers"] = User.objects.filter(role="teacher").count()
         stats["total_students"] = User.objects.filter(role="student").count()
-        stats["total_superadmins"] = User.objects.filter(is_superadmin=True).count()
+        stats["total_superadmins"] = User.objects.filter(role="superadmin").count()
         
         # Student statistics (all schools)
         stats["total_students_all"] = Student.objects.count()
@@ -162,4 +162,3 @@ def superadmin_dashboard_view(request):
             'inactive_schools': SchoolInformation.objects.none(),
         }
         return render(request, "superadmin/dashboard.html", context)
-

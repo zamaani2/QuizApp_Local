@@ -74,7 +74,14 @@
               {% endfor %}
             </select>
           </div>
-          <div class="col-md-3">
+          <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+              <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Classes</option>
+              <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived Classes</option>
+              <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Classes</option>
+            </select>
+          </div>
+          <div class="col-md-1">
             <button type="button" class="btn btn-secondary" id="clearFiltersBtn">
               <i class="bi bi-x-circle me-1"></i>Clear Filters
             </button>
@@ -110,7 +117,9 @@
                 <span class="text-muted">{{ class_obj.maximum_students }}</span>
               </td>
               <td>
-                {% if class_obj.is_class_full %}
+                {% if not class_obj.is_active %}
+                <span class="badge bg-secondary">Archived</span>
+                {% elif class_obj.is_class_full %}
                 <span class="badge bg-danger">Full</span>
                 {% else %}
                 <span class="badge bg-success">Available</span>
@@ -134,15 +143,28 @@
                   >
                     <i class="bi bi-pencil"></i>
                   </button>
+                  {% if class_obj.is_active %}
                   <button
                     type="button"
-                    class="btn btn-sm btn-danger delete-class-btn"
+                    class="btn btn-sm btn-warning delete-class-btn"
                     data-class-id="{{ class_obj.id }}"
                     data-class-name="{{ class_obj.name }}"
-                    title="Delete"
+                    title="Archive class"
                   >
-                    <i class="bi bi-trash"></i>
+                    <i class="bi bi-archive"></i>
                   </button>
+                  {% else %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-success restore-class-btn"
+                    data-class-id="{{ class_obj.id }}"
+                    data-class-name="{{ class_obj.name }}"
+                    data-restore-url="{% url 'quiz_app:class_restore' class_obj.id %}"
+                    title="Restore class"
+                  >
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                  </button>
+                  {% endif %}
                 </div>
               </td>
             </tr>
@@ -166,4 +188,3 @@
 {% block extra_js %}
 <script src="{% static 'js/class_management.js' %}"></script>
 {% endblock extra_js %}
-

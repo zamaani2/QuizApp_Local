@@ -20,6 +20,7 @@ from django.db import transaction
 User = get_user_model()
 
 from ..models import SchoolInformation
+from ..utils.tenant_utils import get_object_or_404_with_school, get_write_school
 
 
 @login_required
@@ -94,7 +95,7 @@ def user_create_view(request):
     
     if request.method == "GET":
         # Return form for modal
-        schools = SchoolInformation.objects.all()
+        schools = SchoolInformation.objects.filter(is_active=True)
         if school:
             schools = SchoolInformation.objects.filter(pk=school.pk)
         schools = schools.order_by('name')
@@ -102,7 +103,10 @@ def user_create_view(request):
         html = render(request, 'users/partials/user_form.html', {
             'user': None,
             'schools': schools,
-            'user_roles': User.ROLES,
+            'user_roles': [
+                choice for choice in User.ROLES
+                if request.user.role == "superadmin" or choice[0] != "superadmin"
+            ],
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
@@ -124,6 +128,16 @@ def user_create_view(request):
                     'success': False,
                     'error': 'Please fill in all required fields.'
                 }, status=400)
+            if role not in dict(User.ROLES):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid user role selected.'
+                }, status=400)
+            if request.user.role == "admin" and role == "superadmin":
+                return JsonResponse({
+                    'success': False,
+                    'error': 'School administrators cannot create superadmin accounts.'
+                }, status=403)
             
             # Check if username already exists
             if User.objects.filter(username=username).exists():
@@ -143,7 +157,10 @@ def user_create_view(request):
             user_school = None
             if school_id:
                 try:
-                    user_school = SchoolInformation.objects.get(pk=school_id)
+                    user_school = SchoolInformation.objects.get(
+                        pk=school_id,
+                        is_active=True,
+                    )
                     # Regular admin can only assign to their own school
                     if request.user.role == "admin" and user_school != school:
                         return JsonResponse({
@@ -157,6 +174,12 @@ def user_create_view(request):
                     }, status=400)
             elif request.user.role == "admin":
                 user_school = school
+
+            if role != "superadmin" and user_school is None:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Select an active school for this user.'
+                }, status=400)
             
             # Set default password if not provided
             if not password:
@@ -202,21 +225,7 @@ def user_edit_view(request, user_id):
     
     school = request.user.school
     
-    # Superadmin can access any user, regular admin only their school
-    if request.user.role == "superadmin":
-        user = get_object_or_404(User, pk=user_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        user = get_object_or_404(User, pk=user_id, school=school)
-    
-    # Additional check (should not be needed but kept for safety)
-    if request.user.role != "superadmin" and school and user.school != school:
-        if request.method == "GET":
-            return JsonResponse({'error': 'User not found'}, status=404)
-        return JsonResponse({'error': 'User not found'}, status=404)
+    user = get_object_or_404_with_school(User, request, pk=user_id)
     
     # Prevent admin from editing superadmin
     if request.user.role == "admin" and user.role == "superadmin":
@@ -234,7 +243,10 @@ def user_edit_view(request, user_id):
         html = render(request, 'users/partials/user_form.html', {
             'user': user,
             'schools': schools,
-            'user_roles': User.ROLES,
+            'user_roles': [
+                choice for choice in User.ROLES
+                if request.user.role == "superadmin" or choice[0] != "superadmin"
+            ],
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
@@ -256,6 +268,16 @@ def user_edit_view(request, user_id):
                     'success': False,
                     'error': 'Please fill in all required fields.'
                 }, status=400)
+            if role not in dict(User.ROLES):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid user role selected.'
+                }, status=400)
+            if request.user.role == "admin" and role == "superadmin":
+                return JsonResponse({
+                    'success': False,
+                    'error': 'School administrators cannot assign the superadmin role.'
+                }, status=403)
             
             # Check if username already exists (excluding current user)
             if User.objects.filter(username=username).exclude(pk=user_id).exists():
@@ -275,7 +297,10 @@ def user_edit_view(request, user_id):
             user_school = None
             if school_id:
                 try:
-                    user_school = SchoolInformation.objects.get(pk=school_id)
+                    user_school = SchoolInformation.objects.get(
+                        pk=school_id,
+                        is_active=True,
+                    )
                     # Regular admin can only assign to their own school
                     if request.user.role == "admin" and user_school != school:
                         return JsonResponse({
@@ -289,6 +314,19 @@ def user_edit_view(request, user_id):
                     }, status=400)
             elif request.user.role == "admin":
                 user_school = school
+
+            if request.user.role == "superadmin" and user.school_id:
+                if user_school and user_school.pk != user.school_id:
+                    return JsonResponse({
+                        'success': False,
+                        'error': "Changing a user's school requires a dedicated transfer workflow."
+                    }, status=400)
+                user_school = user.school
+            if role != "superadmin" and user_school is None:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Select an active school for this user.'
+                }, status=400)
             
             # Update user
             user.username = username
@@ -326,13 +364,7 @@ def user_delete_view(request, user_id):
     
     school = request.user.school
     
-    # Superadmin can access any user, regular admin only their school
-    if request.user.role == "superadmin":
-        user = get_object_or_404(User, pk=user_id)
-    else:
-        if not school:
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        user = get_object_or_404(User, pk=user_id, school=school)
+    user = get_object_or_404_with_school(User, request, pk=user_id)
     
     # Prevent deleting yourself
     if user == request.user:
@@ -340,10 +372,6 @@ def user_delete_view(request, user_id):
             'success': False,
             'error': 'You cannot delete your own account.'
         }, status=400)
-    
-    # Ensure user belongs to same school
-    if school and user.school != school:
-        return JsonResponse({'error': 'User not found'}, status=404)
     
     # Prevent admin from deleting superadmin
     if request.user.role == "admin" and user.role == "superadmin":
@@ -378,7 +406,13 @@ def user_bulk_password_reset_view(request):
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
     if request.method == "GET":
-        html = render(request, 'users/partials/bulk_password_reset_modal.html').content.decode('utf-8')
+        html = render(request, 'users/partials/bulk_password_reset_modal.html', {
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
+        }).content.decode('utf-8')
         return JsonResponse({'html': html})
     
     # POST - Bulk password reset
@@ -388,20 +422,37 @@ def user_bulk_password_reset_view(request):
         user_ids = data.get('user_ids', [])
         default_password = data.get('default_password', '0000')
         
-        if not user_ids:
+        if not isinstance(user_ids, list) or not user_ids:
             return JsonResponse({
                 'success': False,
-                'error': 'No users selected.'
+                'error': 'Select one or more valid users.'
+            }, status=400)
+
+        try:
+            user_ids = [int(user_id) for user_id in user_ids]
+        except (TypeError, ValueError):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid user IDs provided.'
+            }, status=400)
+
+        if len(user_ids) != len(set(user_ids)):
+            return JsonResponse({
+                'success': False,
+                'error': 'User IDs must be unique.'
             }, status=400)
         
         if not default_password:
             default_password = "0000"
         
-        school = request.user.school
+        school = get_write_school(request, data.get('school_id'))
+        if school is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'Select a valid target school.',
+            }, status=400)
         users = User.objects.filter(pk__in=user_ids)
-        
-        if school:
-            users = users.filter(school=school)
+        users = users.filter(school=school)
         
         # Exclude superadmin from regular admin
         if request.user.role == "admin":
@@ -411,10 +462,10 @@ def user_bulk_password_reset_view(request):
         users = users.exclude(pk=request.user.pk)
         
         count = users.count()
-        if count == 0:
+        if count != len(user_ids):
             return JsonResponse({
                 'success': False,
-                'error': 'No valid users found to reset password.'
+                'error': 'One or more selected users are invalid or cannot be reset.'
             }, status=400)
         
         with transaction.atomic():
@@ -432,4 +483,3 @@ def user_bulk_password_reset_view(request):
             'success': False,
             'error': f'Error resetting passwords: {str(e)}'
         }, status=500)
-

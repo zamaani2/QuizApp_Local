@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q, Count, Avg, Max, Min
+from django.db.models import F, Q, Count, Avg, Max, Min, Prefetch
 from django.utils import timezone
 from io import BytesIO
 
@@ -28,6 +28,7 @@ from ..models import (
     QuizAttempt,
     QuizResponse,
     Teacher,
+    AnswerChoice,
 )
 
 
@@ -58,6 +59,8 @@ def quiz_results_list_view(request):
     all_attempts = QuizAttempt.objects.filter(
         quiz__in=teacher_quizzes,
         school=school,
+        quiz__school=school,
+        student__school=school,
         is_submitted=True
     ).select_related('quiz', 'student', 'academic_year', 'term')
     
@@ -118,7 +121,10 @@ def quiz_results_list_view(request):
     
     # Filter to only best attempts
     attempts = QuizAttempt.objects.filter(
-        id__in=best_attempt_ids
+        id__in=best_attempt_ids,
+        school=school,
+        quiz__school=school,
+        student__school=school,
     ).select_related('quiz', 'student', 'academic_year', 'term').order_by('-submitted_at')
     
     # Get filter options (use all_attempts for filter options, not just best attempts)
@@ -173,28 +179,41 @@ def quiz_result_detail_view(request, attempt_id):
         messages.error(request, "You don't have permission to access this page.")
         return redirect("quiz_app:dashboard")
     
-    if not request.user.teacher_profile:
-        messages.error(request, "Teacher profile not found. Please contact administrator.")
-        return redirect("quiz_app:dashboard")
-    
-    teacher = request.user.teacher_profile
     school = request.user.school
-    
-    attempt = get_object_or_404(
-        QuizAttempt,
+    attempts = QuizAttempt.objects.filter(
         pk=attempt_id,
-        quiz__teacher=teacher,
         school=school,
-        is_submitted=True
+        quiz__school=school,
+        student__school=school,
+        is_submitted=True,
     )
+    if request.user.role == "teacher":
+        teacher = request.user.teacher_profile
+        if not teacher:
+            messages.error(request, "Teacher profile not found. Please contact administrator.")
+            return redirect("quiz_app:dashboard")
+        attempts = attempts.filter(quiz__teacher=teacher)
+    attempt = get_object_or_404(attempts)
     
     # Get all responses ordered by question order
-    responses = attempt.responses.select_related(
+    responses = attempt.responses.filter(
+        school=school,
+        question__school=school,
+        question__quiz_id=F('attempt__quiz_id'),
+    ).filter(
+        Q(selected_choice__isnull=True) | Q(selected_choice__school=school)
+    ).select_related(
         'question'
     ).prefetch_related(
-        'question__answer_choices',
+        Prefetch(
+            'question__answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
         'selected_choice',
-        'selected_choices'
+        Prefetch(
+            'selected_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
     ).order_by('question__order')
     
     # Check if print mode
@@ -203,7 +222,7 @@ def quiz_result_detail_view(request, attempt_id):
     if print_mode:
         # Format data for unified template
         quiz = attempt.quiz
-        all_questions = quiz.questions.all().order_by('order')
+        all_questions = quiz.questions.filter(school=school).order_by('order')
         answered_question_ids = set(responses.values_list('question_id', flat=True))
         school_info = school
         
@@ -241,19 +260,18 @@ def quiz_results_export_view(request):
         messages.error(request, "You don't have permission to perform this action.")
         return redirect("quiz_app:dashboard")
     
-    if not request.user.teacher_profile:
-        messages.error(request, "Teacher profile not found. Please contact administrator.")
-        return redirect("quiz_app:dashboard")
-    
     if not OPENPYXL_AVAILABLE:
         messages.error(request, "Excel export requires openpyxl. Please install it.")
         return redirect("quiz_app:quiz_results_list")
-    
-    teacher = request.user.teacher_profile
+
     school = request.user.school
-    
-    # Get quizzes created by this teacher
-    teacher_quizzes = Quiz.objects.filter(teacher=teacher, school=school)
+    quizzes = Quiz.objects.filter(school=school)
+    if request.user.role == "teacher":
+        teacher = request.user.teacher_profile
+        if not teacher:
+            messages.error(request, "Teacher profile not found. Please contact administrator.")
+            return redirect("quiz_app:dashboard")
+        quizzes = quizzes.filter(teacher=teacher)
     
     # Get filter parameters
     quiz_id = request.GET.get('quiz', '')
@@ -262,8 +280,10 @@ def quiz_results_export_view(request):
     
     # Build query - get all attempts first
     all_attempts = QuizAttempt.objects.filter(
-        quiz__in=teacher_quizzes,
+        quiz__in=quizzes,
         school=school,
+        quiz__school=school,
+        student__school=school,
         is_submitted=True
     ).select_related('quiz', 'student', 'academic_year', 'term')
     
@@ -306,7 +326,10 @@ def quiz_results_export_view(request):
     
     # Filter to only best attempts
     attempts = QuizAttempt.objects.filter(
-        id__in=best_attempt_ids
+        id__in=best_attempt_ids,
+        school=school,
+        quiz__school=school,
+        student__school=school,
     ).select_related('quiz', 'student', 'academic_year', 'term').order_by('quiz__title', 'student__full_name', '-submitted_at')
     
     # Create workbook
@@ -433,33 +456,46 @@ def quiz_result_print_view(request, attempt_id):
         messages.error(request, "You don't have permission to access this page.")
         return redirect("quiz_app:dashboard")
     
-    if not request.user.teacher_profile:
-        messages.error(request, "Teacher profile not found. Please contact administrator.")
-        return redirect("quiz_app:dashboard")
-    
-    teacher = request.user.teacher_profile
     school = request.user.school
-    
-    attempt = get_object_or_404(
-        QuizAttempt,
+    attempts_queryset = QuizAttempt.objects.filter(
         pk=attempt_id,
-        quiz__teacher=teacher,
         school=school,
-        is_submitted=True
+        quiz__school=school,
+        student__school=school,
+        is_submitted=True,
     )
+    if request.user.role == "teacher":
+        teacher = request.user.teacher_profile
+        if not teacher:
+            messages.error(request, "Teacher profile not found. Please contact administrator.")
+            return redirect("quiz_app:dashboard")
+        attempts_queryset = attempts_queryset.filter(quiz__teacher=teacher)
+    attempt = get_object_or_404(attempts_queryset)
     
     # Get all responses ordered by question order
-    responses = attempt.responses.select_related(
+    responses = attempt.responses.filter(
+        school=school,
+        question__school=school,
+        question__quiz_id=F('attempt__quiz_id'),
+    ).filter(
+        Q(selected_choice__isnull=True) | Q(selected_choice__school=school)
+    ).select_related(
         'question'
     ).prefetch_related(
-        'question__answer_choices',
+        Prefetch(
+            'question__answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
         'selected_choice',
-        'selected_choices'
+        Prefetch(
+            'selected_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
     ).order_by('question__order')
     
     # Format data for unified template
     quiz = attempt.quiz
-    all_questions = quiz.questions.all().order_by('order')
+    all_questions = quiz.questions.filter(school=school).order_by('order')
     answered_question_ids = set(responses.values_list('question_id', flat=True))
     school_info = school
     
@@ -512,6 +548,8 @@ def quiz_results_bulk_print_view(request):
         all_attempts = QuizAttempt.objects.filter(
             quiz__in=teacher_quizzes,
             school=school,
+            quiz__school=school,
+            student__school=school,
             is_submitted=True
         ).select_related('quiz', 'student', 'academic_year', 'term')
         
@@ -562,7 +600,10 @@ def quiz_results_bulk_print_view(request):
                 best_attempt_ids.append(best_attempt.id)
         
         attempts_queryset = QuizAttempt.objects.filter(
-            id__in=best_attempt_ids
+            id__in=best_attempt_ids,
+            school=school,
+            quiz__school=school,
+            student__school=school,
         ).select_related('quiz', 'student', 'academic_year', 'term').order_by('quiz__title', 'student__full_name')
     else:
         # Get specific attempts
@@ -570,6 +611,8 @@ def quiz_results_bulk_print_view(request):
             id__in=attempt_ids,
             quiz__in=teacher_quizzes,
             school=school,
+            quiz__school=school,
+            student__school=school,
             is_submitted=True
         ).select_related('quiz', 'student', 'academic_year', 'term').order_by('quiz__title', 'student__full_name')
     
@@ -579,16 +622,28 @@ def quiz_results_bulk_print_view(request):
         quiz = attempt.quiz
         
         # Get all responses ordered by question order
-        responses = attempt.responses.select_related(
+        responses = attempt.responses.filter(
+            school=school,
+            question__school=school,
+            question__quiz_id=F('attempt__quiz_id'),
+        ).filter(
+            Q(selected_choice__isnull=True) | Q(selected_choice__school=school)
+        ).select_related(
             'question'
         ).prefetch_related(
-            'question__answer_choices',
+            Prefetch(
+                'question__answer_choices',
+                queryset=AnswerChoice.objects.filter(school=school),
+            ),
             'selected_choice',
-            'selected_choices'
+            Prefetch(
+                'selected_choices',
+                queryset=AnswerChoice.objects.filter(school=school),
+            ),
         ).order_by('question__order')
         
         # Get all questions to show unanswered ones
-        all_questions = quiz.questions.all().order_by('order')
+        all_questions = quiz.questions.filter(school=school).order_by('order')
         answered_question_ids = set(responses.values_list('question_id', flat=True))
         
         attempts_data.append({
@@ -612,4 +667,3 @@ def quiz_results_bulk_print_view(request):
     }
     
     return render(request, 'quiz/results/unified_result_print.html', context)
-

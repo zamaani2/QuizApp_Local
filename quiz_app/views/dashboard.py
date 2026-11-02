@@ -8,13 +8,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse
 
 from ..models import (
     Student,
     Teacher,
     Class,
-    SchoolInformation,
     Quiz,
     QuizAttempt,
 )
@@ -73,82 +72,68 @@ def admin_dashboard_view(request):
 
     user = request.user
     school = user.school
+    if school is None:
+        return HttpResponseForbidden("A valid school association is required.")
 
     # Get statistics
     stats = {}
 
     try:
         # Student statistics
-        students_query = Student.objects.all()
-        if school:
-            students_query = students_query.filter(school=school)
+        students_query = Student.objects.filter(school=school)
         stats["total_students"] = students_query.count()
         
         # Active students are those with active class assignments
-        if school:
-            stats["active_students"] = StudentClass.objects.filter(
-                school=school,
-                is_active=True
-            ).values('student').distinct().count()
-        else:
-            stats["active_students"] = StudentClass.objects.filter(
-                is_active=True
-            ).values('student').distinct().count()
+        stats["active_students"] = StudentClass.objects.filter(
+            school=school,
+            student__school=school,
+            assigned_class__school=school,
+            is_active=True
+        ).values('student').distinct().count()
         
         # Students with class assignments (current academic year)
-        if school and school.current_academic_year:
+        if school.current_academic_year:
             stats["enrolled_students"] = StudentClass.objects.filter(
                 school=school,
+                student__school=school,
+                assigned_class__school=school,
                 assigned_class__academic_year=school.current_academic_year,
                 is_active=True
             ).values('student').distinct().count()
         else:
             stats["enrolled_students"] = StudentClass.objects.filter(
                 school=school,
+                student__school=school,
+                assigned_class__school=school,
                 is_active=True
-            ).values('student').distinct().count() if school else 0
+            ).values('student').distinct().count()
 
         # Teacher statistics
-        teachers_query = Teacher.objects.all()
-        if school:
-            teachers_query = teachers_query.filter(school=school)
+        teachers_query = Teacher.objects.filter(school=school)
         stats["total_teachers"] = teachers_query.count()
         
         # Active teachers are those with active subject assignments
-        if school:
-            stats["active_teachers"] = teachers_query.filter(
-                teachersubjectassignment__is_active=True
-            ).distinct().count()
-        else:
-            stats["active_teachers"] = Teacher.objects.filter(
-                teachersubjectassignment__is_active=True
-            ).distinct().count()
+        stats["active_teachers"] = teachers_query.filter(
+            teachersubjectassignment__school=school,
+            teachersubjectassignment__is_active=True
+        ).distinct().count()
 
         # Class statistics
-        classes_query = Class.objects.all()
-        if school:
-            classes_query = classes_query.filter(school=school)
+        classes_query = Class.objects.filter(school=school)
         stats["total_classes"] = classes_query.count()
         
         # Subject and Department statistics
-        subjects_query = Subject.objects.all()
-        departments_query = Department.objects.all()
-        if school:
-            subjects_query = subjects_query.filter(school=school)
-            departments_query = departments_query.filter(school=school)
+        subjects_query = Subject.objects.filter(school=school)
+        departments_query = Department.objects.filter(school=school)
         stats["total_subjects"] = subjects_query.count()
         stats["total_departments"] = departments_query.count()
         
         # Quiz Category statistics
-        categories_query = QuizCategory.objects.all()
-        if school:
-            categories_query = categories_query.filter(school=school)
+        categories_query = QuizCategory.objects.filter(school=school)
         stats["total_categories"] = categories_query.filter(is_active=True).count()
 
         # Quiz statistics
-        quizzes_query = Quiz.objects.all()
-        if school:
-            quizzes_query = quizzes_query.filter(school=school)
+        quizzes_query = Quiz.objects.filter(school=school)
         stats["total_quizzes"] = quizzes_query.count()
         stats["published_quizzes"] = quizzes_query.filter(
             status="published", is_active=True
@@ -162,9 +147,11 @@ def admin_dashboard_view(request):
         stats["active_quizzes"] = stats["published_quizzes"]
 
         # Quiz attempts
-        attempts_query = QuizAttempt.objects.all()
-        if school:
-            attempts_query = attempts_query.filter(school=school)
+        attempts_query = QuizAttempt.objects.filter(
+            school=school,
+            quiz__school=school,
+            student__school=school,
+        )
         stats["total_attempts"] = attempts_query.count()
         stats["completed_attempts"] = attempts_query.filter(
             is_submitted=True, is_completed=True
@@ -201,27 +188,22 @@ def admin_dashboard_view(request):
             stats["highest_score"] = 0.0
 
         # Quizzes needing grading
-        if school:
-            quizzes_needing_grading = QuizResponse.objects.filter(
-                attempt__school=school,
-                question__question_type='essay',
-                is_graded=False,
-                attempt__is_submitted=True
-            ).values('attempt__quiz').distinct().count()
-        else:
-            quizzes_needing_grading = QuizResponse.objects.filter(
-                question__question_type='essay',
-                is_graded=False,
-                attempt__is_submitted=True
-            ).values('attempt__quiz').distinct().count()
+        quizzes_needing_grading = QuizResponse.objects.filter(
+            attempt__school=school,
+            attempt__quiz__school=school,
+            attempt__student__school=school,
+            question__quiz__school=school,
+            question__question_type='essay',
+            is_graded=False,
+            attempt__is_submitted=True
+        ).values('attempt__quiz').distinct().count()
         stats["quizzes_needing_grading"] = quizzes_needing_grading
 
         # Get current academic year and term
         current_academic_year = None
         current_term = None
-        if school:
-            current_academic_year = school.current_academic_year
-            current_term = school.current_term
+        current_academic_year = school.current_academic_year
+        current_term = school.current_term
 
         # Recent activities
         # Recent quiz attempts (completed)
@@ -254,13 +236,19 @@ def admin_dashboard_view(request):
         ).order_by('-attempt_count')[:5]
 
         # Top performing students
+        attempt_scope = Q(
+            quiz_attempts__school=school,
+            quiz_attempts__quiz__school=school,
+            quiz_attempts__student__school=school,
+            quiz_attempts__is_completed=True,
+        )
         top_students = students_query.annotate(
-            total_attempts=Count('quiz_attempts', filter=Q(quiz_attempts__is_completed=True)),
-            avg_score=Avg('quiz_attempts__percentage', filter=Q(quiz_attempts__is_completed=True))
+            total_attempts=Count('quiz_attempts', filter=attempt_scope),
+            avg_score=Avg('quiz_attempts__percentage', filter=attempt_scope)
         ).filter(total_attempts__gt=0).order_by('-avg_score')[:5]
 
         # Get school information
-        school_info = school if school else SchoolInformation.objects.filter(is_active=True).first()
+        school_info = school
 
     except Exception as e:
         import logging
@@ -337,6 +325,8 @@ def teacher_dashboard_view(request):
     from django.utils import timezone
 
     school = request.user.school
+    if school is None:
+        return HttpResponseForbidden("A valid school association is required.")
     
     # Teachers see only their quizzes, admins see all quizzes in school
     if request.user.role == "teacher":
@@ -360,7 +350,9 @@ def teacher_dashboard_view(request):
     teacher_quizzes_ids = all_quizzes.values_list('id', flat=True)
     all_attempts = QuizAttempt.objects.filter(
         quiz_id__in=teacher_quizzes_ids,
-        school=school
+        school=school,
+        quiz__school=school,
+        student__school=school,
     ).select_related('quiz', 'student', 'quiz__subject')
     
     total_attempts = all_attempts.count()
@@ -391,6 +383,9 @@ def teacher_dashboard_view(request):
         pending_responses_count = QuizResponse.objects.filter(
             attempt__quiz_id=quiz_id,
             attempt__school=school,
+            attempt__quiz__school=school,
+            attempt__student__school=school,
+            question__quiz__school=school,
             question__question_type='essay',
             is_graded=False,
             attempt__is_submitted=True
@@ -403,6 +398,9 @@ def teacher_dashboard_view(request):
     responses_needing_grading = QuizResponse.objects.filter(
         attempt__quiz_id__in=teacher_quizzes_ids,
         attempt__school=school,
+        attempt__quiz__school=school,
+        attempt__student__school=school,
+        question__quiz__school=school,
         question__question_type='essay',
         is_graded=False,
         attempt__is_submitted=True
@@ -467,12 +465,15 @@ def student_dashboard_view(request):
 
     student = request.user.student_profile
     school = request.user.school
+    if school is None or student.school_id != school.pk:
+        return HttpResponseForbidden("A valid school association is required.")
     now = timezone.now()
 
     # Get student's current class assignment
     current_enrollment = StudentClass.objects.filter(
         student=student,
         school=school,
+        assigned_class__school=school,
         is_active=True
     ).select_related('assigned_class', 'assigned_class__academic_year', 'assigned_by').order_by('-date_assigned').first()
 
@@ -509,7 +510,9 @@ def student_dashboard_view(request):
     # Get all quiz attempts for this student
     all_attempts = QuizAttempt.objects.filter(
         student=student,
-        school=school
+        student__school=school,
+        school=school,
+        quiz__school=school,
     ).select_related('quiz', 'quiz__subject', 'academic_year', 'term')
 
     # Get completed attempts
@@ -595,4 +598,3 @@ def extend_session_view(request):
         return JsonResponse({"success": True})
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)})
-

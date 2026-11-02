@@ -138,6 +138,7 @@
         </h5>
       </div>
       <div class="card-body">
+        {% if can_review %}
         {% for question in all_questions %}
         <div class="card mb-3">
           <div class="card-header">
@@ -170,9 +171,11 @@
                     class="bi {% if response.is_correct %}bi-check-circle{% else %}bi-x-circle{% endif %} me-2"
                   ></i>
                   {{ response.selected_choice.choice_text }} {% if not response.is_correct %}
+                  {% if quiz.show_correct_answers %}
                   <br /><small class="text-muted"
                     >Correct answer: {% for choice in question.answer_choices.all %} {% if choice.is_correct %}{{ choice.choice_text }}{% endif %} {% endfor %}
                   </small>
+                  {% endif %}
                   {% endif %}
                 </div>
                 {% else %}
@@ -196,7 +199,7 @@
                 >
                   {{ response.text_answer|linebreaks }}
                 </div>
-                {% if question.question_type == 'short_answer' or question.question_type == 'fill_blank' %} {% if not response.is_correct and question.correct_answer_text %}
+                {% if quiz.show_correct_answers and question.question_type == 'short_answer' or quiz.show_correct_answers and question.question_type == 'fill_blank' %} {% if not response.is_correct and question.correct_answer_text %}
                 <div class="alert alert-success">
                   <strong>Correct Answer:</strong> {{ question.correct_answer_text }}
                 </div>
@@ -242,7 +245,7 @@
             {% endif %}
 
             <!-- Explanation -->
-            {% if question.explanation %}
+            {% if quiz.show_correct_answers and question.explanation %}
             <div class="alert alert-secondary">
               <strong><i class="bi bi-lightbulb me-2"></i>Explanation:</strong>
               <p class="mb-0 mt-2">{{ question.explanation|linebreaks }}</p>
@@ -257,6 +260,11 @@
           </div>
         </div>
         {% endfor %}
+        {% else %}
+        <p class="mb-0 text-muted">
+          Your score is available above. Answer review is not available for this quiz.
+        </p>
+        {% endif %}
       </div>
     </div>
   </div>

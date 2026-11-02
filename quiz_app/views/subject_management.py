@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
@@ -20,8 +20,10 @@ from ..models import (
     Subject,
     LearningArea,
     Department,
+    TeacherSubjectAssignment,
     SchoolInformation,
 )
+from ..utils.tenant_utils import get_object_or_404_with_school, get_write_school
 
 
 @login_required
@@ -39,6 +41,14 @@ def subject_list_view(request):
     
     if school:
         subjects = subjects.filter(school=school)
+    status_filter = request.GET.get("status", "active")
+    if status_filter == "archived":
+        subjects = subjects.filter(is_active=False)
+    elif status_filter == "all":
+        pass
+    else:
+        status_filter = "active"
+        subjects = subjects.filter(is_active=True)
     
     # Search functionality
     search_query = request.GET.get('search', '')
@@ -59,7 +69,9 @@ def subject_list_view(request):
         subjects = subjects.filter(department_id=department_filter)
     
     # Order by subject name
-    subjects = subjects.order_by('subject_name')
+    subjects = subjects.select_related(
+        "learning_area", "department"
+    ).annotate(quiz_count=Count("quizzes")).order_by('subject_name')
     
     # Get filter options
     learning_areas = LearningArea.objects.all()
@@ -79,6 +91,7 @@ def subject_list_view(request):
         'search_query': search_query,
         'learning_area_filter': learning_area_filter,
         'department_filter': department_filter,
+        'status_filter': status_filter,
     }
     
     return render(request, 'subject/subject_list.html', context)
@@ -116,11 +129,23 @@ def subject_create_view(request):
             'subject': None,
             'learning_areas': learning_areas,
             'departments': departments,
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
     
     # POST - Create subject
+    school = get_write_school(request)
+    if school is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Select a valid target school.',
+        }, status=400)
+
     try:
         with transaction.atomic():
             # Get form data
@@ -210,18 +235,8 @@ def subject_edit_view(request, subject_id):
         messages.error(request, "You don't have permission to perform this action.")
         return redirect("quiz_app:subject_list")
     
-    school = request.user.school
-    
-    # Superadmin can access any subject, regular admin only their school
-    if request.user.role == "superadmin":
-        subject = get_object_or_404(Subject, pk=subject_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:subject_list")
-        subject = get_object_or_404(Subject, pk=subject_id, school=school)
+    subject = get_object_or_404_with_school(Subject, request, pk=subject_id)
+    school = subject.school
     
     if request.method == "GET":
         # Get learning areas and departments for dropdowns
@@ -307,47 +322,44 @@ def subject_edit_view(request, subject_id):
 @require_http_methods(["POST"])
 def subject_delete_view(request, subject_id):
     """
-    Delete a subject.
+    Archive a subject while preserving its historical records.
     """
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    school = request.user.school
-    
-    # Superadmin can access any subject, regular admin only their school
-    if request.user.role == "superadmin":
-        subject = get_object_or_404(Subject, pk=subject_id)
-    else:
-        if not school:
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        subject = get_object_or_404(Subject, pk=subject_id, school=school)
+    subject = get_object_or_404_with_school(Subject, request, pk=subject_id)
     
     try:
-        # Check if subject has quizzes
-        quiz_count = subject.quizzes.count()
-        if quiz_count > 0:
-            return JsonResponse({
-                'success': False,
-                'error': f'Cannot delete subject. It has {quiz_count} quiz(es) associated with it.'
-            }, status=400)
-        
-        # Check if subject has class assignments
-        class_subject_count = subject.classsubject_set.count()
-        if class_subject_count > 0:
-            return JsonResponse({
-                'success': False,
-                'error': f'Cannot delete subject. It is assigned to {class_subject_count} class(es).'
-            }, status=400)
-        
-        subject_name = subject.subject_name
-        subject.delete()
+        with transaction.atomic():
+            subject = Subject.objects.select_for_update().get(pk=subject.pk)
+            if subject.is_active:
+                TeacherSubjectAssignment.objects.filter(
+                    subject=subject, is_active=True
+                ).update(is_active=False)
+                subject.is_active = False
+                subject.save(update_fields=["is_active"])
         return JsonResponse({
             'success': True,
-            'message': f'Subject {subject_name} deleted successfully.'
+            'message': f'Subject {subject.subject_name} archived successfully.'
         })
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': f'Error deleting subject: {str(e)}'
+            'error': f'Error archiving subject: {str(e)}'
         }, status=500)
 
+
+@login_required
+@require_http_methods(["POST"])
+def subject_restore_view(request, subject_id):
+    if request.user.role not in ["admin", "superadmin"]:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    subject = get_object_or_404_with_school(Subject, request, pk=subject_id)
+    if not subject.is_active:
+        subject.is_active = True
+        subject.save(update_fields=["is_active"])
+    return JsonResponse({
+        "success": True,
+        "message": f"Subject {subject.subject_name} restored. Historical assignments remain inactive.",
+    })

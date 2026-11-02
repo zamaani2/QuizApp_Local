@@ -35,6 +35,13 @@
       <div class="card-body">
         <!-- Filters -->
         <div class="row mb-3">
+          <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+              <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Subjects</option>
+              <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived Subjects</option>
+              <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Subjects</option>
+            </select>
+          </div>
           <div class="col-md-3">
             <input
               type="text"
@@ -89,7 +96,10 @@
               <td>
                 <span class="badge bg-primary">{{ subject.subject_code }}</span>
               </td>
-              <td><strong>{{ subject.subject_name }}</strong></td>
+              <td>
+                <strong>{{ subject.subject_name }}</strong>
+                {% if not subject.is_active %}<span class="badge bg-secondary ms-1">Archived</span>{% endif %}
+              </td>
               <td>
                 {% if subject.learning_area %}
                 <span class="badge bg-info">{{ subject.learning_area.name }}</span>
@@ -105,7 +115,7 @@
                 {% endif %}
               </td>
               <td>
-                <span class="badge bg-warning">{{ subject.quizzes.count }}</span>
+                <span class="badge bg-warning">{{ subject.quiz_count }}</span>
               </td>
               <td>
                 <div class="btn-group" role="group">
@@ -118,15 +128,28 @@
                   >
                     <i class="bi bi-pencil"></i>
                   </button>
+                  {% if subject.is_active %}
                   <button
                     type="button"
-                    class="btn btn-sm btn-danger delete-subject-btn"
+                    class="btn btn-sm btn-warning delete-subject-btn"
                     data-subject-id="{{ subject.id }}"
                     data-subject-name="{{ subject.subject_name }}"
-                    title="Delete"
+                    title="Archive subject"
                   >
-                    <i class="bi bi-trash"></i>
+                    <i class="bi bi-archive"></i>
                   </button>
+                  {% else %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-success restore-subject-btn"
+                    data-subject-id="{{ subject.id }}"
+                    data-subject-name="{{ subject.subject_name }}"
+                    data-restore-url="{% url 'quiz_app:subject_restore' subject.id %}"
+                    title="Restore subject"
+                  >
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                  </button>
+                  {% endif %}
                 </div>
               </td>
             </tr>
@@ -150,4 +173,3 @@
 {% block extra_js %}
 <script src="{% static 'js/subject_management.js' %}"></script>
 {% endblock extra_js %}
-

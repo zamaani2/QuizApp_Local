@@ -85,9 +85,6 @@
             {% if not admin %}required{% endif %}
             placeholder="{% if admin %}Enter new password (optional){% else %}Enter password{% endif %}"
           />
-          {% if not admin %}
-          <small class="text-muted">Default: 0000 (if left blank)</small>
-          {% endif %}
         </div>
       </div>
     </div>
@@ -175,4 +172,3 @@
     });
   });
 </script>
-

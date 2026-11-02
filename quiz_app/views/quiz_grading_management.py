@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q, Count, F
+from django.db.models import Q, Count, F, Prefetch
 from django.db import transaction
 from django.utils import timezone
 
@@ -21,6 +21,7 @@ from ..models import (
     QuizAttempt,
     QuizResponse,
     Question,
+    AnswerChoice,
     Teacher,
 )
 
@@ -52,6 +53,8 @@ def quiz_grading_list_view(request):
     attempts = QuizAttempt.objects.filter(
         quiz__in=teacher_quizzes,
         school=school,
+        quiz__school=school,
+        student__school=school,
         is_submitted=True
     ).select_related('quiz', 'student', 'academic_year', 'term').prefetch_related('responses').order_by('-submitted_at')
     
@@ -67,6 +70,11 @@ def quiz_grading_list_view(request):
         attempts_with_ungraded = QuizResponse.objects.filter(
             attempt__quiz__in=teacher_quizzes,
             attempt__school=school,
+            attempt__quiz__school=school,
+            attempt__student__school=school,
+            school=school,
+            question__school=school,
+            question__quiz_id=F('attempt__quiz_id'),
             attempt__is_submitted=True,
             question__question_type='essay',
             is_graded=False
@@ -89,7 +97,10 @@ def quiz_grading_list_view(request):
     # Annotate each attempt with grading info
     for attempt in attempts:
         all_essay_responses = attempt.responses.filter(
-            question__question_type='essay'
+            school=school,
+            question__school=school,
+            question__quiz_id=F('attempt__quiz_id'),
+            question__question_type='essay',
         )
         essay_responses_ungraded = all_essay_responses.filter(is_graded=False)
         attempt.ungraded_essay_count = essay_responses_ungraded.count()
@@ -133,6 +144,8 @@ def quiz_attempt_grading_view(request, attempt_id):
             QuizAttempt,
             pk=attempt_id,
             quiz__teacher=teacher,
+            quiz__school=school,
+            student__school=school,
             school=school,
             is_submitted=True
         )
@@ -141,17 +154,31 @@ def quiz_attempt_grading_view(request, attempt_id):
         attempt = get_object_or_404(
             QuizAttempt,
             pk=attempt_id,
+            quiz__school=school,
+            student__school=school,
             school=school,
             is_submitted=True
         )
     
     # Get all responses ordered by question order
-    responses = attempt.responses.select_related(
+    responses = attempt.responses.filter(
+        school=school,
+        question__school=school,
+        question__quiz_id=F('attempt__quiz_id'),
+    ).filter(
+        Q(selected_choice__isnull=True) | Q(selected_choice__school=school)
+    ).select_related(
         'question'
     ).prefetch_related(
-        'question__answer_choices',
+        Prefetch(
+            'question__answer_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
         'selected_choice',
-        'selected_choices'
+        Prefetch(
+            'selected_choices',
+            queryset=AnswerChoice.objects.filter(school=school),
+        ),
     ).order_by('question__order')
     
     # Separate responses by type
@@ -186,20 +213,24 @@ def quiz_response_grade_view(request, response_id):
             return JsonResponse({'error': 'Permission denied'}, status=403)
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    if not request.user.teacher_profile:
-        if request.method == "GET":
-            return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-        return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-    
-    teacher = request.user.teacher_profile
     school = request.user.school
-    
-    response = get_object_or_404(
-        QuizResponse,
+    responses = QuizResponse.objects.filter(
         pk=response_id,
-        attempt__quiz__teacher=teacher,
-        school=school
+        school=school,
+        attempt__school=school,
+        attempt__quiz__school=school,
+        attempt__student__school=school,
+        question__school=school,
+        question__quiz_id=F('attempt__quiz_id'),
+    ).filter(
+        Q(selected_choice__isnull=True) | Q(selected_choice__school=school)
     )
+    if request.user.role == "teacher":
+        teacher = request.user.teacher_profile
+        if not teacher:
+            return JsonResponse({'error': 'Teacher profile not found'}, status=404)
+        responses = responses.filter(attempt__quiz__teacher=teacher)
+    response = get_object_or_404(responses)
     
     if request.method == "GET":
         # Check if this is an AJAX request for modal
@@ -232,7 +263,9 @@ def quiz_response_grade_view(request, response_id):
             }, status=400)
         
         # Validate marks are within question's max marks
-        max_marks = response.question.marks
+        max_marks = response.attempt.configuration_snapshot.get(
+            "questions", {}
+        ).get(str(response.question_id), {}).get("marks", response.question.marks)
         if marks_awarded < 0:
             return JsonResponse({
                 'success': False,
@@ -252,6 +285,15 @@ def quiz_response_grade_view(request, response_id):
             response.is_graded = True
             response.graded_by = request.user
             response.graded_at = timezone.now()
+            response.grading_history = [
+                *response.grading_history,
+                {
+                    "marks_awarded": marks_awarded,
+                    "graded_by_id": request.user.pk,
+                    "graded_at": response.graded_at.isoformat(),
+                    "grading_notes": grading_notes,
+                },
+            ]
             
             # Determine if response is correct based on marks
             # For essay questions, consider it correct if marks > 0
@@ -268,7 +310,13 @@ def quiz_response_grade_view(request, response_id):
             
             # Check if all essay questions are now graded
             essay_responses = response.attempt.responses.filter(
-                question__question_type='essay'
+                school=school,
+                question__school=school,
+                question__quiz_id=F('attempt__quiz_id'),
+                question__question_type='essay',
+            ).filter(
+                Q(selected_choice__isnull=True)
+                | Q(selected_choice__school=school)
             )
             all_graded = all(r.is_graded for r in essay_responses)
             
@@ -303,19 +351,20 @@ def quiz_attempt_bulk_grade_view(request, attempt_id):
     if request.user.role not in ["teacher", "admin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    if not request.user.teacher_profile:
-        return JsonResponse({'error': 'Teacher profile not found'}, status=404)
-    
-    teacher = request.user.teacher_profile
     school = request.user.school
-    
-    attempt = get_object_or_404(
-        QuizAttempt,
+    attempts = QuizAttempt.objects.filter(
         pk=attempt_id,
-        quiz__teacher=teacher,
         school=school,
-        is_submitted=True
+        quiz__school=school,
+        student__school=school,
+        is_submitted=True,
     )
+    if request.user.role == "teacher":
+        teacher = request.user.teacher_profile
+        if not teacher:
+            return JsonResponse({'error': 'Teacher profile not found'}, status=404)
+        attempts = attempts.filter(quiz__teacher=teacher)
+    attempt = get_object_or_404(attempts)
     
     try:
         import json
@@ -338,15 +387,24 @@ def quiz_attempt_bulk_grade_view(request, attempt_id):
                 grading_notes = grade_data.get('grading_notes', '')
                 
                 try:
-                    response = QuizResponse.objects.get(
+                    response = QuizResponse.objects.filter(
                         pk=response_id,
                         attempt=attempt,
-                        school=school
-                    )
+                        school=school,
+                        question__school=school,
+                        question__quiz_id=F('attempt__quiz_id'),
+                    ).filter(
+                        Q(selected_choice__isnull=True)
+                        | Q(selected_choice__school=school)
+                    ).get()
                     
                     # Validate marks
                     marks_awarded = float(marks_awarded)
-                    max_marks = response.question.marks
+                    max_marks = response.attempt.configuration_snapshot.get(
+                        "questions", {}
+                    ).get(str(response.question_id), {}).get(
+                        "marks", response.question.marks
+                    )
                     
                     if marks_awarded < 0 or marks_awarded > max_marks:
                         errors.append(f"Response {response_id}: Invalid marks (0-{max_marks})")
@@ -358,6 +416,15 @@ def quiz_attempt_bulk_grade_view(request, attempt_id):
                     response.is_graded = True
                     response.graded_by = request.user
                     response.graded_at = timezone.now()
+                    response.grading_history = [
+                        *response.grading_history,
+                        {
+                            "marks_awarded": marks_awarded,
+                            "graded_by_id": request.user.pk,
+                            "graded_at": response.graded_at.isoformat(),
+                            "grading_notes": grading_notes,
+                        },
+                    ]
                     
                     if response.question.question_type == 'essay':
                         response.is_correct = marks_awarded > 0
@@ -379,7 +446,10 @@ def quiz_attempt_bulk_grade_view(request, attempt_id):
             
             # Check if all essay questions are graded
             essay_responses = attempt.responses.filter(
-                question__question_type='essay'
+                school=school,
+                question__school=school,
+                question__quiz_id=F('attempt__quiz_id'),
+                question__question_type='essay',
             )
             all_graded = all(r.is_graded for r in essay_responses) if essay_responses.exists() else True
             
@@ -412,4 +482,3 @@ def quiz_attempt_bulk_grade_view(request, attempt_id):
             'success': False,
             'error': f'Error bulk grading: {str(e)}'
         }, status=500)
-

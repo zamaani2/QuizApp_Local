@@ -10,6 +10,17 @@
       <form id="subjectForm" method="post">
         {% csrf_token %}
         <div class="modal-body">
+          {% if user.role == "superadmin" and not subject %}
+          <div class="mb-3">
+            <label for="school_id" class="form-label">Target School <span class="text-danger">*</span></label>
+            <select class="form-select" id="school_id" name="school_id" required>
+              <option value="">Select School</option>
+              {% for school in schools %}
+              <option value="{{ school.id }}">{{ school.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
           <div class="mb-3">
             <label for="subject_name" class="form-label">Subject Name <span class="text-danger">*</span></label>
             <input
@@ -75,4 +86,3 @@
     </div>
   </div>
 </div>
-

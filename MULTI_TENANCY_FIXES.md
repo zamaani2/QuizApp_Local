@@ -1,5 +1,11 @@
 # Multi-Tenancy Security Fixes
 
+> **Historical implementation notes — not a current security assurance.**
+> The utility functions described below were not wired into the views at the
+> time of this review, and the listed view-level findings require revalidation.
+> Current isolation work and remaining coverage are tracked in
+> [PROJECT.md](./PROJECT.md) and [IMPLEMENTATION_CHECKLIST.md](./IMPLEMENTATION_CHECKLIST.md).
+
 ## Overview
 
 This document tracks all fixes applied to ensure proper multi-tenant data isolation across all views.

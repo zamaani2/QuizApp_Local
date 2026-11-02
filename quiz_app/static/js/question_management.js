@@ -92,7 +92,9 @@
             true_false: document.getElementById('trueFalseSection'),
             short_answer: document.getElementById('shortAnswerSection'),
             fill_blank: document.getElementById('fillBlankSection'),
-            essay: document.getElementById('essaySection')
+            essay: document.getElementById('essaySection'),
+            matching: document.getElementById('matchingSection'),
+            ordering: document.getElementById('orderingSection')
         };
 
         Object.keys(sections).forEach(key => {
@@ -140,7 +142,9 @@
             true_false: document.getElementById('trueFalseSection'),
             short_answer: document.getElementById('shortAnswerSection'),
             fill_blank: document.getElementById('fillBlankSection'),
-            essay: document.getElementById('essaySection')
+            essay: document.getElementById('essaySection'),
+            matching: document.getElementById('matchingSection'),
+            ordering: document.getElementById('orderingSection')
         };
 
         if (sections[questionType]) {
@@ -966,4 +970,3 @@
     };
 
 })(jQuery);
-

@@ -22,6 +22,7 @@ from ..models import (
     Term,
     SchoolInformation,
 )
+from ..utils.tenant_utils import get_object_or_404_with_school, get_write_school
 
 
 # ==================== Academic Year Views ====================
@@ -98,11 +99,23 @@ def academic_year_create_view(request):
         # Return form for modal
         html = render(request, 'academic/partials/academic_year_form.html', {
             'academic_year': None,
+            'schools': (
+                SchoolInformation.objects.filter(is_active=True).order_by("name")
+                if request.user.role == "superadmin"
+                else SchoolInformation.objects.none()
+            ),
         }).content.decode('utf-8')
         
         return JsonResponse({'html': html})
     
     # POST - Create academic year
+    school = get_write_school(request)
+    if school is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Select a valid target school.',
+        }, status=400)
+
     try:
         with transaction.atomic():
             # Get form data
@@ -153,13 +166,6 @@ def academic_year_create_view(request):
                     'error': 'Start date must be before end date.'
                 }, status=400)
             
-            # For non-superadmin, school is required
-            if request.user.role != "superadmin" and not school:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'School is required. Please contact administrator to associate a school with your account.'
-                }, status=400)
-            
             # Check for duplicate academic year name for the same school
             existing = AcademicYear.objects.filter(name=name, school=school)
             if existing.exists():
@@ -174,7 +180,7 @@ def academic_year_create_view(request):
                 start_date=start_date,
                 end_date=end_date,
                 is_current=is_current,
-                school=school,  # Can be None for superadmin
+                school=school,
             )
             
             # Validate model
@@ -249,16 +255,10 @@ def academic_year_edit_view(request, academic_year_id):
     
     school = request.user.school
     
-    # Superadmin can access any academic year, regular admin only their school
-    if request.user.role == "superadmin":
-        academic_year = get_object_or_404(AcademicYear, pk=academic_year_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:academic_year_list")
-        academic_year = get_object_or_404(AcademicYear, pk=academic_year_id, school=school)
+    academic_year = get_object_or_404_with_school(
+        AcademicYear, request, pk=academic_year_id
+    )
+    school = academic_year.school
     
     if request.method == "GET":
         # Return form for modal
@@ -353,13 +353,9 @@ def academic_year_delete_view(request, academic_year_id):
     
     school = request.user.school
     
-    # Superadmin can access any academic year, regular admin only their school
-    if request.user.role == "superadmin":
-        academic_year = get_object_or_404(AcademicYear, pk=academic_year_id)
-    else:
-        if not school:
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        academic_year = get_object_or_404(AcademicYear, pk=academic_year_id, school=school)
+    academic_year = get_object_or_404_with_school(
+        AcademicYear, request, pk=academic_year_id
+    )
     
     try:
         # Check if academic year has terms
@@ -392,12 +388,10 @@ def academic_year_set_current_view(request, academic_year_id):
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    school = request.user.school
-    academic_year = get_object_or_404(AcademicYear, pk=academic_year_id)
-    
-    # Ensure academic year belongs to same school
-    if school and academic_year.school != school:
-        return JsonResponse({'error': 'Academic year not found'}, status=404)
+    academic_year = get_object_or_404_with_school(
+        AcademicYear, request, pk=academic_year_id
+    )
+    school = academic_year.school
     
     try:
         with transaction.atomic():
@@ -534,12 +528,21 @@ def term_create_view(request):
                 }, status=400)
             
             # Get academic year
+            academic_years = AcademicYear.objects.filter(pk=academic_year_id)
+            if school is not None:
+                academic_years = academic_years.filter(school=school)
             try:
-                academic_year = AcademicYear.objects.get(pk=academic_year_id, school=school)
+                academic_year = academic_years.get()
             except AcademicYear.DoesNotExist:
                 return JsonResponse({
                     'success': False,
                     'error': 'Invalid academic year selected.'
+                }, status=400)
+            school = academic_year.school
+            if school is None or not school.is_active:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'The selected academic year does not belong to an active school.'
                 }, status=400)
             
             # Create term
@@ -598,16 +601,8 @@ def term_edit_view(request, term_id):
     
     school = request.user.school
     
-    # Superadmin can access any term, regular admin only their school
-    if request.user.role == "superadmin":
-        term = get_object_or_404(Term, pk=term_id)
-    else:
-        if not school:
-            if request.method == "GET":
-                return JsonResponse({'error': 'No school associated with your account'}, status=404)
-            messages.error(request, "No school associated with your account.")
-            return redirect("quiz_app:term_list")
-        term = get_object_or_404(Term, pk=term_id, school=school)
+    term = get_object_or_404_with_school(Term, request, pk=term_id)
+    school = term.academic_year.school
     
     if request.method == "GET":
         # Get academic years for dropdown
@@ -636,7 +631,10 @@ def term_edit_view(request, term_id):
             
             # Get academic year
             try:
-                academic_year = AcademicYear.objects.get(pk=academic_year_id, school=school)
+                academic_year = AcademicYear.objects.get(
+                    pk=academic_year_id,
+                    school=school,
+                )
             except AcademicYear.DoesNotExist:
                 return JsonResponse({
                     'success': False,
@@ -687,12 +685,7 @@ def term_delete_view(request, term_id):
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    school = request.user.school
-    term = get_object_or_404(Term, pk=term_id)
-    
-    # Ensure term belongs to same school
-    if school and term.school != school:
-        return JsonResponse({'error': 'Term not found'}, status=404)
+    term = get_object_or_404_with_school(Term, request, pk=term_id)
     
     try:
         term_name = f"{term.academic_year.name} - {term.get_term_number_display()}"
@@ -717,15 +710,8 @@ def term_set_current_view(request, term_id):
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    school = request.user.school
-    
-    # Superadmin can access any term, regular admin only their school
-    if request.user.role == "superadmin":
-        term = get_object_or_404(Term, pk=term_id)
-    else:
-        if not school:
-            return JsonResponse({'error': 'No school associated with your account'}, status=404)
-        term = get_object_or_404(Term, pk=term_id, school=school)
+    term = get_object_or_404_with_school(Term, request, pk=term_id)
+    school = term.academic_year.school
     
     try:
         with transaction.atomic():
@@ -747,4 +733,3 @@ def term_set_current_view(request, term_id):
             'success': False,
             'error': f'Error setting current term: {str(e)}'
         }, status=500)
-

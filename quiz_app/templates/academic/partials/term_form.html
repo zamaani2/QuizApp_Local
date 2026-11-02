@@ -16,7 +16,7 @@
               <option value="">Select Academic Year</option>
               {% for ay in academic_years %}
               <option value="{{ ay.id }}" {% if term and term.academic_year.id == ay.id %}selected{% endif %}>
-                {{ ay.name }}
+                {{ ay.name }}{% if user.role == "superadmin" %} - {{ ay.school.name }}{% endif %}
               </option>
               {% endfor %}
             </select>
@@ -87,4 +87,3 @@
     </div>
   </div>
 </div>
-
