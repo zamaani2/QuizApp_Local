@@ -86,18 +86,18 @@ count as completion.
 
 ## Phase 3 — Import and export
 
-- [ ] Validated CSV/XLSX student and teacher imports with previews, bounded
+- [x] Validated CSV/XLSX student and teacher imports with previews, bounded
   input, row-level errors, transactions, and downloadable error reports.
-- [ ] School-scoped CSV/XLSX exports, matching filters and academic year,
+- [x] School-scoped CSV/XLSX exports, matching filters and academic year,
   efficient for large datasets and protected against formula injection.
-- [ ] Downloadable import templates.
+- [x] Downloadable import templates.
 
 ## Phase 4 — Assignments
 
-- [ ] Audit existing allocation and quiz-assignment workflows.
-- [ ] Establish whether a separate student-homework workflow exists; implement
+- [x] Audit existing allocation and quiz-assignment workflows.
+- [x] Establish whether a separate student-homework workflow exists; implement
   only in a compatible, school-scoped way.
-- [ ] Test ownership, visibility, dates, submissions, grading, and unauthorized
+- [x] Test ownership, visibility, dates, submissions, grading, and unauthorized
   access for applicable workflows.
 
 ## Phase 5 — Quiz engine
@@ -120,6 +120,6 @@ count as completion.
 
 - [ ] Add meaningful endpoint and persistence tests for all changed behaviors.
 - [x] Apply migrations in the isolated test database.
-- [x] Run focused tests, then the full automated suite (98 tests passed).
+- [x] Run focused tests, then the full automated suite (111 tests passed).
 - [ ] Review query performance, regressions, and migration reversibility.
-- [ ] Update documentation and report incomplete or unverified requirements.
+- [x] Update documentation and report incomplete or unverified requirements.

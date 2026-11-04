@@ -45,11 +45,13 @@
                 format with example data.
               </p>
               <ul class="mb-0">
-                <li><strong>Required fields:</strong> Full Name, Gender</li>
+                <li>
+                  <strong>Required fields:</strong> Full Name, Gender, Date of
+                  Birth, Parent Contact, Admission Date
+                </li>
                 <li>
                   <strong>Optional fields:</strong> Admission Number
-                  (auto-generated if not provided), Date of Birth, Parent
-                  Contact, Admission Date, Email
+                  (auto-generated if not provided), Email
                 </li>
                 <li>
                   <strong>Date format:</strong> YYYY-MM-DD (e.g., 2024-01-15)
@@ -64,18 +66,18 @@
 
             <div class="mb-3">
               <label for="csv_file" class="form-label"
-                >CSV File <span class="text-danger">*</span></label
+                >CSV or XLSX File <span class="text-danger">*</span></label
               >
               <input
                 type="file"
                 class="form-control"
                 id="csv_file"
                 name="csv_file"
-                accept=".csv,.xlsx,.xls"
+                accept=".csv,.xlsx"
                 required
               />
               <small class="text-muted"
-                >Accepted formats: CSV, Excel (.xlsx, .xls)</small
+                >Accepted formats: CSV and Excel (.xlsx)</small
               >
             </div>
 
@@ -128,6 +130,12 @@
                   <!-- Will be populated by JavaScript -->
                 </tbody>
               </table>
+            </div>
+            <div class="mt-3" id="importPreviewArea">
+              <h6>File preview (first five rows)</h6>
+              <div class="table-responsive">
+                <table class="table table-sm table-striped" id="importPreviewTable"></table>
+              </div>
             </div>
             <div class="text-end mt-3">
               <button

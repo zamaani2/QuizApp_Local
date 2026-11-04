@@ -80,6 +80,21 @@ assignment records. Archiving deactivates current enrollments or teaching
 assignments; restoring a class or subject does not reactivate those historical
 relationships.
 
+## Promotion workflow — business decisions required
+
+No promotion operation is implemented. Before adding one, decide:
+
+- Whether promotion is an explicit administrator action or a school-year
+  transition, and which students are eligible.
+- Which target academic year, term, and class are selected, and how capacity
+  and students without a valid target class are handled.
+- Which role may approve promotion and whether the operation is reversible.
+- Whether a promotion closes the current enrollment and creates a new
+  `StudentClass` row, preserving the prior enrollment as history.
+
+Until these rules are approved, use existing enrollment and transfer workflows;
+do not infer a promotion from edits, imports, or archive/restore actions.
+
 ## Teacher-subject allocation is unique per class and year
 
 **Decision:** An active teacher-subject assignment must reference a
@@ -144,3 +159,16 @@ score of completed work. Existing attempts created before snapshots were
 introduced are populated from the current quiz configuration when first
 resumed or otherwise captured; their original configuration cannot be
 reconstructed.
+
+## 2026-11-02 — Imports and exports are bounded and school-scoped
+
+**Decision:** Student and teacher imports accept bounded CSV/XLSX files, show
+sample rows before commit, report row-level validation errors, and preserve
+successful rows within a transaction. Student and teacher exports follow the
+visible list filters; superadmins must select one active target school.
+Spreadsheet output must keep exported values as text or neutralize formula-like
+CSV cells.
+
+**Reason:** Preview and downloadable errors make bulk changes reviewable;
+explicit scoping and formula handling prevent accidental tenant disclosure
+and spreadsheet formula execution.

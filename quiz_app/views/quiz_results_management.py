@@ -412,6 +412,8 @@ def quiz_results_export_view(request):
         
         for col_num, value in enumerate(row_data, 1):
             cell = ws.cell(row=row_num, column=col_num, value=value)
+            if isinstance(value, str):
+                cell.data_type = "s"
             cell.border = border
             if col_num in [6, 7, 8]:  # Score, Total Marks, Percentage columns
                 cell.alignment = Alignment(horizontal="center")

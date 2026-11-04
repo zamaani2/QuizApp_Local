@@ -3228,7 +3228,13 @@ class QuizAnalytics(models.Model):
         for trend in attempts_by_date:
             trends.append(
                 {
-                    "date": trend["date"].isoformat() if trend["date"] else None,
+                    "date": (
+                        trend["date"].isoformat()
+                        if hasattr(trend["date"], "isoformat")
+                        else str(trend["date"])
+                        if trend["date"]
+                        else None
+                    ),
                     "attempts": trend["count"],
                     "average_score": round(trend["avg_score"] or 0, 2),
                     "average_percentage": round(trend["avg_percentage"] or 0, 2),

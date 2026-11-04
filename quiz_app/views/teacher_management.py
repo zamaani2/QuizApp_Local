@@ -12,11 +12,13 @@ This module provides views for managing teachers including:
 import csv
 import io
 from itertools import islice
+from xml.etree.ElementTree import ParseError
+from zipfile import BadZipFile
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q
 from django.db import transaction
@@ -31,6 +33,8 @@ from ..models import (
     User,
 )
 from ..utils.tenant_utils import get_object_or_404_with_school, get_write_school
+from ..utils.export_utils import build_tabular_export
+from ..utils.import_utils import read_tabular_upload
 
 MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024
 MAX_IMPORT_ROWS = 5000
@@ -107,9 +111,73 @@ def teacher_list_view(request):
         'department_filter': department_filter,
         'gender_filter': gender_filter,
         'status_filter': status_filter,
+        'export_schools': (
+            SchoolInformation.objects.filter(is_active=True).order_by("name")
+            if request.user.role == "superadmin"
+            else SchoolInformation.objects.none()
+        ),
     }
     
     return render(request, 'teacher/teacher_list.html', context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def teacher_export_view(request, format_type):
+    if request.user.role not in ["admin", "superadmin"]:
+        return HttpResponse("Permission denied.", status=403)
+    school = get_write_school(request, request.GET.get("school_id"))
+    if school is None:
+        return HttpResponse("Select a valid active target school.", status=400)
+
+    teachers = Teacher.objects.filter(school=school)
+    status_filter = request.GET.get("status", "active")
+    if status_filter == "archived":
+        teachers = teachers.filter(is_active=False)
+    elif status_filter != "all":
+        teachers = teachers.filter(is_active=True)
+
+    search_query = request.GET.get("search", "").strip()
+    if search_query:
+        teachers = teachers.filter(
+            Q(full_name__icontains=search_query)
+            | Q(staff_id__icontains=search_query)
+            | Q(email__icontains=search_query)
+            | Q(contact_number__icontains=search_query)
+        )
+    department_filter = request.GET.get("department", "")
+    if department_filter:
+        teachers = teachers.filter(
+            department_id=department_filter,
+            department__school=school,
+        )
+    gender_filter = request.GET.get("gender", "")
+    if gender_filter:
+        teachers = teachers.filter(gender=gender_filter)
+
+    teachers = teachers.select_related("department").order_by("full_name", "pk")
+    headers = [
+        "Staff ID", "Full Name", "Gender", "Contact Number", "Email",
+        "Department", "Status",
+    ]
+
+    def rows():
+        for teacher in teachers.iterator(chunk_size=500):
+            yield [
+                teacher.staff_id,
+                teacher.full_name,
+                teacher.get_gender_display(),
+                teacher.contact_number,
+                teacher.email,
+                teacher.department.name
+                if teacher.department_id and teacher.department.school_id == school.pk
+                else "",
+                "Active" if teacher.is_active else "Archived",
+            ]
+
+    return build_tabular_export(
+        headers, rows(), format_type, f"{school.slug}_teachers", "Teachers"
+    )
 
 
 @login_required
@@ -482,10 +550,103 @@ def _set_teacher_archive_state_for_record(teacher, *, is_active):
 
 
 @login_required
+@require_http_methods(["GET"])
+def teacher_bulk_import_template_view(request, format_type):
+    if request.user.role not in ["admin", "superadmin"]:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    headers = [
+        "full_name",
+        "contact_number",
+        "gender",
+        "email",
+        "department",
+    ]
+    if format_type == "csv":
+        output = io.StringIO()
+        csv.writer(output).writerow(headers)
+        response = HttpResponse(
+            output.getvalue(),
+            content_type="text/csv; charset=utf-8",
+        )
+        response["Content-Disposition"] = (
+            'attachment; filename="teacher_import_template.csv"'
+        )
+        return response
+    if format_type != "xlsx":
+        return JsonResponse({'error': 'Unsupported template format.'}, status=400)
+
+    try:
+        from openpyxl import Workbook
+    except ImportError:
+        return JsonResponse(
+            {'error': 'XLSX support is not available. Please install openpyxl.'},
+            status=503,
+        )
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Teacher Import Template"
+    worksheet.append(headers)
+    response = HttpResponse(
+        content_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    )
+    response["Content-Disposition"] = (
+        'attachment; filename="teacher_import_template.xlsx"'
+    )
+    workbook.save(response)
+    return response
+
+
+@login_required
+@require_http_methods(["POST"])
+def teacher_bulk_import_preview_view(request):
+    if request.user.role not in ["admin", "superadmin"]:
+        return JsonResponse({"success": False, "error": "Permission denied."}, status=403)
+    uploaded_file = request.FILES.get("csv_file")
+    if uploaded_file is None:
+        return JsonResponse(
+            {"success": False, "error": "No file uploaded."}, status=400
+        )
+    try:
+        headers, rows = read_tabular_upload(
+            uploaded_file,
+            MAX_IMPORT_FILE_SIZE,
+            MAX_IMPORT_ROWS,
+            MAX_IMPORT_COLUMNS,
+        )
+    except ValueError as error:
+        return JsonResponse(
+            {"success": False, "error": str(error)}, status=400
+        )
+    missing_columns = [
+        column
+        for column in ("full_name", "contact_number")
+        if column not in headers
+    ]
+    if missing_columns:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": (
+                    "File must contain columns: "
+                    + ", ".join(missing_columns)
+                ),
+            },
+            status=400,
+        )
+    return JsonResponse(
+        {"success": True, "headers": headers, "preview_rows": rows[:5]}
+    )
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def teacher_bulk_import_view(request):
     """
-    Bulk import teachers from CSV file.
+    Bulk import teachers from CSV or XLSX file.
     
     GET: Returns import form modal
     POST: Processes CSV file and imports teachers
@@ -537,15 +698,86 @@ def teacher_bulk_import_view(request):
                 'error': 'Select a valid target school.',
             }, status=400)
         
-        # Read CSV file
-        file_data = csv_file.read().decode('utf-8')
-        csv_reader = csv.DictReader(io.StringIO(file_data))
+        file_name = csv_file.name.lower()
+        if file_name.endswith(".xls"):
+            return JsonResponse({
+                'success': False,
+                'error': 'Only CSV and XLSX files are supported.',
+            }, status=400)
+        if file_name.endswith(".xlsx"):
+            try:
+                from openpyxl import load_workbook
+                from openpyxl.utils.exceptions import InvalidFileException
+            except ImportError:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'XLSX support is not available. Please install openpyxl or use CSV.',
+                }, status=400)
+
+            workbook = None
+            try:
+                csv_file.seek(0)
+                workbook = load_workbook(csv_file, read_only=True, data_only=True)
+                worksheet = workbook.active
+                headers = []
+                for cell in worksheet[1]:
+                    if cell.value is None or not str(cell.value).strip():
+                        break
+                    headers.append(str(cell.value).strip())
+                if len(headers) > MAX_IMPORT_COLUMNS:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'File exceeds the {MAX_IMPORT_COLUMNS}-column import limit.',
+                    }, status=400)
+
+                rows = []
+                for values in worksheet.iter_rows(min_row=2, values_only=True):
+                    if not any(value is not None and str(value).strip() for value in values):
+                        continue
+                    if len(rows) >= MAX_IMPORT_ROWS:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'File exceeds the {MAX_IMPORT_ROWS}-row import limit.',
+                        }, status=413)
+                    rows.append({
+                        header: (
+                            str(values[index]).strip()
+                            if index < len(values) and values[index] is not None
+                            else ''
+                        )
+                        for index, header in enumerate(headers)
+                    })
+                fieldnames = headers
+                csv_reader = iter(rows)
+            except (
+                BadZipFile,
+                InvalidFileException,
+                OSError,
+                ParseError,
+                ValueError,
+                KeyError,
+            ) as error:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Unable to read XLSX file: {error}',
+                }, status=400)
+            finally:
+                if workbook is not None:
+                    workbook.close()
+        elif file_name.endswith(".csv"):
+            file_data = csv_file.read().decode('utf-8-sig')
+            csv_reader = csv.DictReader(io.StringIO(file_data))
+            fieldnames = csv_reader.fieldnames or []
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Unsupported file format. Please use CSV or XLSX.',
+            }, status=400)
         
         # Expected columns: full_name, gender, contact_number, email, department
         required_columns = ['full_name', 'contact_number']
         
         # Validate headers
-        fieldnames = csv_reader.fieldnames or []
         if len(fieldnames) > MAX_IMPORT_COLUMNS:
             return JsonResponse({
                 'success': False,
@@ -557,13 +789,14 @@ def teacher_bulk_import_view(request):
                 'error': f'CSV must contain columns: {", ".join(required_columns)}'
             }, status=400)
 
-        rows = list(islice(csv_reader, MAX_IMPORT_ROWS + 1))
-        if len(rows) > MAX_IMPORT_ROWS:
-            return JsonResponse({
-                'success': False,
-                'error': f'File exceeds the {MAX_IMPORT_ROWS}-row import limit.',
-            }, status=413)
-        csv_reader = iter(rows)
+        if file_name.endswith(".csv"):
+            rows = list(islice(csv_reader, MAX_IMPORT_ROWS + 1))
+            if len(rows) > MAX_IMPORT_ROWS:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'File exceeds the {MAX_IMPORT_ROWS}-row import limit.',
+                }, status=413)
+            csv_reader = iter(rows)
         
         # Get default department if provided
         default_department_id = request.POST.get('default_department', '') or None
@@ -622,8 +855,9 @@ def teacher_bulk_import_view(request):
                         department=department,
                         school=school,
                     )
-                    teacher.full_clean(exclude=["staff_id"])
-                    teacher.save()
+                    with transaction.atomic():
+                        teacher.full_clean(exclude=["staff_id"])
+                        teacher.save()
                     imported += 1
                 
                 except Exception as e:
@@ -632,6 +866,8 @@ def teacher_bulk_import_view(request):
         # Prepare response
         response_data = {
             'success': True,
+            'complete': not errors,
+            'partial_success': bool(imported and errors),
             'imported': imported,
             'errors': errors,
         }

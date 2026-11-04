@@ -20,6 +20,11 @@ from django.core.exceptions import ValidationError
 import json
 import csv
 import io
+from itertools import islice
+
+MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024
+MAX_IMPORT_ROWS = 5000
+MAX_IMPORT_COLUMNS = 64
 
 from ..models import (
     Quiz,
@@ -858,9 +863,19 @@ def question_bulk_import_view(request, quiz_id):
         
         import_file = request.FILES['import_file']
         file_name = import_file.name.lower()
+        if import_file.size > MAX_IMPORT_FILE_SIZE:
+            return JsonResponse({
+                'success': False,
+                'error': 'File exceeds the 5 MB import limit.',
+            }, status=413)
         
         # Determine file format from extension
-        if file_name.endswith(('.xlsx', '.xls')):
+        if file_name.endswith(".xls"):
+            return JsonResponse({
+                'success': False,
+                'error': 'Only CSV and XLSX files are supported.',
+            }, status=400)
+        if file_name.endswith('.xlsx'):
             # Excel file
             try:
                 imported, errors = _import_questions_from_excel(quiz, import_file, school)
@@ -879,7 +894,7 @@ def question_bulk_import_view(request, quiz_id):
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': False,
-                    'error': 'Unsupported file format. Please use CSV or Excel (.xlsx, .xls) files.'
+                    'error': 'Unsupported file format. Please use CSV or XLSX.',
                 }, status=400)
             messages.error(request, 'Unsupported file format. Please use CSV or Excel (.xlsx, .xls) files.')
             return redirect("quiz_app:question_bulk_import", quiz_id=quiz_id)
@@ -890,6 +905,8 @@ def question_bulk_import_view(request, quiz_id):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             response_data = {
                 'success': True,
+                'complete': not errors,
+                'partial_success': bool(imported and errors),
                 'imported': imported,
                 'errors': errors,
             }
@@ -948,9 +965,19 @@ def _import_questions_from_csv(quiz, csv_file, school):
         csv_reader = csv.DictReader(io.StringIO(file_data))
         
         # Validate required columns
-        if 'question_text' not in csv_reader.fieldnames:
+        fieldnames = csv_reader.fieldnames or []
+        if len(fieldnames) > MAX_IMPORT_COLUMNS:
+            errors.append(f'File exceeds the {MAX_IMPORT_COLUMNS}-column import limit')
+            return imported, errors
+        if 'question_text' not in fieldnames:
             errors.append('CSV file must contain "question_text" column')
             return imported, errors
+
+        rows = list(islice(csv_reader, MAX_IMPORT_ROWS + 1))
+        if len(rows) > MAX_IMPORT_ROWS:
+            errors.append(f'File exceeds the {MAX_IMPORT_ROWS}-row import limit')
+            return imported, errors
+        csv_reader = iter(rows)
         
         # Get next order
         max_order = Question.objects.filter(quiz=quiz).aggregate(
@@ -1024,7 +1051,7 @@ def _import_questions_from_csv(quiz, csv_file, school):
                             # Multiple choice - get from choice1, choice2, etc.
                             for i in range(1, 11):  # Support up to 10 choices
                                 choice_key = f'choice{i}'
-                                if choice_key in csv_reader.fieldnames:
+                                if choice_key in fieldnames:
                                     choice_text = row.get(choice_key, '').strip()
                                     if choice_text:
                                         choices.append(choice_text)
@@ -1094,8 +1121,6 @@ def _import_questions_from_csv(quiz, csv_file, school):
                 
                 except Exception as e:
                     errors.append(f'Row {row_num}: {str(e)}')
-                    import traceback
-                    errors.append(f'Row {row_num}: Traceback: {traceback.format_exc()}')
     
     except Exception as e:
         errors.append(f'Error reading CSV file: {str(e)}')
@@ -1134,6 +1159,10 @@ def _import_questions_from_excel(quiz, excel_file, school):
             else:
                 break
         
+        if len(headers) > MAX_IMPORT_COLUMNS:
+            errors.append(f'File exceeds the {MAX_IMPORT_COLUMNS}-column import limit')
+            wb.close()
+            return imported, errors
         if not headers or 'question_text' not in headers:
             errors.append('Excel file must contain "question_text" column in the first row')
             wb.close()
@@ -1148,6 +1177,10 @@ def _import_questions_from_excel(quiz, excel_file, school):
         rows = []
         for row in ws.iter_rows(min_row=2, values_only=True):
             if any(cell for cell in row if cell is not None):  # Skip empty rows
+                if len(rows) >= MAX_IMPORT_ROWS:
+                    wb.close()
+                    errors.append(f'File exceeds the {MAX_IMPORT_ROWS}-row import limit')
+                    return imported, errors
                 row_dict = {}
                 for idx, header in enumerate(headers):
                     if idx < len(row):
@@ -1289,13 +1322,9 @@ def _import_questions_from_excel(quiz, excel_file, school):
                 
                 except Exception as e:
                     errors.append(f'Row {row_num}: {str(e)}')
-                    import traceback
-                    errors.append(f'Row {row_num}: Traceback: {traceback.format_exc()}')
     
     except Exception as e:
         errors.append(f'Error reading Excel file: {str(e)}')
-        import traceback
-        errors.append(f'Traceback: {traceback.format_exc()}')
     
     return imported, errors
 

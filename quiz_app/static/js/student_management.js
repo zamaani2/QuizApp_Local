@@ -21,6 +21,22 @@
             return;
         }
 
+        $('a[data-export-format]').on('click', function (event) {
+            const params = new URLSearchParams(window.location.search);
+            params.delete('page');
+            const schoolId = $('#exportSchoolFilter').val();
+            if ($('#exportSchoolFilter').length && !schoolId) {
+                event.preventDefault();
+                Swal.fire('Select a school', 'Choose the target school before exporting.', 'warning');
+                return;
+            }
+            if (schoolId) {
+                params.set('school_id', schoolId);
+            }
+            const query = params.toString();
+            this.href = `${this.href.split('?')[0]}${query ? `?${query}` : ''}`;
+        });
+
         // Initialize modals first (they don't depend on DataTables)
         initializeModals();
 
@@ -766,7 +782,7 @@
                     Swal.close();
                     if (response.success) {
                         csvHeaders = response.headers;
-                        showColumnMapping(csvHeaders);
+                        showColumnMapping(csvHeaders, response.preview_rows || []);
                     } else {
                         Swal.fire({
                             icon: 'error',
@@ -854,14 +870,14 @@
         /**
          * Show column mapping interface
          */
-        function showColumnMapping(headers) {
+        function showColumnMapping(headers, previewRows) {
             const fieldDefinitions = {
                 'full_name': { label: 'Full Name', required: true },
                 'gender': { label: 'Gender', required: true },
                 'admission_number': { label: 'Admission Number (Student ID) - Auto-generated if not provided', required: false },
-                'date_of_birth': { label: 'Date of Birth', required: false },
-                'parent_contact': { label: 'Parent Contact', required: false },
-                'admission_date': { label: 'Admission Date', required: false },
+                'date_of_birth': { label: 'Date of Birth', required: true },
+                'parent_contact': { label: 'Parent Contact', required: true },
+                'admission_date': { label: 'Admission Date', required: true },
                 'email': { label: 'Email', required: false },
             };
 
@@ -918,6 +934,22 @@
                 tbody.append(row);
             });
 
+            const previewTable = $('#importPreviewTable').empty();
+            const previewHeader = $('<tr></tr>');
+            headers.forEach(header => {
+                previewHeader.append($('<th></th>').text(header));
+            });
+            previewTable.append($('<thead></thead>').append(previewHeader));
+            const previewBody = $('<tbody></tbody>');
+            previewRows.forEach(rowData => {
+                const row = $('<tr></tr>');
+                headers.forEach(header => {
+                    row.append($('<td></td>').text(rowData[header] || ''));
+                });
+                previewBody.append(row);
+            });
+            previewTable.append(previewBody);
+
             $('#step1').hide();
             $('#step2').show();
         }
@@ -960,15 +992,22 @@
                     }
                     if (response.errors && response.errors.length > 0) {
                         message += `<br><br><strong>Errors (${response.error_count}):</strong><br>`;
-                        message += response.errors.slice(0, 10).join('<br>');
+                        message += response.errors.slice(0, 10)
+                            .map(error => $('<div>').text(error).html())
+                            .join('<br>');
                         if (response.errors.length > 10) {
                             message += `<br>... and ${response.errors.length - 10} more errors.`;
                         }
+                        const reportUrl = createImportErrorReport(response.errors);
+                        message += `<br><br><a href="${reportUrl}" download="student_import_errors.csv">Download complete error report (CSV)</a>`;
                     }
 
+                    const hasErrors = response.errors && response.errors.length > 0;
                     Swal.fire({
-                        icon: response.imported > 0 ? 'success' : 'warning',
-                        title: response.imported > 0 ? 'Import Complete!' : 'Import Failed',
+                        icon: hasErrors ? (response.imported > 0 ? 'warning' : 'error') : 'success',
+                        title: response.complete
+                            ? 'Import Complete!'
+                            : (response.imported > 0 ? 'Partial Import' : 'Import Failed'),
                         html: message,
                         confirmButtonColor: response.imported > 0 ? '#28a745' : '#ffc107'
                     }).then(() => {
@@ -985,6 +1024,7 @@
                         confirmButtonColor: '#dc3545'
                     });
                 }
+
             },
             error: function (xhr) {
                 Swal.close();
@@ -997,6 +1037,26 @@
                 });
             }
         });
+    }
+
+    function createImportErrorReport(errors) {
+        const csvValue = value => {
+            let text = String(value ?? '');
+            if (/^[\s]*[=+\-@]/.test(text)) {
+                text = `'${text}`;
+            }
+            return `"${text.replace(/"/g, '""')}"`;
+        };
+        const lines = [['Row', 'Error'].map(csvValue).join(',')];
+        errors.forEach(error => {
+            const match = String(error).match(/^Row\s+(\d+):\s*(.*)$/i);
+            lines.push([match ? match[1] : '', match ? match[2] : error]
+                .map(csvValue)
+                .join(','));
+        });
+        return URL.createObjectURL(
+            new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+        );
     }
 
     /**

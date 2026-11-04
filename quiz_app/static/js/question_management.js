@@ -459,12 +459,20 @@
                 if (response.success) {
                     let message = response.message || `Successfully imported ${response.imported} question(s).`;
                     if (response.errors && response.errors.length > 0) {
-                        message += `\n\n${response.errors.length} error(s) occurred.`;
+                        message += `<br><br><strong>${response.errors.length} error(s) occurred:</strong><br>`;
+                        message += response.errors.slice(0, 10)
+                            .map(error => $('<div>').text(error).html())
+                            .join('<br>');
+                        if (response.errors.length > 10) {
+                            message += `<br>... and ${response.errors.length - 10} more errors.`;
+                        }
                     }
 
                     Swal.fire({
-                        icon: 'success',
-                        title: 'Import Complete',
+                        icon: response.complete ? 'success' : (response.imported > 0 ? 'warning' : 'error'),
+                        title: response.complete
+                            ? 'Import Complete'
+                            : (response.imported > 0 ? 'Partial Import' : 'Import Failed'),
                         html: message,
                         confirmButtonColor: '#3085d6'
                     }).then(() => {

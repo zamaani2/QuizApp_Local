@@ -47,6 +47,8 @@ from ..models import (
     Teacher,
 )
 from ..utils.tenant_utils import get_object_or_404_with_school, get_write_school
+from ..utils.export_utils import build_tabular_export
+from ..utils.import_utils import read_tabular_upload
 
 
 @login_required
@@ -229,6 +231,11 @@ def student_list_view(request):
         'gender_filter': gender_filter,
         'class_filter': class_filter,
         'status_filter': status_filter,
+        'export_schools': (
+            SchoolInformation.objects.filter(is_active=True).order_by("name")
+            if request.user.role == "superadmin"
+            else SchoolInformation.objects.none()
+        ),
     }
     
     # Use different template for teachers
@@ -238,6 +245,118 @@ def student_list_view(request):
         template = 'student/student_list.html'
     
     return render(request, template, context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def student_export_view(request, format_type):
+    if request.user.role not in ["admin", "superadmin"]:
+        return HttpResponse("Permission denied.", status=403)
+    school = get_write_school(request, request.GET.get("school_id"))
+    if school is None:
+        return HttpResponse("Select a valid active target school.", status=400)
+
+    students = Student.objects.filter(school=school)
+    status_filter = request.GET.get("status", "active")
+    if status_filter == "archived":
+        students = students.filter(is_active=False)
+    elif status_filter != "all":
+        status_filter = "active"
+        students = students.filter(is_active=True)
+
+    search_query = request.GET.get("search", "").strip()
+    if search_query:
+        students = students.filter(
+            Q(full_name__icontains=search_query)
+            | Q(admission_number__icontains=search_query)
+            | Q(email__icontains=search_query)
+            | Q(parent_contact__icontains=search_query)
+        )
+    form_filter = request.GET.get("form", "")
+    if form_filter:
+        students = students.filter(
+            studentclass__assigned_class__form_id=form_filter,
+            studentclass__is_active=True,
+            studentclass__school=school,
+            studentclass__assigned_class__school=school,
+        )
+    learning_area_filter = request.GET.get("learning_area", "")
+    if learning_area_filter:
+        students = students.filter(learning_area_id=learning_area_filter)
+    gender_filter = request.GET.get("gender", "")
+    if gender_filter:
+        students = students.filter(gender=gender_filter)
+    class_filter = request.GET.get("class", "")
+    if class_filter:
+        students = students.filter(
+            studentclass__assigned_class_id=class_filter,
+            studentclass__is_active=True,
+            studentclass__school=school,
+            studentclass__assigned_class__school=school,
+        )
+    academic_year_filter = request.GET.get("academic_year", "")
+    enrollment_query = StudentClass.objects.filter(
+        school=school,
+        student__school=school,
+        assigned_class__school=school,
+        is_active=True,
+    ).select_related("assigned_class__form", "assigned_class__academic_year")
+    if academic_year_filter:
+        students = students.filter(
+            studentclass__assigned_class__academic_year_id=academic_year_filter,
+            studentclass__is_active=True,
+            studentclass__school=school,
+            studentclass__assigned_class__school=school,
+        )
+        enrollment_query = enrollment_query.filter(
+            assigned_class__academic_year_id=academic_year_filter
+        )
+
+    students = students.distinct().select_related(
+        "form", "learning_area"
+    ).prefetch_related(
+        Prefetch("studentclass_set", queryset=enrollment_query.order_by("-date_assigned", "-pk"))
+    ).order_by("-admission_date", "full_name")
+
+    headers = [
+        "Admission Number", "Full Name", "Date of Birth", "Gender",
+        "Parent Contact", "Email", "Form", "Learning Area", "Class",
+        "Academic Year", "Admission Date", "Status",
+    ]
+
+    def rows():
+        for student in students.iterator(chunk_size=500):
+            enrollments = student.studentclass_set.all()
+            enrollment = enrollments[0] if enrollments else None
+            class_obj = enrollment.assigned_class if enrollment else None
+            form = (
+                class_obj.form
+                if class_obj and class_obj.form_id and class_obj.form.school_id == school.pk
+                else student.form
+                if student.form_id and student.form.school_id == school.pk
+                else None
+            )
+            yield [
+                student.admission_number,
+                student.full_name,
+                student.date_of_birth,
+                student.get_gender_display(),
+                student.parent_contact,
+                student.email,
+                form.name if form else "",
+                student.learning_area.name
+                if student.learning_area_id
+                and student.learning_area.school_id == school.pk
+                else "",
+                class_obj.name if class_obj else "",
+                class_obj.academic_year.name if class_obj else "",
+                student.admission_date,
+                "Active" if student.is_active else "Archived",
+            ]
+
+    return build_tabular_export(
+        headers, rows(), format_type, f"{school.slug}_students", "Students"
+    )
 
 
 @login_required
@@ -809,50 +928,10 @@ def student_bulk_import_template_xlsx_view(request):
 
 
 def _read_file_headers(uploaded_file):
-    """
-    Helper function to read headers from CSV or XLSX file.
-    Returns list of headers.
-    """
-    file_name = uploaded_file.name.lower()
-    if uploaded_file.size > MAX_IMPORT_FILE_SIZE:
-        raise ValueError("File exceeds the 5 MB import limit.")
-    if file_name.endswith(".xls"):
-        raise ValueError("Only CSV and XLSX files are supported.")
-    
-    # Check if it's an Excel file
-    if file_name.endswith(('.xlsx', '.xls')):
-        if not OPENPYXL_AVAILABLE:
-            raise ValueError("XLSX support is not available. Please install openpyxl.")
-        
-        from openpyxl import load_workbook
-        
-        # Read the Excel file
-        uploaded_file.seek(0)  # Reset file pointer
-        wb = load_workbook(uploaded_file, read_only=True, data_only=True)
-        ws = wb.active
-        
-        # Get headers from first row
-        headers = []
-        for cell in ws[1]:
-            if cell.value:
-                headers.append(str(cell.value))
-            else:
-                break
-        if len(headers) > MAX_IMPORT_COLUMNS:
-            wb.close()
-            raise ValueError("File exceeds the 64-column import limit.")
-        
-        wb.close()
-        uploaded_file.seek(0)  # Reset file pointer for later use
-        return headers
-    else:
-        # Assume CSV
-        uploaded_file.seek(0)
-        file_data = uploaded_file.read().decode('utf-8')
-        csv_reader = csv.DictReader(io.StringIO(file_data))
-        headers = csv_reader.fieldnames or []
-        uploaded_file.seek(0)  # Reset file pointer for later use
-        return list(headers) if headers else []
+    headers, _ = read_tabular_upload(
+        uploaded_file, MAX_IMPORT_FILE_SIZE, MAX_IMPORT_ROWS, MAX_IMPORT_COLUMNS
+    )
+    return headers
 
 
 @login_required
@@ -872,11 +951,17 @@ def student_bulk_import_preview_headers_view(request):
     
     uploaded_file = request.FILES['csv_file']
     try:
-        headers = _read_file_headers(uploaded_file)
+        headers, rows = read_tabular_upload(
+            uploaded_file,
+            MAX_IMPORT_FILE_SIZE,
+            MAX_IMPORT_ROWS,
+            MAX_IMPORT_COLUMNS,
+        )
         
         return JsonResponse({
             'success': True,
-            'headers': headers
+            'headers': headers,
+            'preview_rows': rows[:5],
         })
     except Exception as e:
         return JsonResponse({
@@ -997,7 +1082,12 @@ def student_bulk_import_view(request):
                     row_dict = {}
                     for idx, header in enumerate(headers):
                         if idx < len(row):
-                            row_dict[header] = str(row[idx]) if row[idx] is not None else ''
+                            value = row[idx]
+                            if isinstance(value, datetime):
+                                value = value.date().isoformat()
+                            elif isinstance(value, date):
+                                value = value.isoformat()
+                            row_dict[header] = str(value) if value is not None else ''
                         else:
                             row_dict[header] = ''
                     rows.append(row_dict)
@@ -1064,9 +1154,6 @@ def student_bulk_import_view(request):
             'admission_number': column_mappings.get('admission_number', 'admission_number'),
         }
         
-        # Required fields - only full_name and gender (admission_number is optional, auto-generated if not provided)
-        required_fields = ['full_name', 'gender']
-        
         # Process rows
         imported = 0
         assigned_to_class = 0
@@ -1096,13 +1183,22 @@ def student_bulk_import_view(request):
                     admission_number_str = get_field_value('admission_number')
                     admission_number = admission_number_str.strip() if admission_number_str else ''
                     
-                    # Validate required fields - only full_name and gender
-                    if not full_name:
-                        errors.append(f'Row {row_num}: Full name is required')
-                        continue
-                    
-                    if not gender:
-                        errors.append(f'Row {row_num}: Gender is required')
+                    missing_fields = [
+                        field_name
+                        for field_name, value in (
+                            ('full_name', full_name),
+                            ('gender', gender),
+                            ('date_of_birth', date_of_birth),
+                            ('parent_contact', parent_contact),
+                            ('admission_date', admission_date),
+                        )
+                        if not value
+                    ]
+                    if missing_fields:
+                        errors.append(
+                            f'Row {row_num}: Missing required fields: '
+                            f'{", ".join(missing_fields)}'
+                        )
                         continue
                     
                     # Validate gender
@@ -1115,19 +1211,6 @@ def student_bulk_import_view(request):
                         if Student.objects.filter(admission_number=admission_number, school=school).exists():
                             errors.append(f'Row {row_num}: Admission number "{admission_number}" already exists')
                             continue
-                    
-                    # Provide defaults for required fields if not provided
-                    if not date_of_birth:
-                        # Default to 10 years ago from today (use January 1st to avoid leap year issues)
-                        default_dob = date(date.today().year - 10, 1, 1)
-                        date_of_birth = default_dob.strftime('%Y-%m-%d')
-                    
-                    if not parent_contact:
-                        parent_contact = 'N/A'
-                    
-                    if not admission_date:
-                        # Default to today's date
-                        admission_date = date.today().strftime('%Y-%m-%d')
                     
                     # Parse date strings to date objects
                     try:
@@ -1166,53 +1249,51 @@ def student_bulk_import_view(request):
                         exclude=["admission_number"] if not admission_number else None
                     )
                     
-                    # Save student with retry for auto-generated admission numbers (handle potential uniqueness conflicts)
-                    max_retries = 5
-                    saved = False
-                    for attempt in range(max_retries):
-                        try:
-                            student.save()
-                            saved = True
-                            break
-                        except IntegrityError as e:
-                            # If admission_number conflict and it was auto-generated, try again with new ID
-                            if 'admission_number' in str(e) and not admission_number:
-                                # Reset admission_number to trigger regeneration
-                                student.admission_number = None
-                                continue
-                            else:
-                                # Other integrity error, re-raise
+                    with transaction.atomic():
+                        # Savepoint each row so a failed insert or enrollment cannot
+                        # leave the outer batch transaction unusable or half-written.
+                        max_retries = 5
+                        saved = False
+                        for attempt in range(max_retries):
+                            try:
+                                with transaction.atomic():
+                                    student.save()
+                                saved = True
+                                break
+                            except IntegrityError as e:
+                                if 'admission_number' in str(e) and not admission_number:
+                                    student.admission_number = None
+                                    continue
                                 raise
-                    
-                    if not saved:
-                        errors.append(f'Row {row_num}: Failed to generate unique admission number after {max_retries} attempts')
-                        continue
-                    
-                    imported += 1
-                    
-                    # Assign to class if specified (academic_year is automatically set to current)
-                    if assign_class:
-                        # Check if student is already assigned to an active class
-                        existing_assignment = StudentClass.objects.filter(
-                            student=student,
-                            is_active=True,
-                            school=school
-                        ).first()
                         
-                        if existing_assignment:
-                            # Deactivate existing assignment
-                            existing_assignment.is_active = False
-                            existing_assignment.save()
-                        
-                        # Create new assignment
-                        student_class = StudentClass(
-                            student=student,
-                            assigned_class=assign_class,
-                            assigned_by=request.user,
-                            school=school,
-                        )
-                        student_class.save()
-                        assigned_to_class += 1
+                        if not saved:
+                            errors.append(
+                                f'Row {row_num}: Failed to generate unique admission '
+                                f'number after {max_retries} attempts'
+                            )
+                            continue
+
+                        if assign_class:
+                            existing_assignment = StudentClass.objects.filter(
+                                student=student,
+                                is_active=True,
+                                school=school
+                            ).first()
+
+                            if existing_assignment:
+                                existing_assignment.is_active = False
+                                existing_assignment.save()
+
+                            student_class = StudentClass(
+                                student=student,
+                                assigned_class=assign_class,
+                                assigned_by=request.user,
+                                school=school,
+                            )
+                            student_class.save()
+                            assigned_to_class += 1
+
+                        imported += 1
                 
                 except Exception as e:
                     errors.append(f'Row {row_num}: {str(e)}')
@@ -1220,6 +1301,8 @@ def student_bulk_import_view(request):
         # Prepare response
         response_data = {
             'success': True,
+            'complete': not errors,
+            'partial_success': bool(imported and errors),
             'imported': imported,
             'assigned_to_class': assigned_to_class,
             'errors': errors,

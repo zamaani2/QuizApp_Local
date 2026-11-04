@@ -21,6 +21,22 @@
             return;
         }
 
+        $('a[data-export-format]').on('click', function (event) {
+            const params = new URLSearchParams(window.location.search);
+            params.delete('page');
+            const schoolId = $('#exportSchoolFilter').val();
+            if ($('#exportSchoolFilter').length && !schoolId) {
+                event.preventDefault();
+                Swal.fire('Select a school', 'Choose the target school before exporting.', 'warning');
+                return;
+            }
+            if (schoolId) {
+                params.set('school_id', schoolId);
+            }
+            const query = params.toString();
+            this.href = `${this.href.split('?')[0]}${query ? `?${query}` : ''}`;
+        });
+
         // Initialize modals first (they don't depend on DataTables)
         initializeModals();
 
@@ -552,6 +568,69 @@
                 const modal = new bootstrap.Modal(document.getElementById('bulkImportModal'));
                 modal.show();
 
+                $('#csv_file').on('change', function () {
+                    $('#submitTeacherImportBtn').prop('disabled', true);
+                    $('#teacherImportPreview').hide();
+                });
+                $('#previewTeacherImportBtn').on('click', function () {
+                    const fileInput = $('#csv_file')[0];
+                    if (!fileInput.files || !fileInput.files.length) {
+                        Swal.fire('Select a file', 'Choose a CSV or XLSX file to preview.', 'warning');
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('csv_file', fileInput.files[0]);
+                    const csrfToken = $('#bulkImportForm [name=csrfmiddlewaretoken]').val()
+                        || getCsrfToken();
+                    if (csrfToken) formData.append('csrfmiddlewaretoken', csrfToken);
+                    Swal.fire({
+                        title: 'Reading file...',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
+                    $.ajax({
+                        url: '/teachers/bulk-import/preview/',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': csrfToken
+                        },
+                        success: function (preview) {
+                            Swal.close();
+                            if (!preview.success) {
+                                Swal.fire('Preview failed', preview.error || 'Unable to preview this file.', 'error');
+                                return;
+                            }
+                            const table = $('#teacherImportPreviewTable').empty();
+                            const heading = $('<tr></tr>');
+                            preview.headers.forEach(value => heading.append($('<th></th>').text(value)));
+                            table.append($('<thead></thead>').append(heading));
+                            const body = $('<tbody></tbody>');
+                            preview.preview_rows.forEach(rowData => {
+                                const row = $('<tr></tr>');
+                                preview.headers.forEach(value => {
+                                    row.append($('<td></td>').text(rowData[value] || ''));
+                                });
+                                body.append(row);
+                            });
+                            table.append(body);
+                            $('#teacherImportPreview').show();
+                            $('#submitTeacherImportBtn').prop('disabled', false);
+                        },
+                        error: function (xhr) {
+                            Swal.close();
+                            Swal.fire(
+                                'Preview failed',
+                                xhr.responseJSON?.error || 'Unable to preview this file.',
+                                'error'
+                            );
+                        }
+                    });
+                });
+
                 // Handle form submission
                 $('#bulkImportForm').on('submit', function (e) {
                     e.preventDefault();
@@ -601,15 +680,22 @@
                     let message = response.message;
                     if (response.errors && response.errors.length > 0) {
                         message += `<br><br><strong>Errors (${response.error_count}):</strong><br>`;
-                        message += response.errors.slice(0, 10).join('<br>');
+                        message += response.errors.slice(0, 10)
+                            .map(error => $('<div>').text(error).html())
+                            .join('<br>');
                         if (response.errors.length > 10) {
                             message += `<br>... and ${response.errors.length - 10} more errors.`;
                         }
+                        const reportUrl = createImportErrorReport(response.errors);
+                        message += `<br><br><a href="${reportUrl}" download="teacher_import_errors.csv">Download complete error report (CSV)</a>`;
                     }
 
+                    const hasErrors = response.errors && response.errors.length > 0;
                     Swal.fire({
-                        icon: response.imported > 0 ? 'success' : 'warning',
-                        title: response.imported > 0 ? 'Import Complete!' : 'Import Failed',
+                        icon: hasErrors ? (response.imported > 0 ? 'warning' : 'error') : 'success',
+                        title: response.complete
+                            ? 'Import Complete!'
+                            : (response.imported > 0 ? 'Partial Import' : 'Import Failed'),
                         html: message,
                         confirmButtonColor: response.imported > 0 ? '#28a745' : '#ffc107'
                     }).then(() => {
@@ -638,6 +724,26 @@
                 });
             }
         });
+    }
+
+    function createImportErrorReport(errors) {
+        const csvValue = value => {
+            let text = String(value ?? '');
+            if (/^[\s]*[=+\-@]/.test(text)) {
+                text = `'${text}`;
+            }
+            return `"${text.replace(/"/g, '""')}"`;
+        };
+        const lines = [['Row', 'Error'].map(csvValue).join(',')];
+        errors.forEach(error => {
+            const match = String(error).match(/^Row\s+(\d+):\s*(.*)$/i);
+            lines.push([match ? match[1] : '', match ? match[2] : error]
+                .map(csvValue)
+                .join(','));
+        });
+        return URL.createObjectURL(
+            new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+        );
     }
 
     /**

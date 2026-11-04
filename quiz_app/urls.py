@@ -36,6 +36,7 @@ from .views import (
     student_bulk_import_preview_headers_view,
     student_bulk_import_template_view,
     student_bulk_import_template_xlsx_view,
+    student_export_view,
     student_detail_view,
     student_profile_view,
     student_enrollment_list_view,
@@ -86,6 +87,9 @@ from .views import (
     teacher_restore_view,
     teacher_bulk_delete_view,
     teacher_bulk_import_view,
+    teacher_bulk_import_preview_view,
+    teacher_bulk_import_template_view,
+    teacher_export_view,
     teacher_detail_view,
     teacher_profile_view,
     assignment_list_view,
@@ -184,6 +188,7 @@ urlpatterns = [
     path("students/bulk-import/template/", student_bulk_import_template_view, name="student_bulk_import_template"),
     path("students/bulk-import/template-xlsx/", student_bulk_import_template_xlsx_view, name="student_bulk_import_template_xlsx"),
     path("students/bulk-import/preview-headers/", student_bulk_import_preview_headers_view, name="student_bulk_import_preview_headers"),
+    path("students/export/<str:format_type>/", student_export_view, name="student_export"),
     path("students/bulk-delete/", student_bulk_delete_view, name="student_bulk_delete"),
     
     # Student Class Enrollment Management URLs
@@ -252,6 +257,13 @@ urlpatterns = [
     path("teachers/<int:teacher_id>/detail/", teacher_detail_view, name="teacher_detail"),
     path("teachers/profile/", teacher_profile_view, name="teacher_profile"),
     path("teachers/bulk-import/", teacher_bulk_import_view, name="teacher_bulk_import"),
+    path("teachers/bulk-import/preview/", teacher_bulk_import_preview_view, name="teacher_bulk_import_preview"),
+    path(
+        "teachers/bulk-import/template/<str:format_type>/",
+        teacher_bulk_import_template_view,
+        name="teacher_bulk_import_template",
+    ),
+    path("teachers/export/<str:format_type>/", teacher_export_view, name="teacher_export"),
     path("teachers/bulk-delete/", teacher_bulk_delete_view, name="teacher_bulk_delete"),
     
     # Teacher Subject Assignment Management URLs

@@ -121,10 +121,15 @@ operation. Exports must match displayed filters, include academic year where
 relevant, avoid cross-school disclosure, and neutralize spreadsheet formulas.
 Never export credentials, password hashes, or authentication tokens.
 
-Current student CSV/XLSX and teacher CSV imports reject files over 5 MB, more
-than 5,000 data rows, or more than 64 columns before writing records. Import
-preview-before-commit and downloadable row-error reports remain incomplete
-and are tracked in `IMPLEMENTATION_CHECKLIST.md`.
+Current student and teacher CSV/XLSX imports reject files over 5 MB, more than
+5,000 data rows, or more than 64 columns before writing records. Import forms
+preview sample rows before commit, validate rows during the transaction, and
+provide downloadable row-error CSV reports. Student imports require supplied
+name, gender, date of birth, parent contact, and admission date; they do not
+synthesize missing personal details. CSV and XLSX import templates are
+available. Student and teacher exports support CSV and XLSX, preserve list
+filters, include student class/year context, and require superadmins to select
+an active target school. Spreadsheet exports prevent formula evaluation.
 
 ## Quiz behavior
 

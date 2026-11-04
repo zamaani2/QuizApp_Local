@@ -51,22 +51,27 @@ if not SECRET_KEY:
         raise ImproperlyConfigured("SECRET_KEY must be configured when DEBUG is off.")
     SECRET_KEY = secrets.token_urlsafe(50)
 
-# ALLOWED_HOSTS: List of hostnames/IPs that Django will accept requests from
-# For hostname access, set this in .env file, e.g.:
-# ALLOWED_HOSTS=your-hostname.local,your-server-name,192.168.1.100
-# Or use '*' for development (NOT recommended for production)
+# ALLOWED_HOSTS: List of hostnames/IPs that Django will accept requests from.
+# Local development can use localhost, loopback, and explicitly configured
+# LAN hostnames/IPs; wildcard entries are ignored in every environment.
 ALLOWED_HOSTS = [
     host.strip().lower()
-    for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-    if host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", "").split(",")
+    if host.strip() and "*" not in host
 ]
-# Local-network development fallback: avoid DisallowedHost noise when DEBUG is on.
 if DEBUG:
-    ALLOWED_HOSTS = ["*"]
-# Automatically trust the Vercel-provided hostname when deployed
+    for local_host in ("localhost", "127.0.0.1", "[::1]"):
+        if local_host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(local_host)
+
+# Automatically allow the Vercel-provided deployment hostname.
 vercel_url = os.environ.get("VERCEL_URL")
-if vercel_url and vercel_url.strip():
+if vercel_url and vercel_url.strip() and "*" not in vercel_url:
     ALLOWED_HOSTS.append(vercel_url.strip().lower())
+if not DEBUG and not ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        "Configure at least one valid ALLOWED_HOSTS entry when DEBUG is off."
+    )
 
 # CSRF trusted origins for production hosts (comma-separated in env)
 CSRF_TRUSTED_ORIGINS = [
@@ -137,7 +142,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("DB_NAME", "quiz_system_db"),
         "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "4545" if DEBUG else ""),
+        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
         "HOST": os.environ.get("DB_HOST", "localhost"),
         "PORT": os.environ.get("DB_PORT", "5432"),
     }

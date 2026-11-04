@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -983,6 +984,138 @@ class SchoolScopedManagementEndpointTests(TestCase):
         self.assertTrue(self.response_a.is_graded)
         self.assertEqual(self.response_a.graded_by, self.admin_a)
 
+    def test_results_export_is_school_scoped_and_formula_values_are_text(self):
+        malicious_title = '=HYPERLINK("https://example.test","open")'
+        self.quiz_a.title = malicious_title
+        self.quiz_a.save(update_fields=["title"])
+
+        response = self.client.get(reverse("quiz_app:quiz_results_export"))
+
+        self.assertEqual(response.status_code, 200)
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(BytesIO(response.content), data_only=False)
+        worksheet = workbook.active
+        rows = list(worksheet.iter_rows(min_row=2))
+        titles = [row[2].value for row in rows]
+
+        self.assertIn(malicious_title, titles)
+        self.assertNotIn("School B Quiz", titles)
+        formula_title_cell = next(row[2] for row in rows if row[2].value == malicious_title)
+        self.assertEqual(formula_title_cell.data_type, "s")
+        self.assertFalse(
+            any(cell.data_type == "f" for row in rows for cell in row)
+        )
+        workbook.close()
+
+    def test_student_exports_are_school_scoped_filtered_and_formula_safe(self):
+        malicious_name = "=HYPERLINK(\"https://example.test\",\"open\")"
+        Student.objects.create(
+            admission_number="A-EXPORT",
+            full_name=malicious_name,
+            date_of_birth="2010-01-01",
+            gender="F",
+            parent_contact="+5551234",
+            admission_date="2026-01-01",
+            school=self.school_a,
+        )
+
+        csv_response = self.client.get(
+            reverse("quiz_app:student_export", args=["csv"]),
+            {"search": "HYPERLINK"},
+        )
+        self.assertEqual(csv_response.status_code, 200)
+        csv_content = b"".join(csv_response.streaming_content).decode("utf-8")
+        self.assertIn("'=HYPERLINK", csv_content)
+        self.assertNotIn("Student B", csv_content)
+        self.assertIn("A-EXPORT", csv_content)
+
+        xlsx_response = self.client.get(
+            reverse("quiz_app:student_export", args=["xlsx"]),
+            {"search": "HYPERLINK"},
+        )
+        self.assertEqual(xlsx_response.status_code, 200)
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(BytesIO(xlsx_response.content), data_only=False)
+        worksheet = workbook.active
+        exported_cell = worksheet["B2"]
+        self.assertEqual(exported_cell.value, malicious_name)
+        self.assertEqual(exported_cell.data_type, "s")
+        self.assertFalse(
+            any(
+                cell.data_type == "f"
+                for row in worksheet.iter_rows()
+                for cell in row
+            )
+        )
+        workbook.close()
+
+    def test_teacher_exports_are_school_scoped_and_honor_filters(self):
+        department = Department.objects.create(
+            name="Export Department",
+            code="EXPORT",
+            school=self.school_a,
+        )
+        Teacher.objects.create(
+            full_name="@Teacher Export",
+            contact_number="555-0101",
+            department=department,
+            school=self.school_a,
+        )
+
+        response = self.client.get(
+            reverse("quiz_app:teacher_export", args=["csv"]),
+            {"department": department.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        content = b"".join(response.streaming_content).decode("utf-8")
+        self.assertIn("'@Teacher Export", content)
+        self.assertNotIn("Teacher B", content)
+
+    def test_superadmin_exports_require_an_explicit_active_target_school(self):
+        superadmin = User.objects.create_user(
+            username="superadmin-export",
+            email="superadmin-export@example.test",
+            role="superadmin",
+            full_name="Superadmin Export",
+        )
+        self.client.force_login(superadmin)
+
+        no_target = self.client.get(
+            reverse("quiz_app:student_export", args=["csv"])
+        )
+        export = self.client.get(
+            reverse("quiz_app:student_export", args=["csv"]),
+            {"school_id": self.school_a.pk},
+        )
+
+        self.assertEqual(no_target.status_code, 400)
+        self.assertEqual(export.status_code, 200)
+        self.school_b.is_active = False
+        self.school_b.save(update_fields=["is_active"])
+        inactive_export = self.client.get(
+            reverse("quiz_app:teacher_export", args=["csv"]),
+            {"school_id": self.school_b.pk},
+        )
+        self.assertEqual(inactive_export.status_code, 400)
+
+    def test_teacher_without_profile_cannot_export_results(self):
+        teacher_without_profile = User.objects.create_user(
+            username="teacher-without-profile",
+            email="teacher-without-profile@example.test",
+            password="test-password",
+            role="teacher",
+            full_name="Teacher Without Profile",
+            school=self.school_a,
+        )
+        self.client.force_login(teacher_without_profile)
+
+        response = self.client.get(reverse("quiz_app:quiz_results_export"))
+
+        self.assertEqual(response.status_code, 403)
+
     def test_superadmin_class_subject_endpoint_uses_class_school(self):
         superadmin = User.objects.create_user(
             username="superadmin-class-subjects",
@@ -1276,6 +1409,50 @@ class SchoolScopedManagementEndpointTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.quiz_a.classes.filter(pk=self.class_a.pk).exists())
+
+    def test_quiz_assignment_enforces_teacher_ownership_and_school_scope(self):
+        extra_class = Class.objects.create(
+            name="Extra School A Class",
+            academic_year=self.academic_year_a,
+            school=self.school_a,
+        )
+        self.client.force_login(self.teacher_user_a)
+
+        foreign_quiz_response = self.client.post(
+            reverse("quiz_app:quiz_assignment_create", args=[self.quiz_a_other_teacher.pk]),
+            {"classes": [extra_class.pk]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        unauthorized_class_response = self.client.post(
+            reverse("quiz_app:quiz_assignment_create", args=[self.quiz_a.pk]),
+            {"classes": [extra_class.pk]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(foreign_quiz_response.status_code, 404)
+        self.assertEqual(unauthorized_class_response.status_code, 400)
+        self.assertFalse(self.quiz_a.classes.filter(pk=extra_class.pk).exists())
+
+        self.client.force_login(self.admin_a)
+        valid_response = self.client.post(
+            reverse("quiz_app:quiz_assignment_create", args=[self.quiz_a_other_teacher.pk]),
+            {"classes": [extra_class.pk]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        mixed_school_response = self.client.post(
+            reverse("quiz_app:quiz_assignment_create", args=[self.quiz_a_other_teacher.pk]),
+            {"classes": [extra_class.pk, self.class_b.pk]},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(valid_response.status_code, 200, valid_response.content)
+        self.assertEqual(mixed_school_response.status_code, 400)
+        self.assertTrue(
+            self.quiz_a_other_teacher.classes.filter(pk=extra_class.pk).exists()
+        )
+        self.assertFalse(
+            self.quiz_a_other_teacher.classes.filter(pk=self.class_b.pk).exists()
+        )
 
     def test_school_admin_bulk_unassign_rejects_unassigned_class_ids(self):
         response = self.client.post(
@@ -1681,7 +1858,8 @@ class SchoolScopedManagementEndpointTests(TestCase):
         def student_upload():
             return SimpleUploadedFile(
                 "students.csv",
-                b"full_name,gender\nImported Student,F\n",
+                b"full_name,gender,date_of_birth,parent_contact,admission_date\n"
+                b"Imported Student,F,2012-01-03,555,2026-01-01\n",
                 content_type="text/csv",
             )
         response = self.client.post(
@@ -1723,6 +1901,154 @@ class SchoolScopedManagementEndpointTests(TestCase):
             Teacher.objects.get(full_name="Imported Teacher").school,
             self.school_a,
         )
+
+    def test_student_import_does_not_invent_missing_required_details(self):
+        response = self.client.post(
+            reverse("quiz_app:student_bulk_import"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "students.csv",
+                    b"full_name,gender\nImported Without Details,F\n",
+                    content_type="text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["complete"])
+        self.assertEqual(response.json()["imported"], 0)
+        self.assertIn("date_of_birth", response.json()["errors"][0])
+        self.assertFalse(
+            Student.objects.filter(full_name="Imported Without Details").exists()
+        )
+
+    def test_student_and_teacher_import_previews_return_sample_rows_without_writes(self):
+        student_response = self.client.post(
+            reverse("quiz_app:student_bulk_import_preview_headers"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "students.csv",
+                    b"name,sex,date_of_birth,parent_contact,admission_date\n"
+                    b"Preview Student,F,2012-01-03,555,2026-01-01\n",
+                    content_type="text/csv",
+                )
+            },
+        )
+        teacher_response = self.client.post(
+            reverse("quiz_app:teacher_bulk_import_preview"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "teachers.csv",
+                    b"full_name,contact_number,gender\n"
+                    b"Preview Teacher,555-0101,F\n",
+                    content_type="text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(student_response.status_code, 200)
+        self.assertEqual(
+            student_response.json()["preview_rows"][0]["name"],
+            "Preview Student",
+        )
+        self.assertEqual(teacher_response.status_code, 200)
+        self.assertEqual(
+            teacher_response.json()["preview_rows"][0]["full_name"],
+            "Preview Teacher",
+        )
+        self.assertFalse(Student.objects.filter(full_name="Preview Student").exists())
+        self.assertFalse(Teacher.objects.filter(full_name="Preview Teacher").exists())
+
+    def test_teacher_import_supports_bounded_xlsx_and_downloadable_templates(self):
+        from openpyxl import Workbook, load_workbook
+
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(["full_name", "contact_number", "gender", "email", "department"])
+        worksheet.append(["XLSX Teacher", "555-0101", "F", "", ""])
+        output = BytesIO()
+        workbook.save(output)
+        workbook.close()
+
+        response = self.client.post(
+            reverse("quiz_app:teacher_bulk_import"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "teachers.xlsx",
+                    output.getvalue(),
+                    content_type=(
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    ),
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["imported"], 1)
+        self.assertTrue(
+            Teacher.objects.filter(
+                full_name="XLSX Teacher",
+                school=self.school_a,
+            ).exists()
+        )
+
+        csv_template = self.client.get(
+            reverse("quiz_app:teacher_bulk_import_template", args=["csv"])
+        )
+        self.assertEqual(csv_template.status_code, 200)
+        self.assertIn(b"full_name,contact_number", csv_template.content)
+
+        xlsx_template = self.client.get(
+            reverse("quiz_app:teacher_bulk_import_template", args=["xlsx"])
+        )
+        self.assertEqual(xlsx_template.status_code, 200)
+        template_workbook = load_workbook(BytesIO(xlsx_template.content), read_only=True)
+        self.assertEqual(
+            next(template_workbook.active.iter_rows(values_only=True))[0],
+            "full_name",
+        )
+        template_workbook.close()
+
+    def test_student_import_templates_are_downloadable_as_csv_and_xlsx(self):
+        csv_response = self.client.get(
+            reverse("quiz_app:student_bulk_import_template")
+        )
+        xlsx_response = self.client.get(
+            reverse("quiz_app:student_bulk_import_template_xlsx")
+        )
+
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn(b"full_name", csv_response.content)
+        self.assertEqual(xlsx_response.status_code, 200)
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(BytesIO(xlsx_response.content), read_only=True)
+        headers = next(workbook.active.iter_rows(values_only=True))
+        self.assertEqual(headers[0], "full_name")
+        workbook.close()
+
+    def test_question_import_rejects_row_limit_overflow_without_writes(self):
+        question_count = self.quiz_a.questions.count()
+        with patch("quiz_app.views.question_management.MAX_IMPORT_ROWS", 1):
+            response = self.client.post(
+                reverse("quiz_app:question_bulk_import", args=[self.quiz_a.pk]),
+                {
+                    "import_file": SimpleUploadedFile(
+                        "questions.csv",
+                        b"question_text,question_type\n"
+                        b"First question,essay\n"
+                        b"Second question,essay\n",
+                        content_type="text/csv",
+                    )
+                },
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["complete"])
+        self.assertEqual(response.json()["imported"], 0)
+        self.assertEqual(self.quiz_a.questions.count(), question_count)
 
     def test_student_and_teacher_imports_reject_row_limit_overflow(self):
         with (
@@ -1927,6 +2253,35 @@ class SchoolScopedManagementEndpointTests(TestCase):
             ).exists()
         )
 
+    def test_student_cannot_start_quiz_outside_its_availability_window(self):
+        self.client.force_login(self.student_user_a)
+        initial_attempt_count = QuizAttempt.objects.filter(
+            quiz=self.quiz_a, student=self.student_a
+        ).count()
+
+        self.quiz_a.available_from = timezone.now() + timedelta(days=1)
+        self.quiz_a.available_until = None
+        self.quiz_a.save(update_fields=["available_from", "available_until"])
+        early_response = self.client.get(
+            reverse("quiz_app:student_quiz_start", args=[self.quiz_a.pk])
+        )
+
+        self.quiz_a.available_from = None
+        self.quiz_a.available_until = timezone.now() - timedelta(days=1)
+        self.quiz_a.save(update_fields=["available_from", "available_until"])
+        late_response = self.client.get(
+            reverse("quiz_app:student_quiz_start", args=[self.quiz_a.pk])
+        )
+
+        self.assertEqual(early_response.status_code, 302)
+        self.assertEqual(late_response.status_code, 302)
+        self.assertEqual(
+            QuizAttempt.objects.filter(
+                quiz=self.quiz_a, student=self.student_a
+            ).count(),
+            initial_attempt_count,
+        )
+
     def test_submitted_attempts_enforce_the_quiz_attempt_limit(self):
         self.quiz_a.max_attempts = 1
         self.quiz_a.save(update_fields=["max_attempts"])
@@ -1960,6 +2315,37 @@ class SchoolScopedManagementEndpointTests(TestCase):
         self.assertTrue(response.json()["submitted"])
         self.assertTrue(attempt.is_submitted)
         self.assertFalse(attempt.responses.exists())
+
+    def test_student_answer_save_persists_response_without_submitting(self):
+        self.client.force_login(self.student_user_a)
+        self.quiz_a.max_attempts = 2
+        self.quiz_a.save(update_fields=["max_attempts"])
+
+        start_response = self.client.get(
+            reverse("quiz_app:student_quiz_start", args=[self.quiz_a.pk])
+        )
+        attempt = QuizAttempt.objects.get(
+            quiz=self.quiz_a,
+            student=self.student_a,
+            is_submitted=False,
+        )
+        save_response = self.client.post(
+            reverse("quiz_app:student_quiz_save", args=[attempt.pk]),
+            {
+                "question_id": self.question_a.pk,
+                "text_answer": "Saved draft response",
+            },
+        )
+
+        self.assertEqual(start_response.status_code, 302)
+        self.assertEqual(save_response.status_code, 200, save_response.content)
+        self.assertTrue(save_response.json()["success"])
+        attempt.refresh_from_db()
+        self.assertFalse(attempt.is_submitted)
+        self.assertEqual(
+            attempt.responses.get(question=self.question_a).text_answer,
+            "Saved draft response",
+        )
 
     def test_quiz_start_persists_attempt_configuration_and_randomized_order(self):
         self.client.force_login(self.student_user_a)
