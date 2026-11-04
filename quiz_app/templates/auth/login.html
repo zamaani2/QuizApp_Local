@@ -4,6 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="{% static 'favicon.ico' %}" />
     <title>Login - SchoolApp</title>
 
     <!-- Include the centralized styles -->
@@ -401,7 +402,7 @@
       <div class="login-card">
         <div class="login-header">
           <div class="login-logo">
-            <a href="#"><b>SI</b>S</a>
+            <a href="{% url 'quiz_app:login' %}"><b>SI</b>S</a>
             <span class="subtitle">Student Quiz System</span>
           </div>
         </div>
@@ -430,6 +431,7 @@
           >
             {% csrf_token %}
             <div class="input-group">
+              <label class="visually-hidden" for="id_username">Username or email</label>
               <input
                 type="text"
                 class="form-control"
@@ -445,6 +447,7 @@
             </div>
 
             <div class="input-group">
+              <label class="visually-hidden" for="id_password">Password</label>
               <input
                 type="password"
                 class="form-control"

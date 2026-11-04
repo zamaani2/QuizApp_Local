@@ -10,6 +10,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.db.models import F, Prefetch
+from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.utils import timezone
@@ -1616,7 +1617,7 @@ class SchoolScopedManagementEndpointTests(TestCase):
             2,
         )
 
-    def test_school_admin_can_delete_question_without_teacher_profile(self):
+    def test_school_admin_cannot_delete_question_with_attempt_history(self):
         response = self.client.post(
             reverse(
                 "quiz_app:question_delete",
@@ -1625,8 +1626,105 @@ class SchoolScopedManagementEndpointTests(TestCase):
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Question.objects.filter(pk=self.question_a.pk).exists())
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Question.objects.filter(pk=self.question_a.pk).exists())
+        self.assertTrue(
+            QuizResponse.objects.filter(
+                pk=self.response_a.pk,
+                attempt=self.attempt_a,
+                question=self.question_a,
+            ).exists()
+        )
+
+    def test_bulk_delete_preserves_questions_with_attempt_history(self):
+        response = self.client.post(
+            reverse("quiz_app:question_bulk_delete", args=[self.quiz_a.pk]),
+            data=json.dumps({"question_ids": [self.question_a.pk]}),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Question.objects.filter(pk=self.question_a.pk).exists())
+        self.assertTrue(
+            QuizResponse.objects.filter(
+                pk=self.response_a.pk,
+                attempt=self.attempt_a,
+            ).exists()
+        )
+
+    def test_queryset_delete_cannot_remove_questions_from_attempted_quiz(self):
+        with self.assertRaises(ProtectedError):
+            with transaction.atomic():
+                Question.objects.filter(pk=self.question_a.pk).delete()
+
+        self.assertTrue(Question.objects.filter(pk=self.question_a.pk).exists())
+        self.assertTrue(
+            QuizResponse.objects.filter(
+                pk=self.response_a.pk,
+                attempt=self.attempt_a,
+            ).exists()
+        )
+
+    def test_question_edit_cannot_remove_a_choice_selected_in_an_attempt(self):
+        question = Question.objects.create(
+            quiz=self.quiz_a,
+            question_text="Select an answer",
+            question_type="multiple_choice",
+            marks=1,
+            school=self.school_a,
+        )
+        retained_choice = AnswerChoice.objects.create(
+            question=question,
+            choice_text="Retained choice",
+            is_correct=True,
+            school=self.school_a,
+        )
+        selected_choice = AnswerChoice.objects.create(
+            question=question,
+            choice_text="Selected choice",
+            school=self.school_a,
+        )
+        attempt = QuizAttempt.objects.create(
+            quiz=self.quiz_a,
+            student=self.student_a,
+            school=self.school_a,
+            attempt_number=9,
+        )
+        attempt.capture_configuration()
+        answer = QuizResponse.objects.create(
+            attempt=attempt,
+            question=question,
+            selected_choice=selected_choice,
+            school=self.school_a,
+        )
+        answer.selected_choices.set([selected_choice])
+
+        response = self.client.post(
+            reverse(
+                "quiz_app:question_edit",
+                args=[self.quiz_a.pk, question.pk],
+            ),
+            {
+                "question_text": "Edited question",
+                "marks": "1",
+                "order": "1",
+                "negative_marks": "0",
+                "choice_id": [retained_choice.pk],
+                "choice_text": ["Retained choice"],
+                "is_correct": ["0"],
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        question.refresh_from_db()
+        self.assertEqual(question.question_text, "Select an answer")
+        self.assertTrue(
+            AnswerChoice.objects.filter(pk=selected_choice.pk).exists()
+        )
+        answer.refresh_from_db()
+        self.assertEqual(answer.selected_choice_id, selected_choice.pk)
 
     def test_teacher_cannot_delete_question_from_another_teachers_quiz(self):
         self.client.force_login(self.teacher_user_a)
@@ -2194,6 +2292,157 @@ class SchoolScopedManagementEndpointTests(TestCase):
             Student.objects.filter(full_name="Imported Without Details").exists()
         )
 
+    def test_student_import_rejects_mixed_valid_and_invalid_rows_without_writes(self):
+        response = self.client.post(
+            reverse("quiz_app:student_bulk_import"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "students.csv",
+                    (
+                        b"full_name,gender,date_of_birth,parent_contact,admission_date,admission_number\n"
+                        b"Valid Import Student,F,2012-01-03,555,2026-01-01,A-NEW1\n"
+                        b"Conflicting Admission,F,2012-01-03,555,2026-01-01,B-0001\n"
+                        b"Duplicate Admission,F,2012-01-03,555,2026-01-01,A-NEW1\n"
+                    ),
+                    content_type="text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertFalse(payload["complete"])
+        self.assertFalse(payload["partial_success"])
+        self.assertEqual(payload["imported"], 0)
+        self.assertTrue(any("Row 3" in error for error in payload["errors"]))
+        self.assertTrue(any("Row 4" in error for error in payload["errors"]))
+        self.assertFalse(
+            Student.objects.filter(
+                full_name="Valid Import Student",
+                school=self.school_a,
+            ).exists()
+        )
+
+    def test_student_import_accepts_utf8_bom_in_csv_header(self):
+        response = self.client.post(
+            reverse("quiz_app:student_bulk_import"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "students.csv",
+                    (
+                        b"\xef\xbb\xbffull_name,gender,date_of_birth,parent_contact,admission_date\n"
+                        b"BOM Student,F,2012-01-03,555,2026-01-01\n"
+                    ),
+                    content_type="text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["imported"], 1)
+        self.assertTrue(
+            Student.objects.filter(full_name="BOM Student", school=self.school_a).exists()
+        )
+
+    def test_imports_reject_duplicate_column_names(self):
+        student_response = self.client.post(
+            reverse("quiz_app:student_bulk_import"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "students.csv",
+                    (
+                        b"full_name,full_name,gender,date_of_birth,parent_contact,admission_date\n"
+                        b"Duplicate Header,Overwritten,F,2012-01-03,555,2026-01-01\n"
+                    ),
+                    content_type="text/csv",
+                )
+            },
+        )
+        teacher_response = self.client.post(
+            reverse("quiz_app:teacher_bulk_import"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "teachers.csv",
+                    b"full_name,contact_number,contact_number\nDuplicate,555,556\n",
+                    content_type="text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(student_response.status_code, 400)
+        self.assertIn("duplicate column names", student_response.json()["error"])
+        self.assertEqual(teacher_response.status_code, 400)
+        self.assertIn("duplicate column names", teacher_response.json()["error"])
+        self.assertFalse(Student.objects.filter(full_name="Overwritten").exists())
+        self.assertFalse(Teacher.objects.filter(full_name="Duplicate").exists())
+
+    def test_teacher_import_rejects_mixed_valid_and_invalid_rows_without_writes(self):
+        response = self.client.post(
+            reverse("quiz_app:teacher_bulk_import"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "teachers.csv",
+                    (
+                        b"full_name,contact_number,gender\n"
+                        b"Valid Import Teacher,555-0101,F\n"
+                        b"Invalid Import Teacher,,M\n"
+                    ),
+                    content_type="text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertFalse(payload["complete"])
+        self.assertFalse(payload["partial_success"])
+        self.assertEqual(payload["imported"], 0)
+        self.assertTrue(any("Row 3" in error for error in payload["errors"]))
+        self.assertFalse(
+            Teacher.objects.filter(
+                full_name="Valid Import Teacher",
+                school=self.school_a,
+            ).exists()
+        )
+
+    def test_teacher_import_rejects_ambiguous_department_name(self):
+        Department.objects.create(
+            name=self.department_b.name,
+            code="DEP-A-1",
+            school=self.school_a,
+        )
+        Department.objects.create(
+            name=self.department_b.name,
+            code="DEP-A-2",
+            school=self.school_a,
+        )
+
+        response = self.client.post(
+            reverse("quiz_app:teacher_bulk_import"),
+            {
+                "csv_file": SimpleUploadedFile(
+                    "teachers.csv",
+                    (
+                        b"full_name,contact_number,department\n"
+                        b"Ambiguous Department Teacher,555-0102,Department B\n"
+                    ),
+                    content_type="text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["imported"], 0)
+        self.assertTrue(
+            any("ambiguous" in error.lower() for error in response.json()["errors"])
+        )
+        self.assertFalse(
+            Teacher.objects.filter(
+                full_name="Ambiguous Department Teacher",
+                school=self.school_a,
+            ).exists()
+        )
+
     def test_student_import_rejects_class_from_a_different_academic_year(self):
         self.academic_year_a.is_current = True
         self.academic_year_a.save(update_fields=["is_current"])
@@ -2628,6 +2877,28 @@ class SchoolScopedManagementEndpointTests(TestCase):
         self.assertFalse(can_attempt)
         self.assertIn("Maximum attempts", message)
 
+    def test_start_endpoint_enforces_the_attempt_limit(self):
+        self.client.force_login(self.student_user_a)
+        self.quiz_a.max_attempts = 1
+        self.quiz_a.save(update_fields=["max_attempts"])
+        initial_count = QuizAttempt.objects.filter(
+            quiz=self.quiz_a,
+            student=self.student_a,
+        ).count()
+
+        response = self.client.get(
+            reverse("quiz_app:student_quiz_start", args=[self.quiz_a.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            QuizAttempt.objects.filter(
+                quiz=self.quiz_a,
+                student=self.student_a,
+            ).count(),
+            initial_count,
+        )
+
     def test_expired_quiz_attempt_is_submitted_and_cannot_save_answers(self):
         self.client.force_login(self.student_user_a)
         self.quiz_a.time_limit = 1
@@ -2683,6 +2954,210 @@ class SchoolScopedManagementEndpointTests(TestCase):
             attempt.responses.get(question=self.question_a).text_answer,
             "Saved draft response",
         )
+
+    def test_refresh_resume_and_two_tabs_reuse_attempt_and_answer(self):
+        self.client.force_login(self.student_user_a)
+        self.quiz_a.max_attempts = 3
+        self.quiz_a.save(update_fields=["max_attempts"])
+
+        start_response = self.client.get(
+            reverse("quiz_app:student_quiz_start", args=[self.quiz_a.pk])
+        )
+        attempt = QuizAttempt.objects.get(
+            quiz=self.quiz_a,
+            student=self.student_a,
+            is_submitted=False,
+        )
+        first_tab = self.client.get(
+            reverse("quiz_app:student_quiz_take", args=[attempt.pk])
+        )
+        refresh = self.client.get(
+            reverse("quiz_app:student_quiz_take", args=[attempt.pk])
+        )
+        resume = self.client.get(
+            reverse("quiz_app:student_quiz_resume", args=[self.quiz_a.pk])
+        )
+        first_save = self.client.post(
+            reverse("quiz_app:student_quiz_save", args=[attempt.pk]),
+            {"question_id": self.question_a.pk, "text_answer": "First tab answer"},
+        )
+        second_tab_save = self.client.post(
+            reverse("quiz_app:student_quiz_save", args=[attempt.pk]),
+            {"question_id": self.question_a.pk, "text_answer": "Second tab answer"},
+        )
+
+        self.assertEqual(start_response.status_code, 302)
+        self.assertEqual(first_tab.status_code, 200)
+        self.assertEqual(refresh.status_code, 200)
+        self.assertEqual(
+            resume.url,
+            reverse("quiz_app:student_quiz_take", args=[attempt.pk]),
+        )
+        self.assertEqual(first_save.status_code, 200)
+        self.assertEqual(second_tab_save.status_code, 200)
+        self.assertEqual(
+            QuizAttempt.objects.filter(
+                quiz=self.quiz_a,
+                student=self.student_a,
+                is_submitted=False,
+            ).count(),
+            1,
+        )
+        self.assertEqual(attempt.responses.count(), 1)
+        self.assertEqual(
+            attempt.responses.get(question=self.question_a).text_answer,
+            "Second tab answer",
+        )
+
+    def test_student_cannot_access_another_students_attempt(self):
+        self.client.force_login(self.student_user_a)
+
+        response = self.client.get(
+            reverse("quiz_app:student_quiz_take", args=[self.attempt_b.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_answer_save_retry_is_idempotent_after_a_lost_response(self):
+        self.client.force_login(self.student_user_a)
+        attempt = QuizAttempt.objects.create(
+            quiz=self.quiz_a,
+            student=self.student_a,
+            school=self.school_a,
+            attempt_number=7,
+        )
+        payload = {
+            "question_id": self.question_a.pk,
+            "text_answer": "Retry-safe answer",
+        }
+
+        first_response = self.client.post(
+            reverse("quiz_app:student_quiz_save", args=[attempt.pk]),
+            payload,
+        )
+        retry_response = self.client.post(
+            reverse("quiz_app:student_quiz_save", args=[attempt.pk]),
+            payload,
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(retry_response.status_code, 200)
+        self.assertEqual(attempt.responses.count(), 1)
+        self.assertEqual(
+            attempt.responses.get(question=self.question_a).text_answer,
+            "Retry-safe answer",
+        )
+
+    def test_attempt_does_not_accept_questions_added_after_start(self):
+        self.client.force_login(self.student_user_a)
+        attempt = QuizAttempt.objects.create(
+            quiz=self.quiz_a,
+            student=self.student_a,
+            school=self.school_a,
+            attempt_number=11,
+        )
+        attempt.capture_configuration()
+        later_question = Question.objects.create(
+            quiz=self.quiz_a,
+            question_text="Added after the attempt started",
+            question_type="essay",
+            school=self.school_a,
+        )
+
+        take_response = self.client.get(
+            reverse("quiz_app:student_quiz_take", args=[attempt.pk])
+        )
+        save_response = self.client.post(
+            reverse("quiz_app:student_quiz_save", args=[attempt.pk]),
+            {
+                "question_id": later_question.pk,
+                "text_answer": "Late question answer",
+            },
+        )
+
+        self.assertEqual(take_response.status_code, 200)
+        self.assertNotContains(take_response, "Added after the attempt started")
+        self.assertEqual(save_response.status_code, 400)
+        self.assertFalse(
+            attempt.responses.filter(question=later_question).exists()
+        )
+
+    def test_attempt_does_not_accept_choices_added_after_start(self):
+        self.client.force_login(self.student_user_a)
+        question = Question.objects.create(
+            quiz=self.quiz_a,
+            question_text="Original multiple choice question",
+            question_type="multiple_choice",
+            marks=1,
+            school=self.school_a,
+        )
+        original_choices = [
+            AnswerChoice.objects.create(
+                question=question,
+                choice_text=f"Original choice {index}",
+                is_correct=index == 1,
+                school=self.school_a,
+            )
+            for index in (1, 2)
+        ]
+        attempt = QuizAttempt.objects.create(
+            quiz=self.quiz_a,
+            student=self.student_a,
+            school=self.school_a,
+            attempt_number=12,
+        )
+        attempt.capture_configuration()
+        question.question_text = "Edited after the attempt started"
+        question.save(update_fields=["question_text"])
+        original_choices[0].choice_text = "Edited original choice"
+        original_choices[0].is_correct = False
+        original_choices[0].save(update_fields=["choice_text", "is_correct"])
+        late_choice = AnswerChoice.objects.create(
+            question=question,
+            choice_text="Added after the attempt started",
+            school=self.school_a,
+        )
+
+        take_response = self.client.get(
+            reverse("quiz_app:student_quiz_take", args=[attempt.pk])
+        )
+        response = self.client.post(
+            reverse("quiz_app:student_quiz_save", args=[attempt.pk]),
+            {
+                "question_id": question.pk,
+                "choice_ids": [late_choice.pk],
+            },
+        )
+
+        self.assertEqual(take_response.status_code, 200)
+        self.assertContains(take_response, "Original multiple choice question")
+        self.assertContains(take_response, "Original choice 1")
+        self.assertNotContains(take_response, "Edited after the attempt started")
+        self.assertNotContains(take_response, "Edited original choice")
+        self.assertNotContains(take_response, "Added after the attempt started")
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(attempt.responses.exists())
+        self.assertEqual(
+            len(
+                attempt.configuration_snapshot["questions"][str(question.pk)][
+                    "choices"
+                ]
+            ),
+            2,
+        )
+        self.assertEqual(len(original_choices), 2)
+
+        valid_save = self.client.post(
+            reverse("quiz_app:student_quiz_save", args=[attempt.pk]),
+            {
+                "question_id": question.pk,
+                "choice_ids": [original_choices[0].pk],
+            },
+        )
+        self.assertEqual(valid_save.status_code, 200)
+        attempt.submit()
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.score, 1)
 
     def test_quiz_start_persists_attempt_configuration_and_randomized_order(self):
         self.client.force_login(self.student_user_a)
@@ -2820,6 +3295,138 @@ class SchoolScopedManagementEndpointTests(TestCase):
         self.assertEqual(attempt.score, 1)
         self.assertEqual(attempt.percentage, 25)
         self.assertEqual(attempt.wrong_answers, 1)
+
+    def test_result_review_uses_attempt_snapshot_after_quiz_and_question_edits(self):
+        quiz = Quiz.objects.create(
+            title="Original snapshot quiz",
+            slug="original-snapshot-quiz",
+            subject=self.subject_a,
+            teacher=self.teacher_a,
+            school=self.school_a,
+            status="published",
+            total_marks=2,
+            show_results_immediately=True,
+            allow_review=True,
+            show_correct_answers=True,
+        )
+        question = Question.objects.create(
+            quiz=quiz,
+            question_text="Original question",
+            question_type="multiple_choice",
+            marks=2,
+            explanation="Original explanation",
+            school=self.school_a,
+        )
+        correct_choice = AnswerChoice.objects.create(
+            question=question,
+            choice_text="Original correct choice",
+            is_correct=True,
+            school=self.school_a,
+        )
+        AnswerChoice.objects.create(
+            question=question,
+            choice_text="Original incorrect choice",
+            school=self.school_a,
+        )
+        attempt = QuizAttempt.objects.create(
+            quiz=quiz,
+            student=self.student_a,
+            school=self.school_a,
+            attempt_number=8,
+        )
+        attempt.capture_configuration()
+        QuizResponse.objects.create(
+            attempt=attempt,
+            question=question,
+            selected_choice=correct_choice,
+            school=self.school_a,
+        )
+        attempt.submit()
+
+        self.client.force_login(self.student_user_a)
+        question.question_text = "Edited question"
+        question.explanation = "Edited explanation"
+        question.save(update_fields=["question_text", "explanation"])
+        correct_choice.choice_text = "Edited correct choice"
+        correct_choice.is_correct = False
+        correct_choice.save(update_fields=["choice_text", "is_correct"])
+        Quiz.objects.filter(pk=quiz.pk).update(
+            title="Edited quiz",
+            total_marks=99,
+            show_correct_answers=False,
+        )
+
+        result = self.client.get(
+            reverse("quiz_app:student_quiz_result_detail", args=[attempt.pk])
+        )
+
+        self.assertEqual(result.status_code, 200)
+        self.assertContains(result, "Original snapshot quiz")
+        self.assertContains(result, "Original question")
+        self.assertContains(result, "Original correct choice")
+        self.assertContains(result, "Original explanation")
+        self.assertContains(result, "/ 2 marks")
+        self.assertNotContains(result, "Edited question")
+        self.assertNotContains(result, "Edited correct choice")
+
+        print_result = self.client.get(
+            reverse("quiz_app:student_quiz_result_print", args=[attempt.pk])
+        )
+        self.assertEqual(print_result.status_code, 200)
+        self.assertContains(print_result, "Original snapshot quiz")
+        self.assertContains(print_result, "Original question")
+
+    def test_result_review_displays_all_selected_multiple_answer_choices(self):
+        quiz = Quiz.objects.create(
+            title="Multiple answer result quiz",
+            slug="multiple-answer-result-quiz",
+            subject=self.subject_a,
+            teacher=self.teacher_a,
+            school=self.school_a,
+            total_marks=2,
+            show_results_immediately=True,
+            allow_review=True,
+        )
+        question = Question.objects.create(
+            quiz=quiz,
+            question_text="Select both correct choices",
+            question_type="multiple_choice",
+            marks=2,
+            school=self.school_a,
+        )
+        choices = [
+            AnswerChoice.objects.create(
+                question=question,
+                choice_text=f"Correct choice {index}",
+                is_correct=True,
+                school=self.school_a,
+            )
+            for index in (1, 2)
+        ]
+        attempt = QuizAttempt.objects.create(
+            quiz=quiz,
+            student=self.student_a,
+            school=self.school_a,
+            attempt_number=10,
+        )
+        attempt.capture_configuration()
+        answer = QuizResponse.objects.create(
+            attempt=attempt,
+            question=question,
+            school=self.school_a,
+        )
+        answer.selected_choices.set(choices)
+        attempt.submit()
+        self.client.force_login(self.student_user_a)
+
+        result = self.client.get(
+            reverse("quiz_app:student_quiz_result_detail", args=[attempt.pk])
+        )
+
+        self.assertEqual(result.status_code, 200)
+        self.assertContains(result, "Correct choice 1")
+        self.assertContains(result, "Correct choice 2")
+        self.assertNotContains(result, "No answer selected")
 
     def test_matching_and_ordering_questions_are_scored_from_attempt_snapshot(self):
         quiz = Quiz.objects.create(
@@ -3041,6 +3648,29 @@ class SchoolScopedManagementEndpointTests(TestCase):
         self.assertTrue(attempt.is_submitted)
         self.assertEqual(attempt.submitted_at, submitted_at)
         self.assertEqual(attempt.score, score)
+
+    def test_manual_submission_after_expiry_submits_the_attempt(self):
+        self.client.force_login(self.student_user_a)
+        self.quiz_a.time_limit = 1
+        self.quiz_a.save(update_fields=["time_limit"])
+        attempt = QuizAttempt.objects.create(
+            quiz=self.quiz_a,
+            student=self.student_a,
+            school=self.school_a,
+            attempt_number=8,
+        )
+        QuizAttempt.objects.filter(pk=attempt.pk).update(
+            started_at=timezone.now() - timedelta(minutes=2)
+        )
+
+        response = self.client.post(
+            reverse("quiz_app:student_quiz_submit", args=[attempt.pk])
+        )
+
+        attempt.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(attempt.is_submitted)
+        self.assertIsNotNone(attempt.submitted_at)
 
     def test_student_gets_score_only_when_review_is_not_immediately_available(self):
         self.client.force_login(self.student_user_a)

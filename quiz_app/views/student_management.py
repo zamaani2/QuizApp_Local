@@ -1088,11 +1088,19 @@ def student_bulk_import_view(request):
                     rows.append(row_dict)
             
             wb.close()
+            fieldnames = headers
             csv_reader = iter(rows)  # Use iterator for consistency
         else:
             # Handle CSV file
-            file_data = uploaded_file.read().decode('utf-8')
+            try:
+                file_data = uploaded_file.read().decode('utf-8-sig')
+            except UnicodeDecodeError:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'CSV file must use UTF-8 encoding.',
+                }, status=400)
             csv_reader = csv.DictReader(io.StringIO(file_data))
+            fieldnames = csv_reader.fieldnames or []
             if len(csv_reader.fieldnames or []) > MAX_IMPORT_COLUMNS:
                 return JsonResponse({
                     'success': False,
@@ -1105,13 +1113,32 @@ def student_bulk_import_view(request):
                     'error': f'File exceeds the {MAX_IMPORT_ROWS}-row import limit.',
                 }, status=413)
             csv_reader = iter(rows)
+
+        if not fieldnames or any(not str(header).strip() for header in fieldnames):
+            return JsonResponse({
+                'success': False,
+                'error': 'File must include a header row with column names.',
+            }, status=400)
+        if len({str(header).strip() for header in fieldnames}) != len(fieldnames):
+            return JsonResponse({
+                'success': False,
+                'error': 'File contains duplicate column names.',
+            }, status=400)
         
         # Get column mappings from POST data
         column_mappings_json = request.POST.get('column_mappings', '{}')
         try:
             column_mappings = json.loads(column_mappings_json)
         except json.JSONDecodeError:
-            column_mappings = {}
+            return JsonResponse({
+                'success': False,
+                'error': 'Column mappings must be valid JSON.',
+            }, status=400)
+        if not isinstance(column_mappings, dict):
+            return JsonResponse({
+                'success': False,
+                'error': 'Column mappings must be a JSON object.',
+            }, status=400)
         
         # Get class assignment if provided
         assign_class_id = request.POST.get('assign_class', '') or None
@@ -1159,10 +1186,12 @@ def student_bulk_import_view(request):
             'admission_number': column_mappings.get('admission_number', 'admission_number'),
         }
         
-        # Process rows
+        # Validate the full upload before saving any records.
         imported = 0
         assigned_to_class = 0
         errors = []
+        prepared_students = []
+        seen_admission_numbers = set()
         
         with transaction.atomic():
             if assign_class_id:
@@ -1179,13 +1208,13 @@ def student_bulk_import_view(request):
                         'error': 'The selected class changed while the import was starting.',
                     }, status=409)
 
-            for row_num, row in enumerate(csv_reader, start=2):  # Start at 2 (row 1 is header)
+            for row_num, row in enumerate(csv_reader, start=2):
                 try:
                     # Get data from row using column mappings
                     def get_field_value(field_name):
                         csv_column = field_mappings.get(field_name)
                         if csv_column and csv_column in row:
-                            return row[csv_column].strip()
+                            return (row[csv_column] or '').strip()
                         return ''
                     
                     full_name = get_field_value('full_name')
@@ -1225,11 +1254,18 @@ def student_bulk_import_view(request):
                         errors.append(f'Row {row_num}: Invalid gender (must be M or F)')
                         continue
                     
-                    # Check if admission_number already exists (only if provided)
                     if admission_number:
-                        if Student.objects.filter(admission_number=admission_number, school=school).exists():
-                            errors.append(f'Row {row_num}: Admission number "{admission_number}" already exists')
+                        if (
+                            admission_number in seen_admission_numbers
+                            or Student.objects.filter(
+                                admission_number=admission_number
+                            ).exists()
+                        ):
+                            errors.append(
+                                f'Row {row_num}: Admission number already exists'
+                            )
                             continue
+                        seen_admission_numbers.add(admission_number)
                     
                     # Parse date strings to date objects
                     try:
@@ -1267,56 +1303,52 @@ def student_bulk_import_view(request):
                     student.full_clean(
                         exclude=["admission_number"] if not admission_number else None
                     )
-                    
-                    with transaction.atomic():
-                        # Savepoint each row so a failed insert or enrollment cannot
-                        # leave the outer batch transaction unusable or half-written.
-                        max_retries = 5
-                        saved = False
-                        for attempt in range(max_retries):
+                    prepared_students.append((row_num, student))
+
+                except Exception as e:
+                    errors.append(f'Row {row_num}: {str(e)}')
+
+            if assign_class and prepared_students:
+                available_slots = max(
+                    0,
+                    assign_class.maximum_students
+                    - assign_class.get_current_student_count(),
+                )
+                for row_num, _student in prepared_students[available_slots:]:
+                    errors.append(
+                        f'Row {row_num}: The selected class has reached its capacity.'
+                    )
+
+            if not errors:
+                for _row_num, student in prepared_students:
+                    if not student.admission_number:
+                        for _attempt in range(5):
                             try:
                                 with transaction.atomic():
                                     student.save()
-                                saved = True
                                 break
-                            except IntegrityError as e:
-                                if 'admission_number' in str(e) and not admission_number:
-                                    student.admission_number = None
-                                    continue
-                                raise
-                        
-                        if not saved:
-                            errors.append(
-                                f'Row {row_num}: Failed to generate unique admission '
-                                f'number after {max_retries} attempts'
+                            except IntegrityError as error:
+                                if "admission_number" not in str(error):
+                                    raise
+                                student.admission_number = None
+                        else:
+                            raise IntegrityError(
+                                "Unable to generate a unique admission number."
                             )
-                            continue
+                    else:
+                        student.save()
 
-                        if assign_class:
-                            existing_assignment = StudentClass.objects.filter(
-                                student=student,
-                                is_active=True,
-                                school=school
-                            ).first()
-
-                            if existing_assignment:
-                                existing_assignment.is_active = False
-                                existing_assignment.save()
-
-                            student_class = StudentClass(
-                                student=student,
-                                assigned_class=assign_class,
-                                assigned_by=request.user,
-                                school=school,
-                            )
-                            student_class.full_clean()
-                            student_class.save()
-                            assigned_to_class += 1
-
-                        imported += 1
-                
-                except Exception as e:
-                    errors.append(f'Row {row_num}: {str(e)}')
+                    if assign_class:
+                        student_class = StudentClass(
+                            student=student,
+                            assigned_class=assign_class,
+                            assigned_by=request.user,
+                            school=school,
+                        )
+                        student_class.full_clean()
+                        student_class.save()
+                        assigned_to_class += 1
+                    imported += 1
         
         # Prepare response
         response_data = {

@@ -765,7 +765,13 @@ def teacher_bulk_import_view(request):
                 if workbook is not None:
                     workbook.close()
         elif file_name.endswith(".csv"):
-            file_data = csv_file.read().decode('utf-8-sig')
+            try:
+                file_data = csv_file.read().decode('utf-8-sig')
+            except UnicodeDecodeError:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'CSV file must use UTF-8 encoding.',
+                }, status=400)
             csv_reader = csv.DictReader(io.StringIO(file_data))
             fieldnames = csv_reader.fieldnames or []
         else:
@@ -782,6 +788,16 @@ def teacher_bulk_import_view(request):
             return JsonResponse({
                 'success': False,
                 'error': f'File exceeds the {MAX_IMPORT_COLUMNS}-column import limit.',
+            }, status=400)
+        if not fieldnames or any(not str(header).strip() for header in fieldnames):
+            return JsonResponse({
+                'success': False,
+                'error': 'File must include a header row with column names.',
+            }, status=400)
+        if len({str(header).strip() for header in fieldnames}) != len(fieldnames):
+            return JsonResponse({
+                'success': False,
+                'error': 'File contains duplicate column names.',
             }, status=400)
         if not all(col in fieldnames for col in required_columns):
             return JsonResponse({
@@ -811,19 +827,20 @@ def teacher_bulk_import_view(request):
                     'error': 'Invalid default department selected.',
                 }, status=400)
         
-        # Process rows
+        # Validate the full upload before saving any records.
         imported = 0
         errors = []
+        prepared_teachers = []
         
         with transaction.atomic():
-            for row_num, row in enumerate(csv_reader, start=2):  # Start at 2 (row 1 is header)
+            for row_num, row in enumerate(csv_reader, start=2):
                 try:
                     # Get data from row
-                    full_name = row.get('full_name', '').strip()
-                    gender = row.get('gender', '').strip().upper()
-                    contact_number = row.get('contact_number', '').strip()
-                    email = row.get('email', '').strip() or None
-                    department_name = row.get('department', '').strip()
+                    full_name = (row.get('full_name') or '').strip()
+                    gender = (row.get('gender') or '').strip().upper()
+                    contact_number = (row.get('contact_number') or '').strip()
+                    email = (row.get('email') or '').strip() or None
+                    department_name = (row.get('department') or '').strip()
                     
                     # Validate required fields
                     if not all([full_name, contact_number]):
@@ -838,13 +855,21 @@ def teacher_bulk_import_view(request):
                     # Get department
                     department = default_department
                     if department_name:
-                        try:
-                            department = Department.objects.get(name__iexact=department_name, school=school)
-                        except Department.DoesNotExist:
+                        matching_departments = list(
+                            Department.objects.filter(
+                                name__iexact=department_name,
+                                school=school,
+                            )[:2]
+                        )
+                        if not matching_departments:
                             errors.append(f'Row {row_num}: Department "{department_name}" not found')
                             continue
-                        except Department.MultipleObjectsReturned:
-                            department = Department.objects.filter(name__iexact=department_name, school=school).first()
+                        if len(matching_departments) > 1:
+                            errors.append(
+                                f'Row {row_num}: Department "{department_name}" is ambiguous'
+                            )
+                            continue
+                        department = matching_departments[0]
                     
                     # Create teacher
                     teacher = Teacher(
@@ -855,19 +880,22 @@ def teacher_bulk_import_view(request):
                         department=department,
                         school=school,
                     )
-                    with transaction.atomic():
-                        teacher.full_clean(exclude=["staff_id"])
-                        teacher.save()
-                    imported += 1
+                    teacher.full_clean(exclude=["staff_id"])
+                    prepared_teachers.append((row_num, teacher))
                 
                 except Exception as e:
                     errors.append(f'Row {row_num}: {str(e)}')
+
+            if not errors:
+                for _row_num, teacher in prepared_teachers:
+                    teacher.save()
+                    imported += 1
         
         # Prepare response
         response_data = {
             'success': True,
             'complete': not errors,
-            'partial_success': bool(imported and errors),
+            'partial_success': False,
             'imported': imported,
             'errors': errors,
         }

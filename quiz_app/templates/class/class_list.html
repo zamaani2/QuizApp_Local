@@ -36,6 +36,7 @@
         <!-- Filters -->
         <div class="row mb-3">
           <div class="col-md-3">
+            <label class="visually-hidden" for="searchInput">Search classes</label>
             <input
               type="text"
               class="form-control"
@@ -45,6 +46,7 @@
             />
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="formFilter">Filter by form</label>
             <select class="form-select" id="formFilter">
               <option value="">All Forms</option>
               {% for form in forms %}
@@ -55,6 +57,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="learningAreaFilter">Filter by learning area</label>
             <select class="form-select" id="learningAreaFilter">
               <option value="">All Learning Areas</option>
               {% for area in learning_areas %}
@@ -65,6 +68,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="academicYearFilter">Filter by academic year</label>
             <select class="form-select" id="academicYearFilter">
               <option value="">All Academic Years</option>
               {% for ay in academic_years %}
@@ -75,6 +79,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="statusFilter">Filter by class status</label>
             <select class="form-select" id="statusFilter">
               <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Classes</option>
               <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived Classes</option>

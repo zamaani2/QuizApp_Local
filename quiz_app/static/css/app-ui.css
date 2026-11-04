@@ -1,0 +1,301 @@
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../vendor/source-sans-3/5.0.12/files/source-sans-3-latin-400-normal.woff2")
+    format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../vendor/source-sans-3/5.0.12/files/source-sans-3-latin-600-normal.woff2")
+    format("woff2");
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../vendor/source-sans-3/5.0.12/files/source-sans-3-latin-700-normal.woff2")
+    format("woff2");
+}
+
+:root {
+  color-scheme: light;
+  --app-focus-ring: #0b63ce;
+}
+
+html[data-bs-theme="dark"] {
+  color-scheme: dark;
+  --app-focus-ring: #8ab4ff;
+}
+
+html,
+body,
+.app-wrapper,
+.app-main,
+.app-content,
+.app-content .container-fluid {
+  min-width: 0;
+  max-width: 100%;
+}
+
+html {
+  overflow-x: clip;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.app-content .row > * {
+  min-width: 0;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 1100;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.75rem 1rem;
+  transform: translateY(-160%);
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 20%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+:focus-visible {
+  outline: 3px solid var(--app-focus-ring);
+  outline-offset: 2px;
+}
+
+.sidebar-menu .nav-link,
+.app-header .nav-link,
+.btn,
+.page-link {
+  min-height: 2.5rem;
+}
+
+.sidebar-menu .nav-link {
+  display: flex;
+  align-items: center;
+}
+
+.app-content .card-header {
+  gap: 0.75rem;
+}
+
+.app-content .card-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-content .card-tools > * {
+  max-width: 100%;
+}
+
+.app-content .card-body {
+  min-width: 0;
+}
+
+.app-content .table {
+  margin-bottom: 0;
+}
+
+html[data-bs-theme="dark"] body {
+  background-color: #111827 !important;
+  color: #e5e7eb;
+}
+
+html[data-bs-theme="dark"] body .app-content,
+html[data-bs-theme="dark"] body .app-content-header,
+html[data-bs-theme="dark"] body .content-wrapper,
+html[data-bs-theme="dark"] body .main-content,
+html[data-bs-theme="dark"] body .dashboard-content,
+html[data-bs-theme="dark"] body .page-content,
+html[data-bs-theme="dark"] body .dashboard {
+  background: #111827 !important;
+  color: #e5e7eb !important;
+}
+
+html[data-bs-theme="dark"] body .card,
+html[data-bs-theme="dark"] body .modal-content,
+html[data-bs-theme="dark"] body .dropdown-menu,
+html[data-bs-theme="dark"] body .list-group-item {
+  background: #1f2937 !important;
+  color: #e5e7eb !important;
+  border-color: #374151;
+}
+
+html[data-bs-theme="dark"] body[class*="-theme-page"] .app-content .card {
+  background: #1f2937 !important;
+  color: #e5e7eb !important;
+}
+
+html[data-bs-theme="dark"] body .card-body,
+html[data-bs-theme="dark"] body .content-section,
+html[data-bs-theme="dark"] body .card-header:not([class*="bg-"]),
+html[data-bs-theme="dark"] body .card-footer {
+  background: #1f2937 !important;
+  color: #e5e7eb !important;
+  border-color: #374151;
+}
+
+html[data-bs-theme="dark"] body .table {
+  --bs-table-color: #e5e7eb;
+  --bs-table-bg: #1f2937 !important;
+  --bs-table-border-color: #374151;
+  --bs-table-striped-bg: #263244;
+  --bs-table-hover-bg: #2b3a4f;
+  background: #1f2937 !important;
+}
+
+html[data-bs-theme="dark"] body .table > :not(caption) > * > * {
+  color: #e5e7eb !important;
+  background-color: #1f2937 !important;
+  border-color: #374151;
+}
+
+html[data-bs-theme="dark"] body .form-control,
+html[data-bs-theme="dark"] body .form-select {
+  background: #111827 !important;
+  color: #e5e7eb !important;
+  border-color: #4b5563 !important;
+}
+
+html[data-bs-theme="dark"] body .form-control::placeholder {
+  color: #9ca3af;
+}
+
+html[data-bs-theme="dark"] body .text-muted {
+  color: #b7c1ce !important;
+}
+
+html[data-bs-theme="dark"] body .app-content h1,
+html[data-bs-theme="dark"] body .app-content h2,
+html[data-bs-theme="dark"] body .app-content h3,
+html[data-bs-theme="dark"] body .app-content h4,
+html[data-bs-theme="dark"] body .app-content h5,
+html[data-bs-theme="dark"] body .app-content h6,
+html[data-bs-theme="dark"] body .app-content p {
+  color: #e5e7eb !important;
+}
+
+@media (max-width: 767.98px) {
+  .app-content .container-fluid {
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .app-content-header .row {
+    row-gap: 0.5rem;
+  }
+
+  .app-content-header .breadcrumb {
+    justify-content: flex-start;
+    margin-bottom: 0;
+  }
+
+  .app-content .card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .app-content .card-tools {
+    width: 100%;
+  }
+
+  .app-content .card-tools > .btn,
+  .app-content .card-tools > .form-select {
+    flex: 1 1 auto;
+  }
+
+  .app-content .card-body {
+    overflow-x: auto;
+  }
+
+  .app-content .card-body > .table,
+  .app-content .card-body > div > .table {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .app-content .btn-group {
+    flex-wrap: wrap;
+  }
+
+  .app-header .container-fluid {
+    gap: 0.25rem;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+  }
+
+  .app-header .navbar-nav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .app-header .navbar-nav.ms-auto {
+    margin-left: auto !important;
+  }
+
+  #session-timer-display > span {
+    font-size: 0.75rem;
+  }
+
+  .user-menu .dropdown-menu {
+    right: 0;
+    left: auto;
+    max-width: calc(100vw - 1rem);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .app-header #bd-theme-text {
+    display: none !important;
+  }
+
+  .app-header [data-lte-toggle="fullscreen"] {
+    display: none;
+  }
+
+  .app-header .user-menu .user-image {
+    margin-right: 0;
+  }
+
+  #session-timer-display > span {
+    display: none;
+  }
+
+  .app-content .card-body {
+    padding: 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

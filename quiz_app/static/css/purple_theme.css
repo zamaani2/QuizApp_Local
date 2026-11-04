@@ -1035,17 +1035,17 @@
 
 /* ===== DARK MODE SUPPORT ===== */
 @media (prefers-color-scheme: dark) {
-  .purple-theme-page {
+  html[data-bs-theme="dark"] .purple-theme-page {
     --purple-light: #1a0f2e;
     --purple-lighter: #2d1b3d;
   }
 
-  .purple-theme-page .card {
+  html[data-bs-theme="dark"] .purple-theme-page .card {
     background: var(--purple-lighter);
     color: white;
   }
 
-  .purple-theme-page .table {
+  html[data-bs-theme="dark"] .purple-theme-page .table {
     color: white;
   }
 }

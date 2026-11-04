@@ -1193,17 +1193,17 @@
 
 /* ===== DARK MODE SUPPORT ===== */
 @media (prefers-color-scheme: dark) {
-  .green-theme-page {
+  html[data-bs-theme="dark"] .green-theme-page {
     --green-light: #0d1f0d;
     --green-lighter: #1a3d1a;
   }
 
-  .green-theme-page .card {
+  html[data-bs-theme="dark"] .green-theme-page .card {
     background: var(--green-lighter);
     color: white;
   }
 
-  .green-theme-page .table {
+  html[data-bs-theme="dark"] .green-theme-page .table {
     color: white;
   }
 }

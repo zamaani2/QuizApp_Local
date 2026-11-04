@@ -69,6 +69,7 @@
         <!-- Filters -->
         <div class="row mb-3">
           <div class="col-md-3">
+            <label class="visually-hidden" for="searchInput">Search students</label>
             <input
               type="text"
               class="form-control"
@@ -78,6 +79,7 @@
             />
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="formFilter">Filter by form</label>
             <select class="form-select" id="formFilter">
               <option value="">All Forms</option>
               {% for form in forms %}
@@ -88,6 +90,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="genderFilter">Filter by gender</label>
             <select class="form-select" id="genderFilter">
               <option value="">All Genders</option>
               <option value="M" {% if gender_filter == 'M' %}selected{% endif %}>Male</option>
@@ -95,6 +98,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="classFilter">Filter by class</label>
             <select class="form-select" id="classFilter">
               <option value="">All Classes</option>
               {% for class_obj in classes %}
@@ -105,6 +109,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="statusFilter">Filter by student status</label>
             <select class="form-select" id="statusFilter">
               <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Students</option>
               <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived Students</option>
@@ -119,11 +124,12 @@
         </div>
 
         <!-- Students Table -->
+        <div class="table-responsive">
         <table id="studentsTable" class="table table-bordered table-striped table-hover">
           <thead>
             <tr>
               <th width="30">
-                <input type="checkbox" id="selectAll" />
+                <input type="checkbox" id="selectAll" aria-label="Select all students on this page" />
               </th>
               <th>Admission Number</th>
               <th>Full Name</th>
@@ -139,7 +145,7 @@
             {% for student in students %}
             <tr data-student-id="{{ student.id }}">
               <td>
-                <input type="checkbox" class="student-checkbox" value="{{ student.id }}" />
+                <input type="checkbox" class="student-checkbox" value="{{ student.id }}" aria-label="Select {{ student.full_name }}" />
               </td>
               <td>{{ student.admission_number }}</td>
               <td>
@@ -194,6 +200,7 @@
                     href="{% url 'quiz_app:student_detail' student.id %}"
                     class="btn btn-sm btn-info"
                     title="View Details"
+                    aria-label="View {{ student.full_name }} details"
                   >
                     <i class="bi bi-eye"></i>
                   </a>
@@ -203,6 +210,7 @@
                     data-modal-url="{% url 'quiz_app:student_edit' student.id %}"
                     data-modal-title="Edit Student"
                     title="Edit"
+                    aria-label="Edit {{ student.full_name }}"
                   >
                     <i class="bi bi-pencil"></i>
                   </button>
@@ -213,6 +221,7 @@
                     data-student-id="{{ student.id }}"
                     data-student-name="{{ student.full_name }}"
                     title="Archive student"
+                    aria-label="Archive {{ student.full_name }}"
                   >
                     <i class="bi bi-archive"></i>
                   </button>
@@ -224,6 +233,7 @@
                     data-student-name="{{ student.full_name }}"
                     data-restore-url="{% url 'quiz_app:student_restore' student.id %}"
                     title="Restore student"
+                    aria-label="Restore {{ student.full_name }}"
                   >
                     <i class="bi bi-arrow-counterclockwise"></i>
                   </button>
@@ -231,9 +241,18 @@
                 </div>
               </td>
             </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="py-5 text-center">
+                <i class="bi bi-people fs-2 d-block mb-2 text-muted" aria-hidden="true"></i>
+                <strong>No students found</strong>
+                <p class="text-muted mb-0">Try adjusting the filters or add a student to this school.</p>
+              </td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
+        </div>
         {% if page_obj.paginator.num_pages > 1 %}
         <nav aria-label="Student list pages">
           <ul class="pagination justify-content-center mt-3">

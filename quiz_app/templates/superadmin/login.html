@@ -4,6 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="{% static 'favicon.ico' %}" />
     <title>Superadmin Login - SchoolApp</title>
 
     <!-- Include the centralized styles -->
@@ -345,7 +346,7 @@
       <div class="login-card">
         <div class="login-header">
           <div class="login-logo">
-            <a href="#"><b>SI</b>S</a>
+            <a href="{% url 'quiz_app:superadmin_login' %}"><b>SI</b>S</a>
             <span class="subtitle">Super Administrator Portal</span>
             <span class="badge">System Management</span>
           </div>

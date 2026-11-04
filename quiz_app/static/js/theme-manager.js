@@ -57,6 +57,7 @@ class ThemeManager {
         this.htmlElement = document.documentElement;
         this.bodyElement = document.body;
         this.storageKey = 'preferredTheme';
+        this.colorModeStorageKey = 'preferredColorMode';
 
         this.init();
     }
@@ -95,8 +96,6 @@ class ThemeManager {
     }
 
     applyTheme(themeName) {
-        console.log('Applying theme:', themeName);
-
         if (!this.themes[themeName]) {
             console.warn('Theme "' + themeName + '" not found. Falling back to academic theme.');
             themeName = 'academic';
@@ -105,15 +104,7 @@ class ThemeManager {
         var theme = this.themes[themeName];
         this.currentTheme = themeName;
 
-        // Set Bootstrap theme attribute (with fallback for older browsers)
-        try {
-            this.htmlElement.setAttribute('data-bs-theme', theme.dataAttribute);
-            console.log('Set data-bs-theme to:', theme.dataAttribute);
-        } catch (e) {
-            // Fallback for older browsers
-            this.htmlElement.setAttribute('data-theme', theme.dataAttribute);
-            console.log('Set data-theme to:', theme.dataAttribute);
-        }
+        this.applyColorMode(this.getSavedColorMode());
 
         // Remove all theme classes from body
         var themeValues = Object.values(this.themes);
@@ -123,14 +114,12 @@ class ThemeManager {
 
         // Add current theme class
         this.bodyElement.classList.add(theme.class);
-        console.log('Added theme class:', theme.class);
 
         // Theme CSS is loaded statically, no dynamic loading needed
 
         // Save to localStorage (with fallback)
         try {
             localStorage.setItem(this.storageKey, themeName);
-            console.log('Saved theme to localStorage:', themeName);
         } catch (e) {
             // Fallback for browsers without localStorage
             document.cookie = this.storageKey + '=' + themeName + '; path=/';
@@ -187,6 +176,13 @@ class ThemeManager {
     bindEvents() {
         // Use event delegation to handle dynamically added elements
         document.addEventListener('click', (e) => {
+            const colorModeButton = e.target.closest('[data-bs-theme-value]');
+            if (colorModeButton) {
+                e.preventDefault();
+                this.setColorMode(colorModeButton.getAttribute('data-bs-theme-value'));
+                return;
+            }
+
             if (e.target.closest('[data-theme]')) {
                 e.preventDefault();
                 const themeButton = e.target.closest('[data-theme]');
@@ -207,13 +203,77 @@ class ThemeManager {
         // Listen for system theme changes
         if (window.matchMedia) {
             const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-            mediaQuery.addEventListener('change', (e) => {
-                // Only auto-switch if user hasn't manually set a preference
-                const hasManualPreference = localStorage.getItem(this.storageKey);
-                if (!hasManualPreference) {
-                    this.applyTheme('academic');
+            const updateAutomaticColorMode = () => {
+                if (this.getSavedColorMode() === 'auto') {
+                    this.applyColorMode('auto');
                 }
-            });
+            };
+            if (mediaQuery.addEventListener) {
+                mediaQuery.addEventListener('change', updateAutomaticColorMode);
+            } else if (mediaQuery.addListener) {
+                mediaQuery.addListener(updateAutomaticColorMode);
+            }
+        }
+    }
+
+    getSavedColorMode() {
+        try {
+            const mode = localStorage.getItem(this.colorModeStorageKey);
+            return ['light', 'dark', 'auto'].includes(mode) ? mode : 'auto';
+        } catch (e) {
+            return 'auto';
+        }
+    }
+
+    setColorMode(mode) {
+        if (!['light', 'dark', 'auto'].includes(mode)) {
+            return;
+        }
+        try {
+            localStorage.setItem(this.colorModeStorageKey, mode);
+        } catch (e) {
+            // The current page still applies the selected mode if storage is unavailable.
+        }
+        this.applyColorMode(mode, true);
+    }
+
+    applyColorMode(mode, focus) {
+        const prefersDark = window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const resolvedMode = mode === 'auto'
+            ? (prefersDark ? 'dark' : 'light')
+            : mode;
+        this.htmlElement.setAttribute('data-bs-theme', resolvedMode);
+
+        const activeButton = document.querySelector(
+            `[data-bs-theme-value="${mode}"]`
+        );
+        document.querySelectorAll('[data-bs-theme-value]').forEach(button => {
+            const isActive = button === activeButton;
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-pressed', String(isActive));
+            const checkmark = button.querySelector('.bi-check-lg');
+            if (checkmark) {
+                checkmark.classList.toggle('d-none', !isActive);
+            }
+        });
+
+        const switcher = document.getElementById('bd-theme');
+        const activeIcon = switcher && switcher.querySelector('.theme-icon-active i');
+        if (activeIcon && activeButton) {
+            const buttonIcon = activeButton.querySelector('i');
+            if (buttonIcon) {
+                activeIcon.className = buttonIcon.className;
+            }
+        }
+        if (switcher) {
+            switcher.setAttribute(
+                'aria-label',
+                `Color mode: ${mode.charAt(0).toUpperCase()}${mode.slice(1)}`
+            );
+            if (focus) {
+                switcher.focus();
+            }
         }
     }
 
@@ -320,4 +380,3 @@ document.head.appendChild(style);
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ThemeManager;
 }
-

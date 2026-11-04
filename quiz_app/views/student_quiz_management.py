@@ -6,6 +6,8 @@ This module provides views for students to:
 - Start and take quizzes
 - View quiz results
 """
+import copy
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -563,6 +565,15 @@ def student_quiz_take_view(request, attempt_id):
         question_id: position
         for position, question_id in enumerate(attempt.question_order, start=1)
     }
+    if attempt.configuration_snapshot:
+        snapshot_question_ids = set(
+            attempt.configuration_snapshot.get("questions", {})
+        )
+        questions = [
+            question
+            for question in questions
+            if str(question.pk) in snapshot_question_ids
+        ]
     questions.sort(
         key=lambda question: (
             question_positions.get(question.pk, len(question_positions)),
@@ -584,6 +595,12 @@ def student_quiz_take_view(request, attempt_id):
         )
         choices = list(question.answer_choices.all())
         choice_snapshots = question_snapshot.get("choices", {})
+        if attempt.configuration_snapshot:
+            choices = [
+                choice
+                for choice in choices
+                if str(choice.pk) in choice_snapshots
+            ]
         for choice in choices:
             snapshot_choice = choice_snapshots.get(str(choice.pk), {})
             choice.choice_text = snapshot_choice.get("text", choice.choice_text)
@@ -716,6 +733,9 @@ def student_quiz_save_view(request, attempt_id):
                     'submitted': True,
                 }, status=400)
 
+            if not attempt.configuration_snapshot:
+                attempt.capture_configuration()
+
             try:
                 question = attempt.quiz.questions.get(
                     id=question_id, school=school
@@ -725,39 +745,69 @@ def student_quiz_save_view(request, attempt_id):
                     {'success': False, 'error': 'Question not found'}, status=404
                 )
 
+            question_snapshot = attempt.configuration_snapshot.get(
+                "questions", {}
+            ).get(str(question.pk))
+            if question_snapshot is None:
+                return JsonResponse(
+                    {
+                        'success': False,
+                        'error': 'Question was not part of this attempt.',
+                    },
+                    status=400,
+                )
+            question_type = question_snapshot.get(
+                "question_type", question.question_type
+            )
+
+            choices = []
+            if question_type in ['multiple_choice', 'true_false']:
+                choice_ids = request.POST.getlist('choice_ids')
+                if not choice_ids and request.POST.get('choice_id'):
+                    choice_ids = [request.POST.get('choice_id')]
+                try:
+                    choice_ids = [int(choice_id) for choice_id in choice_ids]
+                except (TypeError, ValueError):
+                    return JsonResponse(
+                        {'success': False, 'error': 'Invalid choice'}, status=400
+                    )
+
+                allowed_choice_ids = set(question_snapshot.get("choices", {}))
+                choices = list(
+                    question.answer_choices.filter(
+                        id__in=choice_ids, school=school
+                    )
+                )
+                if (
+                    len({choice.pk for choice in choices}) != len(set(choice_ids))
+                    or len(choice_ids) != len(set(choice_ids))
+                    or any(str(choice.pk) not in allowed_choice_ids for choice in choices)
+                ):
+                    return JsonResponse(
+                        {'success': False, 'error': 'Invalid choice'}, status=400
+                    )
+                if question_type == "true_false" and len(choices) > 1:
+                    return JsonResponse(
+                        {'success': False, 'error': 'Select only one answer.'},
+                        status=400,
+                    )
+
             # Get or create response
             response, created = QuizResponse.objects.get_or_create(
                 attempt=attempt,
                 question=question,
                 defaults={'school': school}
             )
-            
+
             # Update response based on question type
-            if question.question_type in ['multiple_choice', 'true_false']:
-                choice_ids = request.POST.getlist('choice_ids')
-                if not choice_ids and request.POST.get('choice_id'):
-                    choice_ids = [request.POST.get('choice_id')]
-                choices = list(
-                    question.answer_choices.filter(
-                        id__in=choice_ids, school=school
-                    )
-                )
-                if len({str(choice.pk) for choice in choices}) != len(set(choice_ids)):
-                    return JsonResponse(
-                        {'success': False, 'error': 'Invalid choice'}, status=400
-                    )
-                if question.question_type == "true_false" and len(choices) > 1:
-                    return JsonResponse(
-                        {'success': False, 'error': 'Select only one answer.'},
-                        status=400,
-                    )
+            if question_type in ['multiple_choice', 'true_false']:
                 response.selected_choice = choices[0] if len(choices) == 1 else None
                 response.selected_choices.set(choices)
             
-            elif question.question_type in ['short_answer', 'fill_blank', 'essay']:
+            elif question_type in ['short_answer', 'fill_blank', 'essay']:
                 text_answer = request.POST.get('text_answer', '').strip()
                 response.text_answer = text_answer
-            elif question.question_type in ['matching', 'ordering']:
+            elif question_type in ['matching', 'ordering']:
                 text_answer = request.POST.get('text_answer', '').strip()
                 response.text_answer = text_answer
             
@@ -948,6 +998,114 @@ def student_quiz_attempts_view(request):
     return render(request, 'quiz/student/attempts_list.html', context)
 
 
+def _attempt_review_snapshot(attempt, quiz, questions, responses):
+    configuration = attempt.configuration_snapshot or {}
+    quiz_snapshot = configuration.get("quiz", {})
+    question_snapshots = configuration.get("questions", {})
+    if not question_snapshots:
+        return quiz, list(questions), list(responses)
+
+    quiz = copy.copy(quiz)
+    for field in (
+        "title",
+        "description",
+        "instructions",
+        "time_limit",
+        "total_marks",
+        "passing_marks",
+        "show_results_immediately",
+        "show_correct_answers",
+        "allow_review",
+    ):
+        if field in quiz_snapshot:
+            setattr(quiz, field, quiz_snapshot[field])
+
+    live_questions = {question.pk: question for question in questions}
+    question_ids = attempt.question_order or [
+        int(question_id) for question_id in question_snapshots
+    ]
+    review_questions = []
+    review_questions_by_id = {}
+    choices_by_question = {}
+
+    for position, question_id in enumerate(question_ids, start=1):
+        question_snapshot = question_snapshots.get(str(question_id))
+        if question_snapshot is None:
+            continue
+
+        question = live_questions.get(question_id)
+        if question is None:
+            question = Question(
+                pk=question_id,
+                quiz=quiz,
+                school=attempt.school,
+                question_type=question_snapshot.get("question_type", "essay"),
+                question_text=question_snapshot.get("question_text", ""),
+                marks=question_snapshot.get("marks", 1),
+                order=question_snapshot.get("order", position),
+            )
+        else:
+            question = copy.copy(question)
+            question.quiz = quiz
+
+        for field in (
+            "question_text",
+            "question_type",
+            "marks",
+            "correct_answer_text",
+            "explanation",
+            "order",
+        ):
+            if field in question_snapshot:
+                setattr(question, field, question_snapshot[field])
+        question.order = question_snapshot.get("order", position)
+
+        choices = []
+        choice_map = {}
+        for choice_id, choice_snapshot in question_snapshot.get("choices", {}).items():
+            choice = AnswerChoice(
+                pk=int(choice_id),
+                question=question,
+                school=attempt.school,
+                choice_text=choice_snapshot.get("text", ""),
+                is_correct=choice_snapshot.get("is_correct", False),
+                order=choice_snapshot.get("order", 0),
+                partial_credit=choice_snapshot.get("partial_credit", 0),
+            )
+            choices.append(choice)
+            choice_map[choice.pk] = choice
+        question._prefetched_objects_cache = {
+            **getattr(question, "_prefetched_objects_cache", {}),
+            "answer_choices": choices,
+        }
+        review_questions.append(question)
+        review_questions_by_id[question.pk] = question
+        choices_by_question[question.pk] = choice_map
+
+    review_responses = []
+    for response in responses:
+        response = copy.copy(response)
+        response.question = review_questions_by_id.get(
+            response.question_id, response.question
+        )
+        selected_choice = choices_by_question.get(
+            response.question_id, {}
+        ).get(response.selected_choice_id)
+        if selected_choice:
+            response.selected_choice = selected_choice
+        response._prefetched_objects_cache = {
+            **getattr(response, "_prefetched_objects_cache", {}),
+            "selected_choices": [
+                choices_by_question.get(response.question_id, {})[choice.pk]
+                for choice in response.selected_choices.all()
+                if choice.pk in choices_by_question.get(response.question_id, {})
+            ],
+        }
+        review_responses.append(response)
+
+    return quiz, review_questions, review_responses
+
+
 @login_required
 @require_http_methods(["GET"])
 def student_quiz_result_detail_view(request, attempt_id):
@@ -1001,18 +1159,19 @@ def student_quiz_result_detail_view(request, attempt_id):
     ).order_by('question__order')
     
     # Create a dictionary of responses by question ID for easy lookup
-    responses_dict = {}
-    for response in responses:
-        responses_dict[response.question.id] = response
-    
     # Get all questions to show unanswered ones
-    all_questions = quiz.questions.filter(school=school).prefetch_related(
+    all_questions = list(quiz.questions.filter(school=school).prefetch_related(
         Prefetch(
             'answer_choices',
             queryset=AnswerChoice.objects.filter(school=school),
         )
-    ).order_by('order')
-    answered_question_ids = set(responses.values_list('question_id', flat=True))
+    ).order_by('order'))
+    quiz, all_questions, responses = _attempt_review_snapshot(
+        attempt, quiz, all_questions, responses
+    )
+    responses_dict = {response.question_id: response for response in responses}
+    answered_question_ids = set(responses_dict)
+    can_review = quiz.show_results_immediately and quiz.allow_review
     
     context = {
         'attempt': attempt,
@@ -1021,7 +1180,7 @@ def student_quiz_result_detail_view(request, attempt_id):
         'responses_dict': responses_dict,
         'all_questions': all_questions,
         'answered_question_ids': answered_question_ids,
-        'can_review': quiz.show_results_immediately and quiz.allow_review,
+        'can_review': can_review,
     }
     
     return render(request, 'quiz/student/result_detail.html', context)
@@ -1079,13 +1238,18 @@ def student_quiz_result_print_view(request, attempt_id):
     ).order_by('question__order')
     
     # Get all questions to show unanswered ones
-    all_questions = quiz.questions.filter(school=school).prefetch_related(
+    all_questions = list(quiz.questions.filter(school=school).prefetch_related(
         Prefetch(
             'answer_choices',
             queryset=AnswerChoice.objects.filter(school=school),
         )
-    ).order_by('order')
-    answered_question_ids = set(responses.values_list('question_id', flat=True))
+    ).order_by('order'))
+    quiz, all_questions, responses = _attempt_review_snapshot(
+        attempt, quiz, all_questions, responses
+    )
+    answered_question_ids = {
+        response.question_id for response in responses
+    }
     
     # School information (school is already a SchoolInformation instance)
     school_info = school

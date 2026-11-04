@@ -45,6 +45,7 @@
         <!-- Filters -->
         <div class="row mb-3">
           <div class="col-md-2">
+            <label class="visually-hidden" for="searchInput">Search assignments</label>
             <input
               type="text"
               class="form-control"
@@ -54,6 +55,7 @@
             />
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="teacherFilter">Filter by teacher</label>
             <select class="form-select" id="teacherFilter">
               <option value="">All Teachers</option>
               {% for teacher in teachers %}
@@ -64,6 +66,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="subjectFilter">Filter by subject</label>
             <select class="form-select" id="subjectFilter">
               <option value="">All Subjects</option>
               {% for subject in subjects %}
@@ -74,6 +77,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="classFilter">Filter by class</label>
             <select class="form-select" id="classFilter">
               <option value="">All Classes</option>
               {% for class_obj in classes %}
@@ -84,6 +88,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="academicYearFilter">Filter by academic year</label>
             <select class="form-select" id="academicYearFilter">
               <option value="">All Academic Years</option>
               {% for ay in academic_years %}
@@ -94,6 +99,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="activeFilter">Filter by assignment status</label>
             <select class="form-select" id="activeFilter">
               <option value="">All Status</option>
               <option value="true" {% if active_filter == 'true' %}selected{% endif %}>Active</option>
@@ -184,4 +190,3 @@
 {% block extra_js %}
 <script src="{% static 'js/teacher_assignment_management.js' %}"></script>
 {% endblock extra_js %}
-

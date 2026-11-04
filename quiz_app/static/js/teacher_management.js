@@ -191,10 +191,10 @@
                     { orderable: false, targets: [0, 7] }
                 ],
                 deferRender: true,
-                // Handle empty tables gracefully
-                emptyTable: "No teachers found",
                 language: {
                     search: "Search:",
+                    emptyTable: "No teachers found. Add a teacher or change filters.",
+                    zeroRecords: "No teachers match the current filters.",
                     lengthMenu: "Show _MENU_ entries",
                     info: "Showing _START_ to _END_ of _TOTAL_ teachers",
                     infoEmpty: "No teachers found",

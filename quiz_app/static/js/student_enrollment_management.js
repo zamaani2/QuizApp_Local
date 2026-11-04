@@ -152,10 +152,10 @@
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
                 order: [[4, 'desc']],
                 deferRender: true,
-                // Handle empty tables gracefully
-                emptyTable: "No enrollments found",
                 language: {
                     search: "Search:",
+                    emptyTable: "No enrollments found. Enroll a student or change filters.",
+                    zeroRecords: "No enrollments match the current filters.",
                     lengthMenu: "Show _MENU_ entries",
                     info: "Showing _START_ to _END_ of _TOTAL_ enrollments",
                     infoEmpty: "No enrollments found",

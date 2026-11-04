@@ -31,13 +31,20 @@ function initializeMenuTreeview() {
 
         // Only process items that have a treeview
         if (navLink && treeview && arrow) {
+            navLink.setAttribute(
+                'aria-expanded',
+                item.classList.contains('menu-open') ? 'true' : 'false'
+            );
+
             // Initially hide the treeview
             if (!item.classList.contains('menu-open')) {
                 treeview.style.display = 'none';
             }
 
             // Add click handler to the nav link
-            navLink.addEventListener('click', function (e) {
+            if (navLink.dataset.treeviewHandlerAttached !== 'true') {
+                navLink.dataset.treeviewHandlerAttached = 'true';
+                navLink.addEventListener('click', function (e) {
                 // Prevent default if it's a hash link
                 if (navLink.getAttribute('href') === '#') {
                     e.preventDefault();
@@ -51,11 +58,13 @@ function initializeMenuTreeview() {
                     item.classList.remove('menu-open');
                     treeview.style.display = 'none';
                     arrow.style.transform = 'rotate(0deg)';
+                    navLink.setAttribute('aria-expanded', 'false');
                 } else {
                     // Open the menu
                     item.classList.add('menu-open');
                     treeview.style.display = 'block';
                     arrow.style.transform = 'rotate(90deg)';
+                    navLink.setAttribute('aria-expanded', 'true');
 
                     // If accordion mode is enabled, close other open menus
                     const sidebar = document.querySelector('.sidebar-menu');
@@ -72,11 +81,16 @@ function initializeMenuTreeview() {
                                 if (openArrow) {
                                     openArrow.style.transform = 'rotate(0deg)';
                                 }
+                                const openLink = openMenu.querySelector('.nav-link');
+                                if (openLink) {
+                                    openLink.setAttribute('aria-expanded', 'false');
+                                }
                             }
                         });
                     }
                 }
-            });
+                });
+            }
 
             // Set initial arrow rotation if menu is open
             if (item.classList.contains('menu-open')) {
@@ -91,4 +105,3 @@ function initializeMenuTreeview() {
         }
     });
 }
-

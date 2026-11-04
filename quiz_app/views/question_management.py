@@ -17,6 +17,7 @@ from django.views.decorators.http import require_http_methods
 from django.db.models import Q, Max, Prefetch
 from django.db import transaction
 from django.core.exceptions import ValidationError
+from django.db.models.deletion import ProtectedError
 import json
 import csv
 import io
@@ -591,6 +592,12 @@ def question_edit_view(request, quiz_id, question_id):
             messages.success(request, 'Question updated successfully.')
             return redirect("quiz_app:quiz_detail", quiz_id=quiz_id)
     
+    except ProtectedError:
+        message = "Answer choices in quizzes with attempts cannot be removed."
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': message}, status=400)
+        messages.error(request, message)
+        return redirect("quiz_app:question_edit", quiz_id=quiz_id, question_id=question_id)
     except Exception as e:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
@@ -619,6 +626,13 @@ def question_delete_view(request, quiz_id, question_id):
         quiz_filters['teacher'] = request.user.teacher_profile
     quiz = get_object_or_404(Quiz, **quiz_filters)
     question = get_object_or_404(Question, pk=question_id, quiz=quiz, school=school)
+
+    if quiz.attempts.exists():
+        message = "Questions in a quiz with attempts cannot be deleted."
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': message}, status=400)
+        messages.error(request, message)
+        return redirect("quiz_app:quiz_detail", quiz_id=quiz_id)
     
     try:
         question_text = question.question_text[:50]
@@ -1637,6 +1651,12 @@ def question_bulk_delete_view(request, quiz_id):
             return JsonResponse({
                 'success': False,
                 'error': 'One or more questions do not belong to this quiz.'
+            }, status=400)
+
+        if quiz.attempts.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Questions in a quiz with attempts cannot be deleted.',
             }, status=400)
         
         with transaction.atomic():

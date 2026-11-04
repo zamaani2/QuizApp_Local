@@ -1125,17 +1125,17 @@
 
 /* ===== DARK MODE SUPPORT ===== */
 @media (prefers-color-scheme: dark) {
-  .red-theme-page {
+  html[data-bs-theme="dark"] .red-theme-page {
     --red-light: #1a0f0f;
     --red-lighter: #2d1b1b;
   }
 
-  .red-theme-page .card {
+  html[data-bs-theme="dark"] .red-theme-page .card {
     background: var(--red-lighter);
     color: white;
   }
 
-  .red-theme-page .table {
+  html[data-bs-theme="dark"] .red-theme-page .table {
     color: white;
   }
 }

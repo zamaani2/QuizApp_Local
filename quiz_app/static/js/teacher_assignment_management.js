@@ -150,10 +150,10 @@
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
                 order: [[5, 'desc']],
                 deferRender: true,
-                // Handle empty tables gracefully
-                emptyTable: "No assignments found",
                 language: {
                     search: "Search:",
+                    emptyTable: "No assignments found. Add an assignment or change filters.",
+                    zeroRecords: "No assignments match the current filters.",
                     lengthMenu: "Show _MENU_ entries",
                     info: "Showing _START_ to _END_ of _TOTAL_ assignments",
                     infoEmpty: "No assignments found",
@@ -896,4 +896,3 @@
     }
 
 })(jQuery);
-

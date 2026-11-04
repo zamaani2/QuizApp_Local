@@ -48,12 +48,28 @@ cp .env.example .env
 Edit `.env` file with your database credentials:
 
 ```env
+DEBUG=True
+SECRET_KEY=your-local-development-secret
 DB_NAME=quiz_system_db
 DB_USER=postgres
 DB_PASSWORD=your_postgres_password
 DB_HOST=localhost
 DB_PORT=5432
 ```
+
+`DEBUG=True` is for local development only. It prevents the production-only
+database credential check from running; it does not switch the application to
+SQLite. PostgreSQL must still be running locally, the database must exist, and
+the credentials must be valid. `python-dotenv` is installed by
+`pip install -r requirements.txt`, so Django loads the project-root `.env`.
+The development server can then be started with:
+
+```powershell
+python manage.py runserver
+```
+
+If you do not use `.env`, set the equivalent variables in the current shell
+before starting Django. Do not set `DEBUG=True` in production.
 
 ### 3. Update settings.py (Optional)
 

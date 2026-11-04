@@ -1722,17 +1722,17 @@
 
 /* ===== DARK MODE SUPPORT ===== */
 @media (prefers-color-scheme: dark) {
-  .academic-pro-theme-page {
+  html[data-bs-theme="dark"] .academic-pro-theme-page {
     --academic-light: #0f172a;
     --academic-lighter: #1e293b;
   }
 
-  .academic-pro-theme-page .card {
+  html[data-bs-theme="dark"] .academic-pro-theme-page .card {
     background: var(--academic-lighter);
     color: white;
   }
 
-  .academic-pro-theme-page .table {
+  html[data-bs-theme="dark"] .academic-pro-theme-page .table {
     color: white;
   }
 }

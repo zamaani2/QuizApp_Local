@@ -3,6 +3,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
+from django.db.models.deletion import ProtectedError
 from django.utils.text import slugify
 import random
 import string
@@ -2547,12 +2548,14 @@ class QuizAttempt(models.Model):
             answer_order[str(question.pk)] = choice_ids
             question_snapshots[str(question.pk)] = {
                 "question_id": question.pk,
+                "order": question.order,
                 "question_text": question.question_text,
                 "question_type": question.question_type,
                 "marks": question.marks,
                 "negative_marks": question.negative_marks,
                 "partial_credit": question.partial_credit,
                 "correct_answer_text": question.correct_answer_text or "",
+                "explanation": question.explanation or "",
                 "choices": {
                     str(choice.pk): {
                         "text": choice.choice_text,
@@ -3308,3 +3311,23 @@ def update_quiz_total_marks(sender, instance, **kwargs):
 def update_quiz_total_marks_on_delete(sender, instance, **kwargs):
     """Update quiz total marks when questions are deleted"""
     instance.quiz.calculate_total_marks()
+
+
+@receiver(pre_delete, sender=Question)
+def protect_questions_used_by_attempts(sender, instance, **kwargs):
+    if instance.quiz.attempts.exists():
+        raise ProtectedError(
+            "Questions in a quiz with attempts cannot be deleted.",
+            [instance],
+        )
+
+
+@receiver(pre_delete, sender=AnswerChoice)
+def protect_choices_used_by_attempts(sender, instance, **kwargs):
+    if instance.question.quiz.attempts.exists() or QuizResponse.objects.filter(
+        Q(selected_choice=instance) | Q(selected_choices=instance)
+    ).exists():
+        raise ProtectedError(
+            "Answer choices in quizzes with attempts cannot be deleted.",
+            [instance],
+        )

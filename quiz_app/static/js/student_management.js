@@ -207,10 +207,10 @@
                 colReorder: false,
                 // Use deferRender for better performance and to avoid cell access issues
                 deferRender: true,
-                // Handle empty tables gracefully
-                emptyTable: "No students found",
                 language: {
                     search: "Search:",
+                    emptyTable: "No students found. Add a student or change filters.",
+                    zeroRecords: "No students match the current filters.",
                     lengthMenu: "Show _MENU_ entries",
                     info: "Showing _START_ to _END_ of _TOTAL_ students",
                     infoEmpty: "No students found",

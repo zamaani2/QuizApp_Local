@@ -69,6 +69,7 @@
         <!-- Filters -->
         <div class="row mb-3">
           <div class="col-md-3">
+            <label class="visually-hidden" for="searchInput">Search teachers</label>
             <input
               type="text"
               class="form-control"
@@ -78,6 +79,7 @@
             />
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="departmentFilter">Filter by department</label>
             <select class="form-select" id="departmentFilter">
               <option value="">All Departments</option>
               {% for dept in departments %}
@@ -88,6 +90,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="genderFilter">Filter by gender</label>
             <select class="form-select" id="genderFilter">
               <option value="">All Genders</option>
               <option value="M" {% if gender_filter == 'M' %}selected{% endif %}>Male</option>
@@ -95,6 +98,7 @@
             </select>
           </div>
           <div class="col-md-2">
+            <label class="visually-hidden" for="statusFilter">Filter by teacher status</label>
             <select class="form-select" id="statusFilter">
               <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Teachers</option>
               <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived Teachers</option>
@@ -113,7 +117,7 @@
           <thead>
             <tr>
               <th width="30">
-                <input type="checkbox" id="selectAll" />
+                <input type="checkbox" id="selectAll" aria-label="Select all teachers on this page" />
               </th>
               <th>Staff ID</th>
               <th>Full Name</th>
@@ -128,7 +132,7 @@
             {% for teacher in teachers %}
             <tr data-teacher-id="{{ teacher.id }}">
               <td>
-                <input type="checkbox" class="teacher-checkbox" value="{{ teacher.id }}" />
+                <input type="checkbox" class="teacher-checkbox" value="{{ teacher.id }}" aria-label="Select {{ teacher.full_name }}" />
               </td>
               <td>{{ teacher.staff_id }}</td>
               <td>

@@ -155,10 +155,10 @@
                     { orderable: false, targets: [7] }  // Actions column (7)
                 ],
                 deferRender: true,
-                // Handle empty tables gracefully
-                emptyTable: "No classes found",
                 language: {
                     search: "Search:",
+                    emptyTable: "No classes found. Add a class or change filters.",
+                    zeroRecords: "No classes match the current filters.",
                     lengthMenu: "Show _MENU_ entries",
                     info: "Showing _START_ to _END_ of _TOTAL_ classes",
                     infoEmpty: "No classes found",
