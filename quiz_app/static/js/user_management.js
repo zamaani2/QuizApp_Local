@@ -332,7 +332,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // Confirm bulk password reset
     function confirmBulkPasswordReset(selectedUsers) {
         const userIds = Array.from(selectedUsers).map(cb => cb.value);
-        const defaultPassword = document.getElementById('defaultPassword').value || '0000';
         const targetSchool = document.getElementById('bulkPasswordResetSchoolId');
         if (targetSchool && !targetSchool.value) {
             showToast('Warning', 'Choose the school that owns the selected users.', 'warning');
@@ -348,7 +347,6 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             body: JSON.stringify({
                 user_ids: userIds,
-                default_password: defaultPassword,
                 school_id: targetSchool ? targetSchool.value : null
             })
         })
@@ -368,7 +366,7 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .catch(error => {
                 console.error('Error:', error);
-                showToast('Error', 'An error occurred while resetting passwords.', 'error');
+                showToast('Error', 'An error occurred while sending reset links.', 'error');
             });
     }
 

@@ -2,5 +2,15 @@
 .env.*
 !.env.example
 *.env
+
+*.sqlite3
+*.sqlite
+*.db
+/media/
+/staticfiles/
+
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

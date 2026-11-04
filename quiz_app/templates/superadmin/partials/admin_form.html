@@ -58,6 +58,7 @@
       </div>
     </div>
     
+    {% if admin %}
     <div class="row">
       <div class="col-md-6">
         <div class="mb-3">
@@ -74,22 +75,18 @@
       </div>
       <div class="col-md-6">
         <div class="mb-3">
-          <label for="password" class="form-label">
-            Password {% if admin %}(leave blank to keep current){% else %}<span class="text-danger">*</span>{% endif %}
-          </label>
+          <label for="password" class="form-label">Password</label>
           <input
             type="password"
             class="form-control"
             id="password"
             name="password"
-            {% if not admin %}required{% endif %}
-            placeholder="{% if admin %}Enter new password (optional){% else %}Enter password{% endif %}"
+            placeholder="Enter new password (optional)"
           />
+          <small class="text-muted">Leave blank to keep the current password.</small>
         </div>
       </div>
     </div>
-    
-    {% if admin %}
     <div class="row">
       <div class="col-md-12">
         <div class="mb-3">
@@ -106,6 +103,26 @@
             </label>
           </div>
         </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="school" class="form-label">School <span class="text-danger">*</span></label>
+          <select class="form-select" id="school" name="school" required>
+            <option value="">Select School</option>
+            {% for school in schools %}
+            <option value="{{ school.id }}">{{ school.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <p class="form-text text-muted">
+          The administrator will receive a secure, time-limited password setup
+          link. No password is sent by email.
+        </p>
       </div>
     </div>
     {% endif %}

@@ -1,83 +1,41 @@
-"""Test script to diagnose Supabase database connection"""
-import os
-import sys
+"""Test a PostgreSQL connection supplied through DATABASE_URL."""
 
-# Test 1: Direct connection with individual parameters
-print("=" * 60)
-print("Test 1: Direct connection with individual parameters")
-print("=" * 60)
+import os
+import socket
+import sys
+from urllib.parse import urlparse
 
 try:
     import psycopg2
-    
-    conn_params = {
-        'host': 'db.emqcixyklluxufekncir.supabase.co',
-        'database': 'postgres',
-        'user': 'postgres',
-        'password': 'Sakora@12@1',
-        'port': 5432,
-        'connect_timeout': 10,
-    }
-    
-    print(f"Attempting to connect to: {conn_params['host']}")
-    conn = psycopg2.connect(**conn_params)
-    print("[SUCCESS] Connection successful!")
-    conn.close()
-except Exception as e:
-    print(f"[FAILED] Connection failed: {e}")
-    print(f"Error type: {type(e).__name__}")
+except ImportError:
+    print("Install psycopg2 to run this connection check.")
+    sys.exit(2)
 
-# Test 2: Connection string format
-print("\n" + "=" * 60)
-print("Test 2: Connection string format (URL-encoded password)")
-print("=" * 60)
+database_url = os.environ.get("DATABASE_URL")
+if not database_url:
+    print("Set DATABASE_URL to a PostgreSQL connection URI before running this check.")
+    sys.exit(2)
+
+parsed_url = urlparse(database_url)
+if parsed_url.scheme not in ("postgres", "postgresql") or not parsed_url.hostname:
+    print("DATABASE_URL must be a PostgreSQL connection URI with a hostname.")
+    sys.exit(2)
 
 try:
-    import urllib.parse
-    encoded_password = urllib.parse.quote('Sakora@12@1', safe='')
-    conn_string = f"postgresql://postgres:{encoded_password}@db.emqcixyklluxufekncir.supabase.co:5432/postgres?sslmode=require"
-    print(f"Connection string: postgresql://postgres:***@db.emqcixyklluxufekncir.supabase.co:5432/postgres")
-    conn = psycopg2.connect(conn_string)
-    print("[SUCCESS] Connection successful!")
-    conn.close()
-except Exception as e:
-    print(f"[FAILED] Connection failed: {e}")
-    print(f"Error type: {type(e).__name__}")
+    addresses = socket.getaddrinfo(
+        parsed_url.hostname, parsed_url.port or 5432, type=socket.SOCK_STREAM
+    )
+except socket.gaierror as exc:
+    print(f"[FAILED] DNS resolution failed ({type(exc).__name__}).")
+    sys.exit(1)
 
-# Test 3: Check DNS resolution
-print("\n" + "=" * 60)
-print("Test 3: DNS Resolution Check")
-print("=" * 60)
+print(f"[SUCCESS] DNS resolved to {len(addresses)} address record(s).")
 
 try:
-    import socket
-    hostname = 'db.emqcixyklluxufekncir.supabase.co'
-    print(f"Resolving hostname: {hostname}")
-    
-    # Try IPv4
-    try:
-        ipv4 = socket.gethostbyname(hostname)
-        print(f"[SUCCESS] IPv4 address: {ipv4}")
-    except socket.gaierror as e:
-        print(f"[FAILED] IPv4 resolution failed: {e}")
-    
-    # Try IPv6
-    try:
-        ipv6 = socket.getaddrinfo(hostname, 5432, socket.AF_INET6)[0][4][0]
-        print(f"[SUCCESS] IPv6 address: {ipv6}")
-    except Exception as e:
-        print(f"[FAILED] IPv6 resolution failed: {e}")
-        
-except Exception as e:
-    print(f"[FAILED] DNS check failed: {e}")
+    with psycopg2.connect(database_url, connect_timeout=10):
+        pass
+except psycopg2.Error as exc:
+    print(f"[FAILED] PostgreSQL connection failed ({type(exc).__name__}).")
+    sys.exit(1)
 
-print("\n" + "=" * 60)
-print("Recommendations:")
-print("=" * 60)
-print("1. Verify your Supabase project is active and fully provisioned")
-print("2. Check if you need to use Connection Pooling URL instead")
-print("3. Verify your database password is correct")
-print("4. Check Windows firewall settings")
-print("5. Try using Supabase's connection pooler: aws-0-[region].pooler.supabase.com")
-print("=" * 60)
-
+print("[SUCCESS] PostgreSQL connection successful.")

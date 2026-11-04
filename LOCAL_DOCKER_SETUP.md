@@ -45,6 +45,16 @@ Set `DB_NAME` and `DB_USER` too if the database volume was initialized with
 non-default values. These environment variables take precedence over values
 from `.env`.
 
+### Email delivery
+
+Account creation sends a password setup link, never a password. Configure
+`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and the
+appropriate TLS setting in the ignored `.env` before creating accounts.
+`EMAIL_BACKEND` uses SMTP so reset tokens are not printed to console logs.
+If SMTP delivery fails, the account remains created; users can request a new
+link from the login page's **Forgot your password?** link. Password reset
+responses do not reveal whether an email address has an account.
+
 The host port defaults to `8000`. If another local service already uses it,
 set `APP_PORT` to an available port (for example `18080`) and update
 `CSRF_TRUSTED_ORIGINS` and `SITE_URL` to use that port:

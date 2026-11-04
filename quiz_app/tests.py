@@ -1699,7 +1699,7 @@ class SchoolScopedManagementEndpointTests(TestCase):
             User.objects.filter(username="unauthorized-superadmin").exists()
         )
 
-    def test_superadmin_admin_create_requires_a_nondefault_password(self):
+    def test_superadmin_admin_create_uses_password_setup_link(self):
         superadmin = User.objects.create_user(
             username="superadmin-create-admin",
             email="superadmin-create-admin@example.test",
@@ -1715,15 +1715,13 @@ class SchoolScopedManagementEndpointTests(TestCase):
             "school": self.school_a.pk,
         }
 
-        missing_password = self.client.post(url, data=payload)
-        self.assertEqual(missing_password.status_code, 400)
-        self.assertFalse(User.objects.filter(username="new-school-admin").exists())
-
-        payload["password"] = "Long-Unique-Password-8392"
         created = self.client.post(url, data=payload)
         self.assertEqual(created.status_code, 200, created.content)
         created_admin = User.objects.get(username="new-school-admin")
-        self.assertTrue(created_admin.check_password(payload["password"]))
+        self.assertEqual(created_admin.role, "admin")
+        self.assertEqual(created_admin.school, self.school_a)
+        self.assertTrue(created_admin.is_active)
+        self.assertTrue(created_admin.has_usable_password())
         self.assertFalse(created_admin.check_password("0000"))
 
     def test_superadmin_student_create_requires_and_uses_target_school(self):

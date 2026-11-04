@@ -11,6 +11,10 @@ from django.views.decorators.http import require_http_methods
 from django.db.models import Q
 from django.db import transaction
 
+from ..account_security import (
+    generate_account_setup_password,
+    schedule_password_setup_email,
+)
 from ..models import (
     User,
     SchoolInformation,
@@ -97,15 +101,13 @@ def superadmin_admin_create_view(request):
             username = request.POST.get('username', '').strip()
             email = request.POST.get('email', '').strip()
             full_name = request.POST.get('full_name', '').strip()
-            password = request.POST.get('password', '').strip()
             school_id = request.POST.get('school', '').strip()
-            is_active = request.POST.get('is_active', '') == 'on'
             
             # Validation
-            if not all([username, email, full_name, school_id, password]):
+            if not all([username, email, full_name, school_id]):
                 return JsonResponse({
                     'success': False,
-                    'error': 'Username, email, full name, school, and password are required.'
+                    'error': 'Username, email, full name, and school are required.'
                 }, status=400)
             
             # Check if username already exists
@@ -135,16 +137,21 @@ def superadmin_admin_create_view(request):
             admin = User.objects.create_user(
                 username=username,
                 email=email,
-                password=password,
+                password=generate_account_setup_password(),
                 full_name=full_name,
                 role="admin",
                 school=school,
-                is_active=is_active,
+                is_active=True,
             )
+            schedule_password_setup_email(admin)
             
             return JsonResponse({
                 'success': True,
-                'message': f'Administrator {admin.full_name} created successfully for {school.name}.',
+                'message': (
+                    f'Administrator {admin.full_name} created successfully for '
+                    f'{school.name}. A password setup link will be sent to the '
+                    'provided email.'
+                ),
                 'admin_id': admin.id
             })
     
@@ -293,7 +300,6 @@ def superadmin_admin_detail_view(request, admin_id):
     }
     
     return render(request, 'superadmin/admin_detail.html', context)
-
 
 
 

@@ -29,6 +29,14 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment or an optional .env file}
       DB_PORT: ${DB_PORT:-5432}
       SITE_URL: ${SITE_URL:-http://localhost:8000}
+      EMAIL_HOST: ${EMAIL_HOST:-localhost}
+      EMAIL_PORT: ${EMAIL_PORT:-25}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-False}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-False}
+      EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-10}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@schoolsystem.com}
     depends_on:
       db:
         condition: service_healthy

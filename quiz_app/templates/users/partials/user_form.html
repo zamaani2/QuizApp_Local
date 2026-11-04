@@ -78,28 +78,31 @@
             </div>
           </div>
           <div class="row">
+            {% if user %}
             <div class="col-md-6 mb-3">
               <label for="password" class="form-label">
                 Password
-                {% if not user %}<span class="text-danger">*</span>{% endif %}
               </label>
               <input
                 type="password"
                 class="form-control"
                 id="password"
                 name="password"
-                {% if not user %}required{% endif %}
-                placeholder="{% if user %}Leave blank to keep current password{% else %}Default: 0000{% endif %}"
+                placeholder="Leave blank to keep current password"
               />
               <small class="form-text text-muted">
-                {% if user %}
                 Leave blank to keep the current password.
-                {% else %}
-                If left blank, default password "0000" will be used.
-                {% endif %}
               </small>
               <div class="invalid-feedback"></div>
             </div>
+            {% else %}
+            <div class="col-md-6 mb-3">
+              <p class="form-text text-muted">
+                The user will receive a secure, time-limited password setup link
+                at this email address. No password is sent by email.
+              </p>
+            </div>
+            {% endif %}
             <div class="col-md-6 mb-3">
               <label for="school" class="form-label">School</label>
               <select class="form-select" id="school" name="school">
@@ -130,4 +133,3 @@
     </div>
   </div>
 </div>
-

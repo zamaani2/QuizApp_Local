@@ -17,6 +17,12 @@ from django.views.decorators.http import require_http_methods
 from django.db.models import Q
 from django.db import transaction
 
+from ..account_security import (
+    can_receive_password_setup_email,
+    generate_account_setup_password,
+    schedule_password_setup_email,
+)
+
 User = get_user_model()
 
 from ..models import SchoolInformation
@@ -119,7 +125,6 @@ def user_create_view(request):
             email = request.POST.get('email', '').strip()
             full_name = request.POST.get('full_name', '').strip()
             role = request.POST.get('role', '').strip()
-            password = request.POST.get('password', '').strip()
             school_id = request.POST.get('school', '') or None
             
             # Validation
@@ -181,23 +186,24 @@ def user_create_view(request):
                     'error': 'Select an active school for this user.'
                 }, status=400)
             
-            # Set default password if not provided
-            if not password:
-                password = "0000"
-            
-            # Create user
+            # Give new users an unknown random password and email a one-time
+            # password setup link instead of collecting or distributing one.
             user = User.objects.create_user(
                 username=username,
                 email=email,
-                password=password,
+                password=generate_account_setup_password(),
                 full_name=full_name,
                 role=role,
                 school=user_school,
             )
+            schedule_password_setup_email(user)
             
             return JsonResponse({
                 'success': True,
-                'message': f'User {user.full_name} created successfully.',
+                'message': (
+                    f'User {user.full_name} created successfully. '
+                    'A password setup link will be sent to the provided email.'
+                ),
                 'user_id': user.id
             })
     
@@ -395,10 +401,10 @@ def user_delete_view(request, user_id):
 @require_http_methods(["GET", "POST"])
 def user_bulk_password_reset_view(request):
     """
-    Bulk password reset for users.
+    Send password reset links to selected users without changing their passwords.
     
     GET: Returns bulk password reset modal
-    POST: Resets passwords for multiple users to default "0000"
+    POST: Sends one-time password reset links to selected users
     """
     if request.user.role not in ["admin", "superadmin"]:
         if request.method == "GET":
@@ -415,12 +421,11 @@ def user_bulk_password_reset_view(request):
         }).content.decode('utf-8')
         return JsonResponse({'html': html})
     
-    # POST - Bulk password reset
+    # POST - Send password reset links
     try:
         import json
         data = json.loads(request.body)
         user_ids = data.get('user_ids', [])
-        default_password = data.get('default_password', '0000')
         
         if not isinstance(user_ids, list) or not user_ids:
             return JsonResponse({
@@ -442,9 +447,6 @@ def user_bulk_password_reset_view(request):
                 'error': 'User IDs must be unique.'
             }, status=400)
         
-        if not default_password:
-            default_password = "0000"
-        
         school = get_write_school(request, data.get('school_id'))
         if school is None:
             return JsonResponse({
@@ -453,6 +455,7 @@ def user_bulk_password_reset_view(request):
             }, status=400)
         users = User.objects.filter(pk__in=user_ids)
         users = users.filter(school=school)
+        users = users.select_related("student_profile", "teacher_profile")
         
         # Exclude superadmin from regular admin
         if request.user.role == "admin":
@@ -461,21 +464,26 @@ def user_bulk_password_reset_view(request):
         # Prevent resetting your own password
         users = users.exclude(pk=request.user.pk)
         
-        count = users.count()
-        if count != len(user_ids):
+        selected_users = list(users)
+        if len(selected_users) != len(user_ids):
             return JsonResponse({
                 'success': False,
-                'error': 'One or more selected users are invalid or cannot be reset.'
+                'error': 'One or more selected users are invalid or cannot receive reset links.'
             }, status=400)
-        
+
+        if any(not can_receive_password_setup_email(user) for user in selected_users):
+            return JsonResponse({
+                'success': False,
+                'error': 'All selected users must have active accounts and deliverable email addresses.'
+            }, status=400)
+
         with transaction.atomic():
-            for user in users:
-                user.set_password(default_password)
-                user.save()
+            for user in selected_users:
+                schedule_password_setup_email(user)
         
         return JsonResponse({
             'success': True,
-            'message': f'Password reset successfully for {count} user(s). Default password: {default_password}'
+            'message': f'Password reset links queued for {len(selected_users)} user(s). Their current passwords are unchanged.'
         })
     
     except Exception as e:

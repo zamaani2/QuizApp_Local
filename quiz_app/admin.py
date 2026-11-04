@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
+from .account_security import schedule_password_setup_email
 from .models import (
     User,
     AcademicYear,
@@ -49,6 +50,11 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('role', 'full_name', 'email', 'school', 'is_superadmin')
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            schedule_password_setup_email(obj)
 
 
 @admin.register(AcademicYear)

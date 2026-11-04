@@ -11,12 +11,7 @@ from django.db.models import Q
 from django.db.models.signals import post_save, pre_delete, post_delete
 from django.dispatch import receiver
 from django.contrib.auth.hashers import make_password
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from django.conf import settings
-from django.urls import reverse
 import secrets
-import logging
 from django.apps import apps
 
 from django.core.exceptions import ValidationError
@@ -90,47 +85,6 @@ def generate_secure_password(length=12):
     secrets.SystemRandom().shuffle(password_list)
 
     return "".join(password_list)
-
-
-def send_user_credentials_email(user, password):
-    """
-    Send email with login credentials to the user.
-    """
-    try:
-        # Get school information
-        school_info = SchoolInformation.get_active()
-
-        # Build the login URL
-        login_url = f"{settings.SITE_URL}{reverse('login')}"
-
-        # Prepare context for email template
-        context = {
-            "user": user,
-            "password": password,
-            "school_name": (
-                school_info.name if school_info else "School Management System"
-            ),
-            "school_address": school_info.address if school_info else "",
-            "login_url": login_url,
-        }
-
-        # Render email template
-        email_html = render_to_string("emails/user_credentials.html", context)
-
-        # Send email
-        send_mail(
-            subject=f'Your {context["school_name"]} Account Credentials',
-            message=f"Your username is {user.username} and password is {password}. Please login at {login_url}",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            html_message=email_html,
-            fail_silently=False,
-        )
-
-        return True
-    except Exception as e:
-        print(f"Failed to send email: {str(e)}")
-        return False
 
 
 class User(AbstractUser):
@@ -1489,7 +1443,7 @@ def create_student_user(sender, instance, created, **kwargs):
 
     This function creates a user account when a new student is created,
     with username based on admission number and a secure random password.
-    The credentials are sent to the student via email.
+    A password setup link is sent instead of emailing the generated password.
     """
     if created:
         # Check if a user already exists for this student
@@ -1521,12 +1475,11 @@ def create_student_user(sender, instance, created, **kwargs):
             school=instance.school,  # Set the school from the student instance
         )
 
-        # Store the plain password temporarily for sending to the student
-        instance.temp_password = password
-
-        # Send credentials via email if student has email
+        # Send a password setup link only to a supplied email address.
         if instance.email:
-            send_user_credentials_email(user, password)
+            from .account_security import schedule_password_setup_email
+
+            schedule_password_setup_email(user)
 
 
 @receiver(pre_delete, sender=Student)
@@ -1548,7 +1501,7 @@ def create_teacher_user(sender, instance, created, **kwargs):
 
     This function creates a user account when a new teacher is created,
     with username based on staff_id and a secure random password.
-    The credentials are sent to the teacher via email.
+    A password setup link is sent instead of emailing the generated password.
     """
     if created and not instance.skip_user_creation:
         # Check if a user already exists for this teacher
@@ -1580,12 +1533,11 @@ def create_teacher_user(sender, instance, created, **kwargs):
             school=instance.school,  # Set the school from the teacher instance
         )
 
-        # Store the plain password temporarily for sending to the teacher
-        instance.temp_password = password
-
-        # Send credentials via email if teacher has email
+        # Send a password setup link only to a supplied email address.
         if instance.email:
-            send_user_credentials_email(user, password)
+            from .account_security import schedule_password_setup_email
+
+            schedule_password_setup_email(user)
 
 
 @receiver(pre_delete, sender=Teacher)

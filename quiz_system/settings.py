@@ -253,8 +253,26 @@ CSRF_COOKIE_SECURE = not DEBUG
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Email settings (for development)
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Password-reset links contain bearer tokens, so use SMTP rather than a
+# console backend that would write the links to application logs.
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "False").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@schoolsystem.com")
 
 # SITE_URL: Base URL for the application (used in emails, links, etc.)
