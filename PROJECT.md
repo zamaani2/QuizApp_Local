@@ -41,15 +41,18 @@ secret when none is supplied.
   learning area. `ClassSubject` allocates a subject to a class for an academic
   year.
 - `StudentClass` records student-to-class enrollment and has active status,
-  school, assignment date, and assigning user. The class carries the academic
-  year.
+  school, assignment date, and assigning user. It references the class rather
+  than storing a separate year; the enrollment's academic year is therefore
+  the class's `academic_year` and must not be changed after enrollment history
+  exists.
 - `TeacherSubjectAssignment` connects teacher, subject, class, and academic
   year, with school, active status, assigning user, and reassignment history.
   `ClassTeacher` separately records class-teacher responsibility.
 - `Quiz` belongs to a subject, teacher, school, and optionally an academic
   year and term. Its `classes` many-to-many relation represents quiz
   assignment to classes. `QuizAttempt` and `QuizResponse` store student
-  attempts and answers.
+  attempts, answers, scores, academic-year/term context, and configuration
+  snapshots. Changing current enrollment does not rewrite a past attempt.
 - No separate student-homework/assignment model was identified in the current
   model definitions. Teacher-subject allocation and quiz-to-class assignment
   are distinct existing workflows and must not be presented as student
@@ -93,6 +96,31 @@ submitted relation belongs to the same school.
 - A student should have no more than one active class enrollment at a time in
   the school. A transfer or promotion closes the old active enrollment and
   creates a new year/class enrollment; it does not erase the old enrollment.
+- Editing or reactivating a historical enrollment creates a new row instead
+  of changing the old student's/class relationship or reactivating that row.
+  Student identity on an enrollment is immutable; class transfers are new
+  enrollments.
+- Existing-student enrollment actions do not move a student across academic
+  years. That transition is treated as promotion and is blocked until school
+  eligibility and approval rules are defined.
+- Student imports create new student profiles only. If class assignment is
+  requested, the selected class must be active, belong to the target school,
+  belong to that school's current academic year, and pass normal enrollment
+  validation including capacity. Imports do not promote or update existing
+  students.
+- Enrollment and transfer operations currently require the student and class
+  to belong to the same school. There is no separate cross-school transfer
+  history model or workflow; changing `Student.school` in place would make
+  existing enrollment rows inconsistent and is not supported.
+- `Student.is_active` represents active versus archived profile state. There
+  is no distinct withdrawn status, withdrawal date, or reason in the current
+  model; archiving must not be presented as a policy-defined withdrawal.
+- A class's academic year cannot be changed after enrollments, teaching
+  assignments, subject allocations, or quiz assignments exist. Academic years
+  and terms referenced by classes, quizzes, or attempts cannot be hard-deleted
+  through the management views or Django admin. Quizzes with attempts cannot
+  be hard-deleted, and student, enrollment, attempt, and response records
+  cannot be deleted through Django admin.
 - Enforce class capacity on the server in a transaction so concurrent
   enrollment cannot exceed the configured limit. Enrollment creation locks
   the target class, treats repeated assignment to the same class as

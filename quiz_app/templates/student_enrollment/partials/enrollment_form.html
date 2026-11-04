@@ -13,28 +13,38 @@
           <div class="row">
             <div class="col-md-6">
               <div class="mb-3">
+                {% if enrollment %}
+                <span class="form-label">Student</span>
+                <p class="form-control-plaintext">
+                  {{ enrollment.student.full_name }} ({{ enrollment.student.admission_number }})
+                </p>
+                {% else %}
                 <label for="student" class="form-label">Student <span class="text-danger">*</span></label>
                 <select class="form-select" id="student" name="student" required>
                   <option value="">Select Student</option>
                   {% for student in students %}
-                  <option value="{{ student.id }}" {% if enrollment and enrollment.student.id == student.id %}selected{% endif %}>
-                    {{ student.full_name }} ({{ student.admission_number }})
-                  </option>
+                  <option value="{{ student.id }}">{{ student.full_name }} ({{ student.admission_number }})</option>
                   {% endfor %}
                 </select>
+                {% endif %}
               </div>
             </div>
             <div class="col-md-6">
               <div class="mb-3">
+                {% if enrollment %}
+                <span class="form-label">Class and academic year</span>
+                <p class="form-control-plaintext">
+                  {{ enrollment.assigned_class.name }} ({{ enrollment.assigned_class.academic_year.name }})
+                </p>
+                {% else %}
                 <label for="assigned_class" class="form-label">Class <span class="text-danger">*</span></label>
                 <select class="form-select" id="assigned_class" name="assigned_class" required>
                   <option value="">Select Class</option>
                   {% for class_obj in classes %}
-                  <option value="{{ class_obj.id }}" {% if enrollment and enrollment.assigned_class.id == class_obj.id %}selected{% endif %}>
-                    {{ class_obj.name }} ({{ class_obj.academic_year.name }})
-                  </option>
+                  <option value="{{ class_obj.id }}">{{ class_obj.name }} ({{ class_obj.academic_year.name }})</option>
                   {% endfor %}
                 </select>
+                {% endif %}
               </div>
             </div>
           </div>
@@ -68,7 +78,11 @@
           {% endif %}
           <div class="alert alert-warning">
             <i class="bi bi-exclamation-triangle me-2"></i>
-            <strong>Note:</strong> If the student already has an active class assignment, it will be deactivated and replaced with the new assignment.
+            {% if enrollment %}
+            <strong>Note:</strong> Student and class history are fixed for this record. Use Assign Student to Class to transfer the student; the prior enrollment will remain in history.
+            {% else %}
+            <strong>Note:</strong> If the student has an active enrollment, it will be deactivated and retained when the new class enrollment is created.
+            {% endif %}
           </div>
         </div>
         <div class="modal-footer">
@@ -81,4 +95,3 @@
     </div>
   </div>
 </div>
-

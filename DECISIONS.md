@@ -84,16 +84,35 @@ relationships.
 
 No promotion operation is implemented. Before adding one, decide:
 
-- Whether promotion is an explicit administrator action or a school-year
-  transition, and which students are eligible.
+- Whether promotion is a manual administrator action or an automatic
+  school-year transition, and which students are eligible.
+- How failed students, repeaters, students who do not meet promotion
+  requirements, and graduating students are handled.
 - Which target academic year, term, and class are selected, and how capacity
   and students without a valid target class are handled.
 - Which role may approve promotion and whether the operation is reversible.
 - Whether a promotion closes the current enrollment and creates a new
   `StudentClass` row, preserving the prior enrollment as history.
 
-Until these rules are approved, use existing enrollment and transfer workflows;
-do not infer a promotion from edits, imports, or archive/restore actions.
+Until these rules are approved, do not implement or infer promotion eligibility
+or progression behavior. Existing enrollment/transfer actions are explicit
+class assignments, not promotion decisions; imports only create new students
+and do not update or advance existing records.
+
+## Student transfer and withdrawal limits
+
+The current enrollment flow supports class changes within one school by
+retaining the old `StudentClass` row and creating a new one. It does not support
+moving a student identity between schools: `Student.school` is the owning
+school for all related enrollments, and no separate school-transfer history
+model exists. Do not change that field in place to simulate a cross-school
+transfer. A supported workflow requires an approved identity, admission-number,
+account, and historical-school policy.
+
+The student model has only an active/archive flag and no distinct withdrawn
+status, date, or reason. Do not treat archive/restore as a withdrawal decision;
+add withdrawal behavior only after its meaning and downstream access rules are
+specified.
 
 ## Teacher-subject allocation is unique per class and year
 
@@ -114,6 +133,17 @@ inactive enrollment rows remain as history.
 
 **Reason:** Capacity-aware application checks must also be protected against
 concurrent duplicate enrollment writes without deleting transfer history.
+
+Enrollment identity and class/year context are historical data. Editing a
+student's enrollment cannot change its student identity; changing class or
+reactivating an inactive record creates a new enrollment row. A class's
+academic year cannot be changed after enrollment, allocation, teaching, or
+quiz-assignment history exists. Referenced academic years and terms are
+retained rather than hard-deleted. Generic enrollment actions reject moving a
+student with existing enrollment history into a different academic year until
+the promotion policy above is approved. Student/class enrollment records,
+attempts, and responses cannot be hard-deleted through Django admin, and a
+quiz with recorded attempts cannot be deleted through its management workflow.
 
 ## 2026-11-02 — Class capacity and quiz rules are server-enforced
 

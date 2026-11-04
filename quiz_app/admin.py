@@ -31,6 +31,11 @@ from .models import (
 
 
 # Custom User Admin
+class PreserveAcademicHistoryAdminMixin:
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """Custom admin for User model"""
@@ -58,7 +63,7 @@ class UserAdmin(BaseUserAdmin):
 
 
 @admin.register(AcademicYear)
-class AcademicYearAdmin(admin.ModelAdmin):
+class AcademicYearAdmin(PreserveAcademicHistoryAdminMixin, admin.ModelAdmin):
     """Admin for AcademicYear model"""
     list_display = ['name', 'school', 'start_date', 'end_date', 'is_current', 'get_duration_days']
     list_filter = ['is_current', 'school', 'start_date']
@@ -71,7 +76,7 @@ class AcademicYearAdmin(admin.ModelAdmin):
 
 
 @admin.register(Term)
-class TermAdmin(admin.ModelAdmin):
+class TermAdmin(PreserveAcademicHistoryAdminMixin, admin.ModelAdmin):
     """Admin for Term model"""
     list_display = ['academic_year', 'get_term_number_display', 'school', 'start_date', 'end_date', 'is_current', 'get_duration_days']
     list_filter = ['is_current', 'term_number', 'school', 'academic_year']
@@ -121,7 +126,7 @@ class TeacherAdmin(admin.ModelAdmin):
 
 
 @admin.register(Student)
-class StudentAdmin(admin.ModelAdmin):
+class StudentAdmin(PreserveAcademicHistoryAdminMixin, admin.ModelAdmin):
     """Admin for Student model"""
     list_display = ['admission_number', 'full_name', 'school', 'form', 'learning_area', 'gender', 'calculate_age_display']
     list_filter = ['school', 'form', 'learning_area', 'gender']
@@ -135,7 +140,7 @@ class StudentAdmin(admin.ModelAdmin):
 
 
 @admin.register(Class)
-class ClassAdmin(admin.ModelAdmin):
+class ClassAdmin(PreserveAcademicHistoryAdminMixin, admin.ModelAdmin):
     """Admin for Class model"""
     list_display = ['class_id', 'name', 'school', 'form', 'learning_area', 'academic_year', 'get_current_student_count', 'maximum_students', 'is_class_full_display']
     list_filter = ['school', 'form', 'learning_area', 'academic_year']
@@ -163,7 +168,7 @@ class ClassTeacherAdmin(admin.ModelAdmin):
 
 
 @admin.register(StudentClass)
-class StudentClassAdmin(admin.ModelAdmin):
+class StudentClassAdmin(PreserveAcademicHistoryAdminMixin, admin.ModelAdmin):
     """Admin for StudentClass model"""
     list_display = ['student', 'assigned_class', 'school', 'date_assigned', 'is_active', 'assigned_by']
     list_filter = ['is_active', 'school', 'date_assigned']
@@ -286,6 +291,16 @@ class QuizAdmin(admin.ModelAdmin):
     readonly_fields = ['quiz_id', 'slug', 'created_at', 'updated_at', 'total_marks']
     date_hierarchy = 'created_at'
     filter_horizontal = ['classes']
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.attempts.exists():
+            return False
+        return super().has_delete_permission(request, obj)
     
     fieldsets = (
         ('Basic Information', {
@@ -385,7 +400,7 @@ class QuizResponseInline(admin.TabularInline):
 
 
 @admin.register(QuizAttempt)
-class QuizAttemptAdmin(admin.ModelAdmin):
+class QuizAttemptAdmin(PreserveAcademicHistoryAdminMixin, admin.ModelAdmin):
     """Admin for QuizAttempt model"""
     list_display = ['attempt_id', 'student', 'quiz', 'attempt_number', 'score', 'percentage', 'get_grade', 'is_completed', 'is_submitted', 'started_at']
     list_filter = ['is_completed', 'is_submitted', 'needs_grading', 'is_graded', 'school', 'academic_year', 'term', 'started_at']
@@ -421,7 +436,7 @@ class QuizAttemptAdmin(admin.ModelAdmin):
 
 
 @admin.register(QuizResponse)
-class QuizResponseAdmin(admin.ModelAdmin):
+class QuizResponseAdmin(PreserveAcademicHistoryAdminMixin, admin.ModelAdmin):
     """Admin for QuizResponse model"""
     list_display = ['response_id', 'attempt', 'question', 'is_correct', 'marks_awarded', 'is_graded', 'answered_at']
     list_filter = ['is_correct', 'is_graded', 'question__question_type', 'school', 'answered_at']

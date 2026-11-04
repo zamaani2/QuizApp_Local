@@ -82,7 +82,12 @@ count as completion.
 - [x] Enforce active enrollment uniqueness per school, capacity-safe locked
   enrollment creation, idempotent repeat requests, and history-preserving
   transfers.
-- [ ] Define and test any required explicit promotion workflow.
+- [x] Preserve enrollment identity/history during edits and reactivation;
+  validate import assignments against active same-school current-year classes
+  and normal capacity rules; retain referenced academic years and terms.
+- [ ] Obtain promotion eligibility, failed/repeating/graduation, manual vs
+  automatic, target selection, and approval rules before implementing any
+  promotion workflow.
 
 ## Phase 3 — Import and export
 

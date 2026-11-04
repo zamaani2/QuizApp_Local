@@ -27,6 +27,21 @@ from ..models import (
 from ..utils.tenant_utils import get_object_or_404_with_school
 
 
+def _crosses_academic_year(student, school, target_class):
+    latest_enrollment = (
+        StudentClass.objects.select_for_update()
+        .filter(student=student, school=school)
+        .select_related("assigned_class")
+        .order_by("-date_assigned", "-pk")
+        .first()
+    )
+    return (
+        latest_enrollment is not None
+        and latest_enrollment.assigned_class.academic_year_id
+        != target_class.academic_year_id
+    )
+
+
 @login_required
 @require_http_methods(["GET"])
 def student_enrollment_list_view(request):
@@ -42,6 +57,7 @@ def student_enrollment_list_view(request):
         school__isnull=False,
         student__school_id=F("school_id"),
         assigned_class__school_id=F("school_id"),
+        assigned_class__academic_year__school_id=F("school_id"),
     )
     
     if school:
@@ -77,7 +93,11 @@ def student_enrollment_list_view(request):
     
     # Get filter options
     students = Student.objects.all()
-    classes = Class.objects.all()
+    students = students.filter(is_active=True)
+    classes = Class.objects.filter(
+        is_active=True,
+        academic_year__school_id=F("school_id"),
+    )
     
     if school:
         students = students.filter(school=school)
@@ -157,7 +177,11 @@ def student_enrollment_create_view(request):
                 }, status=400)
             
             # Get related objects
-            class_queryset = Class.objects.filter(pk=class_id)
+            class_queryset = Class.objects.filter(
+                pk=class_id,
+                is_active=True,
+                academic_year__school_id=F("school_id"),
+            )
             if request.user.role != "superadmin":
                 class_queryset = class_queryset.filter(school=school)
             try:
@@ -183,6 +207,11 @@ def student_enrollment_create_view(request):
                     'success': False,
                     'error': 'Invalid selection. Please ensure all selections belong to the selected class school.'
                 }, status=400)
+            if not student.is_active:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Archived students cannot be assigned to a class.',
+                }, status=400)
             
             # Check if student already has an active assignment
             existing_assignment = StudentClass.objects.select_for_update().filter(
@@ -199,6 +228,16 @@ def student_enrollment_create_view(request):
                         'message': f'Student {student.full_name} is already assigned to class {class_obj.name}.',
                         'enrollment_id': existing_assignment.id,
                     })
+            if _crosses_academic_year(student, school, class_obj):
+                return JsonResponse({
+                    'success': False,
+                    'error': (
+                        'Cross-year promotion is not available until the school '
+                        'defines promotion eligibility and approval rules.'
+                    ),
+                }, status=400)
+
+            if existing_assignment:
                 if class_obj.is_class_full():
                     return JsonResponse({
                         'success': False,
@@ -275,7 +314,11 @@ def student_enrollment_bulk_create_view(request):
     if request.method == "GET":
         # Get options for dropdowns
         students = Student.objects.all()
-        classes = Class.objects.all()
+        students = students.filter(is_active=True)
+        classes = Class.objects.filter(
+            is_active=True,
+            academic_year__school_id=F("school_id"),
+        )
         
         if school:
             students = students.filter(school=school)
@@ -331,7 +374,11 @@ def student_enrollment_bulk_create_view(request):
         errors = []
 
         with transaction.atomic():
-            class_queryset = Class.objects.filter(pk=class_id)
+            class_queryset = Class.objects.filter(
+                pk=class_id,
+                is_active=True,
+                academic_year__school_id=F("school_id"),
+            )
             if request.user.role != "superadmin":
                 class_queryset = class_queryset.filter(school=school)
             try:
@@ -358,6 +405,11 @@ def student_enrollment_bulk_create_view(request):
                     'success': False,
                     'error': 'One or more selected students are invalid.'
                 }, status=400)
+            if any(not student.is_active for student in students):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Archived students cannot be assigned to a class.',
+                }, status=400)
 
             for student in students:
                 try:
@@ -373,6 +425,15 @@ def student_enrollment_bulk_create_view(request):
                             if existing_assignment.assigned_class_id == class_obj.pk:
                                 skipped += 1
                                 continue
+                        if _crosses_academic_year(student, school, class_obj):
+                            errors.append(
+                                f'{student.full_name}: Cross-year promotion is '
+                                'not available until the school defines '
+                                'promotion eligibility and approval rules.'
+                            )
+                            continue
+
+                        if existing_assignment:
                             if class_obj.is_class_full():
                                 errors.append(
                                     f'{student.full_name}: The selected class has reached its capacity.'
@@ -479,8 +540,11 @@ def student_enrollment_edit_view(request, enrollment_id):
     
     if request.method == "GET":
         # Get options for dropdowns
-        students = Student.objects.all()
-        classes = Class.objects.all()
+        students = Student.objects.filter(is_active=True)
+        classes = Class.objects.filter(
+            is_active=True,
+            academic_year__school_id=F("school_id"),
+        )
         
         if school:
             students = students.filter(school=school)
@@ -500,58 +564,125 @@ def student_enrollment_edit_view(request, enrollment_id):
     
     # POST - Update enrollment
     try:
+        student_id = request.POST.get("student") or enrollment.student_id
+        if str(student_id) != str(enrollment.student_id):
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    'An enrollment cannot be reassigned to another student. '
+                    'Create a separate enrollment for the other student.'
+                ),
+            }, status=400)
+
         with transaction.atomic():
-            enrollment = StudentClass.objects.select_for_update().get(
-                pk=enrollment.pk,
-                school=school,
-            )
-            # Get form data
-            student_id = request.POST.get('student', '')
-            class_id = request.POST.get('assigned_class', '')
-            is_active = request.POST.get('is_active', '') == 'on'
-            
-            # Get related objects
             try:
-                student = Student.objects.select_for_update().get(
-                    pk=student_id,
-                    school=school,
-                )
                 class_obj = Class.objects.select_for_update().get(
-                    pk=class_id,
+                    pk=request.POST.get("assigned_class") or enrollment.assigned_class_id,
+                    school=school,
+                    is_active=True,
+                    academic_year__school=school,
+                )
+                student = Student.objects.select_for_update().get(
+                    pk=enrollment.student_id,
                     school=school,
                 )
-            except (Student.DoesNotExist, Class.DoesNotExist):
+                enrollment = StudentClass.objects.select_for_update().get(
+                    pk=enrollment.pk,
+                    school=school,
+                )
+            except (Student.DoesNotExist, Class.DoesNotExist, StudentClass.DoesNotExist):
                 return JsonResponse({
                     'success': False,
-                    'error': 'Invalid selection. Please ensure all selections belong to your school.'
+                    'error': 'Invalid student or active same-school class selected.',
                 }, status=400)
-            
-            # If changing to active and student already has another active assignment
-            if is_active:
-                existing_assignment = StudentClass.objects.select_for_update().filter(
-                    student=student,
-                    is_active=True,
-                    school=school,
-                    assigned_class__school=school,
-                ).exclude(pk=enrollment.id).first()
-                
-                if existing_assignment:
-                    # Deactivate existing assignment
-                    existing_assignment.is_active = False
-                    existing_assignment.save()
-            
-            enrollment.student = student
-            enrollment.assigned_class = class_obj
-            enrollment.is_active = is_active
-            
-            # Validate
-            enrollment.full_clean()
-            enrollment.save()
-            
+
+            is_active = request.POST.get("is_active", "") == "on"
+            class_changed = class_obj.pk != enrollment.assigned_class_id
+            if class_changed and not is_active:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Select an active enrollment to transfer the student.',
+                }, status=400)
+
+            if not is_active:
+                if enrollment.is_active:
+                    enrollment.is_active = False
+                    enrollment.save(update_fields=["is_active"])
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Enrollment was deactivated; its history was retained.',
+                    'enrollment_id': enrollment.pk,
+                })
+
+            if not student.is_active:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Archived students cannot be enrolled in a class.',
+                }, status=400)
+
+            if _crosses_academic_year(student, school, class_obj):
+                return JsonResponse({
+                    'success': False,
+                    'error': (
+                        'Cross-year promotion is not available until the school '
+                        'defines promotion eligibility and approval rules.'
+                    ),
+                }, status=400)
+
+            existing_assignment = StudentClass.objects.select_for_update().filter(
+                student=student,
+                is_active=True,
+                school=school,
+                assigned_class__school=school,
+            ).exclude(pk=enrollment.pk).first()
+            if existing_assignment:
+                if existing_assignment.assigned_class_id == class_obj.pk:
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'Student is already actively enrolled in this class.',
+                        'enrollment_id': existing_assignment.pk,
+                    })
+                return JsonResponse({
+                    'success': False,
+                    'error': (
+                        'The student already has an active enrollment. '
+                        'Update that enrollment to make a transfer.'
+                    ),
+                }, status=409)
+
+            if enrollment.is_active and not class_changed:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Enrollment is already active.',
+                    'enrollment_id': enrollment.pk,
+                })
+
+            if class_obj.is_class_full():
+                return JsonResponse({
+                    'success': False,
+                    'error': 'The selected class has reached its capacity.',
+                }, status=400)
+
+            if enrollment.is_active:
+                enrollment.is_active = False
+                enrollment.save(update_fields=["is_active"])
+
+            new_enrollment = StudentClass(
+                student=student,
+                assigned_class=class_obj,
+                assigned_by=request.user,
+                school=school,
+            )
+            new_enrollment.full_clean()
+            new_enrollment.save()
+
             return JsonResponse({
                 'success': True,
-                'message': f'Enrollment updated successfully.',
-                'enrollment_id': enrollment.id,
+                'message': (
+                    'A new enrollment was created; the previous enrollment '
+                    'remains as history.'
+                ),
+                'enrollment_id': new_enrollment.pk,
             })
     
     except ValidationError as e:
@@ -566,6 +697,11 @@ def student_enrollment_edit_view(request, enrollment_id):
             'success': False,
             'error': ' '.join(error_messages)
         }, status=400)
+    except IntegrityError:
+        return JsonResponse({
+            'success': False,
+            'error': 'The student already has an active class enrollment.',
+        }, status=409)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -595,12 +731,16 @@ def student_enrollment_delete_view(request, enrollment_id):
         return JsonResponse({'error': 'Enrollment has an invalid school association.'}, status=404)
     
     try:
-        student_name = enrollment.student.full_name
-        class_name = enrollment.assigned_class.name
-        
-        # Instead of deleting, deactivate the assignment
-        enrollment.is_active = False
-        enrollment.save()
+        with transaction.atomic():
+            enrollment = StudentClass.objects.select_for_update().get(
+                pk=enrollment.pk,
+                school=enrollment.school,
+            )
+            student_name = enrollment.student.full_name
+            class_name = enrollment.assigned_class.name
+            if enrollment.is_active:
+                enrollment.is_active = False
+                enrollment.save(update_fields=["is_active"])
         
         return JsonResponse({
             'success': True,

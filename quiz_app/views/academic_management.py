@@ -253,8 +253,6 @@ def academic_year_edit_view(request, academic_year_id):
         messages.error(request, "You don't have permission to perform this action.")
         return redirect("quiz_app:academic_year_list")
     
-    school = request.user.school
-    
     academic_year = get_object_or_404_with_school(
         AcademicYear, request, pk=academic_year_id
     )
@@ -351,23 +349,35 @@ def academic_year_delete_view(request, academic_year_id):
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
     
-    school = request.user.school
-    
     academic_year = get_object_or_404_with_school(
         AcademicYear, request, pk=academic_year_id
     )
-    
+
     try:
-        # Check if academic year has terms
-        term_count = academic_year.term_set.count()
-        if term_count > 0:
-            return JsonResponse({
-                'success': False,
-                'error': f'Cannot delete academic year. It has {term_count} term(s) associated with it.'
-            }, status=400)
-        
-        academic_year_name = academic_year.name
-        academic_year.delete()
+        with transaction.atomic():
+            academic_year = AcademicYear.objects.select_for_update().get(
+                pk=academic_year.pk,
+                school=academic_year.school,
+            )
+            has_academic_history = (
+                academic_year.term_set.exists()
+                or academic_year.classes.exists()
+                or academic_year.quizzes.exists()
+                or academic_year.quiz_attempts.exists()
+            )
+            if has_academic_history:
+                return JsonResponse({
+                    'success': False,
+                    'error': (
+                        'Cannot delete an academic year with terms, classes, '
+                        'quizzes, or recorded attempts. Archive or retain its '
+                        'records instead.'
+                    )
+                }, status=400)
+
+            academic_year_name = academic_year.name
+            academic_year.delete()
+
         return JsonResponse({
             'success': True,
             'message': f'Academic year {academic_year_name} deleted successfully.'
@@ -387,23 +397,24 @@ def academic_year_set_current_view(request, academic_year_id):
     """
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
-    
+
+    school = request.user.school
+
     academic_year = get_object_or_404_with_school(
         AcademicYear, request, pk=academic_year_id
     )
-    school = academic_year.school
-    
+
     try:
         with transaction.atomic():
-            # Set this academic year as current
+            academic_year = AcademicYear.objects.select_for_update().get(
+                pk=academic_year.pk,
+                school=academic_year.school,
+            )
             academic_year.is_current = True
             academic_year.save()
-            
-            # Update school's current academic year if school exists
             if school:
                 school.current_academic_year = academic_year
                 school.save()
-        
         return JsonResponse({
             'success': True,
             'message': f'Academic year {academic_year.name} set as current successfully.'
@@ -680,7 +691,7 @@ def term_edit_view(request, term_id):
 @require_http_methods(["POST"])
 def term_delete_view(request, term_id):
     """
-    Delete a term.
+    Delete a term only if no quiz or attempt history references it.
     """
     if request.user.role not in ["admin", "superadmin"]:
         return JsonResponse({'error': 'Permission denied'}, status=403)
@@ -688,8 +699,22 @@ def term_delete_view(request, term_id):
     term = get_object_or_404_with_school(Term, request, pk=term_id)
     
     try:
-        term_name = f"{term.academic_year.name} - {term.get_term_number_display()}"
-        term.delete()
+        with transaction.atomic():
+            term = Term.objects.select_for_update().get(
+                pk=term.pk,
+                school=term.school,
+            )
+            if term.quizzes.exists() or term.quiz_attempts.exists():
+                return JsonResponse({
+                    'success': False,
+                    'error': (
+                        'Cannot delete a term referenced by quizzes or recorded '
+                        'attempts. Retain the term to preserve assessment history.'
+                    ),
+                }, status=400)
+
+            term_name = f"{term.academic_year.name} - {term.get_term_number_display()}"
+            term.delete()
         return JsonResponse({
             'success': True,
             'message': f'Term {term_name} deleted successfully.'

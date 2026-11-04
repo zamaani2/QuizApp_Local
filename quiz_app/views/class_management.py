@@ -315,6 +315,11 @@ def class_edit_view(request, class_id):
     # POST - Update class
     try:
         with transaction.atomic():
+            class_obj = Class.objects.select_for_update().get(
+                pk=class_obj.pk,
+                school=school,
+            )
+
             # Get form data
             class_obj.name = request.POST.get('name', '').strip()
             form_id = request.POST.get('form', '') or None

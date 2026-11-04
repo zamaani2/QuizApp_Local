@@ -706,8 +706,26 @@ def quiz_delete_view(request, quiz_id):
         quiz = get_object_or_404(Quiz, pk=quiz_id, school=school)
     
     try:
-        quiz_title = quiz.title
-        quiz.delete()
+        with transaction.atomic():
+            quiz = Quiz.objects.select_for_update().get(
+                pk=quiz.pk,
+                school=school,
+            )
+            if quiz.attempts.exists():
+                error = (
+                    'This quiz has recorded attempts and cannot be deleted '
+                    'without erasing assessment history.'
+                )
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': False,
+                        'error': error,
+                    }, status=400)
+                messages.error(request, error)
+                return redirect("quiz_app:quiz_list")
+
+            quiz_title = quiz.title
+            quiz.delete()
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({

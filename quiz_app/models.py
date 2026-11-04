@@ -483,6 +483,20 @@ class Student(models.Model):
         errors = {}
         if not self.school_id:
             errors["school"] = "Student must belong to a school."
+        elif self.pk:
+            previous_school_id = (
+                type(self).objects.filter(pk=self.pk)
+                .values_list("school_id", flat=True)
+                .first()
+            )
+            if (
+                previous_school_id is not None
+                and previous_school_id != self.school_id
+            ):
+                errors["school"] = (
+                    "A student's school cannot be changed without a dedicated "
+                    "school-transfer workflow."
+                )
         if self.form_id and self.school_id != self.form.school_id:
             errors["form"] = "Form must belong to the student's school."
         if self.learning_area_id and self.school_id != self.learning_area.school_id:
@@ -657,6 +671,30 @@ class Class(models.Model):
                 errors["learning_area"] = (
                     "Learning area must belong to the class school."
                 )
+        if self.pk and self.academic_year_id:
+            previous_academic_year_id = (
+                type(self).objects.filter(pk=self.pk)
+                .values_list("academic_year_id", flat=True)
+                .first()
+            )
+            if (
+                previous_academic_year_id is not None
+                and previous_academic_year_id != self.academic_year_id
+            ):
+                has_history = (
+                    StudentClass.objects.filter(assigned_class_id=self.pk).exists()
+                    or ClassSubject.objects.filter(class_name_id=self.pk).exists()
+                    or ClassTeacher.objects.filter(class_assigned_id=self.pk).exists()
+                    or TeacherSubjectAssignment.objects.filter(
+                        class_assigned_id=self.pk
+                    ).exists()
+                    or self.assigned_quizzes.exists()
+                )
+                if has_history:
+                    errors["academic_year"] = (
+                        "A class's academic year cannot change after academic "
+                        "history has been recorded."
+                    )
         if errors:
             raise ValidationError(errors)
 
@@ -789,6 +827,29 @@ class StudentClass(models.Model):
 
     def clean(self):
         super().clean()
+        if self.pk:
+            previous_values = (
+                type(self).objects.filter(pk=self.pk)
+                .values("student_id", "assigned_class_id", "school_id", "is_active")
+                .first()
+            )
+            if previous_values:
+                for field in ("student_id", "assigned_class_id", "school_id"):
+                    if previous_values[field] != getattr(self, field):
+                        raise ValidationError({
+                            field.removesuffix("_id"): (
+                                "Enrollment history cannot be reassigned; "
+                                "create a new enrollment record."
+                            )
+                        })
+                if not previous_values["is_active"] and self.is_active:
+                    raise ValidationError({
+                        "is_active": (
+                            "A historical enrollment cannot be reactivated; "
+                            "create a new enrollment record."
+                        )
+                    })
+
         school_id = (
             self.school_id
             or (self.student.school_id if self.student_id else None)
@@ -798,6 +859,7 @@ class StudentClass(models.Model):
             school_id is None
             or self.student.school_id != school_id
             or self.assigned_class.school_id != school_id
+            or self.assigned_class.academic_year.school_id != school_id
             or not self.student.is_active
             or not self.assigned_class.is_active
         ):

@@ -4,6 +4,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from django.contrib import admin as django_admin
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -766,6 +767,9 @@ class SchoolScopedManagementEndpointTests(TestCase):
 
     def test_student_archive_and_restore_preserve_history_and_account_state(self):
         enrollment = StudentClass.objects.get(student=self.student_a)
+        enrollment_count = StudentClass.objects.filter(
+            student=self.student_a
+        ).count()
         archive_response = self.client.post(
             reverse("quiz_app:student_delete", args=[self.student_a.pk])
         )
@@ -799,6 +803,10 @@ class SchoolScopedManagementEndpointTests(TestCase):
         self.assertTrue(self.student_a.is_active)
         self.assertTrue(self.student_user_a.is_active)
         self.assertFalse(enrollment.is_active)
+        self.assertEqual(
+            StudentClass.objects.filter(student=self.student_a).count(),
+            enrollment_count,
+        )
 
     def test_student_restore_preserves_pre_archive_account_deactivation(self):
         self.student_user_a.is_active = False
@@ -1051,6 +1059,37 @@ class SchoolScopedManagementEndpointTests(TestCase):
         )
         workbook.close()
 
+    def test_student_export_includes_inactive_enrollment_for_selected_prior_year(self):
+        previous_year = AcademicYear.objects.create(
+            name="2025",
+            start_date="2025-01-01",
+            end_date="2025-12-31",
+            school=self.school_a,
+        )
+        previous_class = Class.objects.create(
+            name="Previous Year Class",
+            academic_year=previous_year,
+            school=self.school_a,
+        )
+        previous_enrollment = StudentClass.objects.create(
+            student=self.student_a,
+            assigned_class=previous_class,
+            school=self.school_a,
+            is_active=False,
+        )
+
+        response = self.client.get(
+            reverse("quiz_app:student_export", args=["csv"]),
+            {"academic_year": previous_year.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        exported = b"".join(response.streaming_content).decode("utf-8")
+        self.assertIn(self.student_a.admission_number, exported)
+        self.assertIn("Previous Year Class", exported)
+        self.assertIn("2025", exported)
+        self.assertFalse(previous_enrollment.is_active)
+
     def test_teacher_exports_are_school_scoped_and_honor_filters(self):
         department = Department.objects.create(
             name="Export Department",
@@ -1187,6 +1226,241 @@ class SchoolScopedManagementEndpointTests(TestCase):
             ).count(),
             1,
         )
+
+    def test_enrollment_edit_transfer_creates_history_instead_of_rewriting_it(self):
+        previous_enrollment = StudentClass.objects.get(student=self.student_a)
+        target_class = Class.objects.create(
+            name="Transferred Class",
+            academic_year=self.academic_year_a,
+            school=self.school_a,
+        )
+
+        response = self.client.post(
+            reverse("quiz_app:enrollment_edit", args=[previous_enrollment.pk]),
+            {
+                "student": self.student_a.pk,
+                "assigned_class": target_class.pk,
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        previous_enrollment.refresh_from_db()
+        current_enrollment = StudentClass.objects.get(
+            student=self.student_a,
+            assigned_class=target_class,
+            is_active=True,
+        )
+        self.assertFalse(previous_enrollment.is_active)
+        self.assertEqual(previous_enrollment.assigned_class, self.class_a)
+        self.assertEqual(previous_enrollment.school, self.school_a)
+        self.assertEqual(current_enrollment.school, self.school_a)
+        self.assertEqual(
+            StudentClass.objects.filter(
+                student=self.student_a,
+                school=self.school_a,
+            ).count(),
+            2,
+        )
+
+    def test_enrollment_edit_reactivation_creates_new_row(self):
+        previous_enrollment = StudentClass.objects.get(student=self.student_a)
+        previous_enrollment.is_active = False
+        previous_enrollment.save(update_fields=["is_active"])
+
+        response = self.client.post(
+            reverse("quiz_app:enrollment_edit", args=[previous_enrollment.pk]),
+            {"is_active": "on"},
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        previous_enrollment.refresh_from_db()
+        self.assertFalse(previous_enrollment.is_active)
+        self.assertEqual(
+            StudentClass.objects.filter(
+                student=self.student_a,
+                school=self.school_a,
+                is_active=True,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            StudentClass.objects.filter(
+                student=self.student_a,
+                school=self.school_a,
+            ).count(),
+            2,
+        )
+
+    def test_historical_enrollment_cannot_be_reassigned_or_reactivated(self):
+        historical_enrollment = StudentClass.objects.get(student=self.student_a)
+        target_class = Class.objects.create(
+            name="History Guard Class",
+            academic_year=self.academic_year_a,
+            school=self.school_a,
+        )
+        historical_enrollment.is_active = False
+        historical_enrollment.save(update_fields=["is_active"])
+
+        historical_enrollment.assigned_class = target_class
+        with self.assertRaises(ValidationError):
+            historical_enrollment.full_clean()
+
+        historical_enrollment.refresh_from_db()
+        historical_enrollment.is_active = True
+        with self.assertRaises(ValidationError):
+            historical_enrollment.full_clean()
+
+        historical_enrollment.refresh_from_db()
+        self.assertFalse(historical_enrollment.is_active)
+        self.assertEqual(historical_enrollment.assigned_class, self.class_a)
+
+    def test_enrollment_edit_rejects_changing_the_student(self):
+        previous_enrollment = StudentClass.objects.get(student=self.student_a)
+
+        response = self.client.post(
+            reverse("quiz_app:enrollment_edit", args=[previous_enrollment.pk]),
+            {
+                "student": self.student_b.pk,
+                "assigned_class": self.class_a.pk,
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        previous_enrollment.refresh_from_db()
+        self.assertTrue(previous_enrollment.is_active)
+        self.assertEqual(previous_enrollment.student, self.student_a)
+
+    def test_generic_enrollment_rejects_cross_year_promotion_without_policy(self):
+        next_year = AcademicYear.objects.create(
+            name="2027",
+            start_date="2027-01-01",
+            end_date="2027-12-31",
+            school=self.school_a,
+        )
+        next_year_class = Class.objects.create(
+            name="Next Year Class",
+            academic_year=next_year,
+            school=self.school_a,
+        )
+        previous_enrollment = StudentClass.objects.get(student=self.student_a)
+
+        response = self.client.post(
+            reverse("quiz_app:enrollment_create"),
+            {
+                "student": self.student_a.pk,
+                "assigned_class": next_year_class.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        previous_enrollment.refresh_from_db()
+        self.assertTrue(previous_enrollment.is_active)
+        self.assertEqual(previous_enrollment.assigned_class, self.class_a)
+        self.assertFalse(
+            StudentClass.objects.filter(
+                student=self.student_a,
+                assigned_class=next_year_class,
+                is_active=True,
+            ).exists()
+        )
+
+    def test_student_school_cannot_be_changed_without_transfer_workflow(self):
+        self.student_a.school = self.school_b
+
+        with self.assertRaises(ValidationError):
+            self.student_a.full_clean()
+
+        self.student_a.refresh_from_db()
+        self.assertEqual(self.student_a.school, self.school_a)
+
+    def test_class_academic_year_cannot_change_after_history_exists(self):
+        next_year = AcademicYear.objects.create(
+            name="2027",
+            start_date="2027-01-01",
+            end_date="2027-12-31",
+            school=self.school_a,
+        )
+
+        response = self.client.post(
+            reverse("quiz_app:class_edit", args=[self.class_a.pk]),
+            {
+                "name": self.class_a.name,
+                "academic_year": next_year.pk,
+                "maximum_students": self.class_a.maximum_students,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400, response.content)
+        self.class_a.refresh_from_db()
+        self.assertEqual(self.class_a.academic_year, self.academic_year_a)
+        self.assertTrue(
+            StudentClass.objects.filter(
+                assigned_class=self.class_a,
+                student=self.student_a,
+            ).exists()
+        )
+
+    def test_academic_year_and_term_deletion_preserve_history(self):
+        term = Term.objects.create(
+            academic_year=self.academic_year_a,
+            term_number=1,
+            start_date="2026-01-01",
+            end_date="2026-04-30",
+        )
+        self.attempt_a.term = term
+        self.attempt_a.academic_year = self.academic_year_a
+        self.attempt_a.save(update_fields=["term", "academic_year"])
+
+        year_response = self.client.post(
+            reverse("quiz_app:academic_year_delete", args=[self.academic_year_a.pk])
+        )
+        term_response = self.client.post(
+            reverse("quiz_app:term_delete", args=[term.pk])
+        )
+
+        self.assertEqual(year_response.status_code, 400)
+        self.assertEqual(term_response.status_code, 400)
+        self.assertTrue(AcademicYear.objects.filter(pk=self.academic_year_a.pk).exists())
+        self.assertTrue(Term.objects.filter(pk=term.pk).exists())
+        self.attempt_a.refresh_from_db()
+        self.assertEqual(self.attempt_a.term, term)
+        self.assertEqual(self.attempt_a.academic_year, self.academic_year_a)
+
+    def test_quiz_with_attempts_cannot_be_deleted(self):
+        response = self.client.post(
+            reverse("quiz_app:quiz_delete", args=[self.quiz_a.pk]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Quiz.objects.filter(pk=self.quiz_a.pk).exists())
+        self.assertTrue(QuizAttempt.objects.filter(pk=self.attempt_a.pk).exists())
+        self.assertTrue(QuizResponse.objects.filter(pk=self.response_a.pk).exists())
+
+    def test_django_admin_disables_hard_delete_of_academic_history(self):
+        request = RequestFactory().get("/admin/")
+        request.user = self.admin_a
+
+        for model in (
+            Student,
+            StudentClass,
+            Class,
+            AcademicYear,
+            Term,
+            QuizAttempt,
+            QuizResponse,
+        ):
+            with self.subTest(model=model.__name__):
+                self.assertFalse(
+                    django_admin.site._registry[model].has_delete_permission(
+                        request
+                    )
+                )
+        quiz_admin = django_admin.site._registry[Quiz]
+        self.assertFalse(quiz_admin.has_delete_permission(request, self.quiz_a))
+        self.assertNotIn("delete_selected", quiz_admin.get_actions(request))
 
     def test_active_student_enrollment_is_unique_but_history_is_retained(self):
         duplicate_values = {
@@ -1918,6 +2192,71 @@ class SchoolScopedManagementEndpointTests(TestCase):
         self.assertIn("date_of_birth", response.json()["errors"][0])
         self.assertFalse(
             Student.objects.filter(full_name="Imported Without Details").exists()
+        )
+
+    def test_student_import_rejects_class_from_a_different_academic_year(self):
+        self.academic_year_a.is_current = True
+        self.academic_year_a.save(update_fields=["is_current"])
+        historical_year = AcademicYear.objects.create(
+            name="2025",
+            start_date="2025-01-01",
+            end_date="2025-12-31",
+            school=self.school_a,
+        )
+        historical_class = Class.objects.create(
+            name="Historical Intake",
+            academic_year=historical_year,
+            school=self.school_a,
+        )
+        upload = SimpleUploadedFile(
+            "students.csv",
+            (
+                b"full_name,gender,date_of_birth,parent_contact,admission_date\n"
+                b"Imported Historical Student,F,2012-01-03,555,2026-01-01\n"
+            ),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            reverse("quiz_app:student_bulk_import"),
+            {"csv_file": upload, "assign_class": historical_class.pk},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            Student.objects.filter(
+                full_name="Imported Historical Student",
+                school=self.school_a,
+            ).exists()
+        )
+
+    def test_student_import_cannot_bypass_class_capacity(self):
+        self.academic_year_a.is_current = True
+        self.academic_year_a.save(update_fields=["is_current"])
+        self.class_a.maximum_students = 1
+        self.class_a.save(update_fields=["maximum_students"])
+        upload = SimpleUploadedFile(
+            "students.csv",
+            (
+                b"full_name,gender,date_of_birth,parent_contact,admission_date\n"
+                b"Imported Full Class Student,F,2012-01-03,555,2026-01-01\n"
+            ),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            reverse("quiz_app:student_bulk_import"),
+            {"csv_file": upload, "assign_class": self.class_a.pk},
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["imported"], 0)
+        self.assertEqual(response.json()["assigned_to_class"], 0)
+        self.assertFalse(
+            Student.objects.filter(
+                full_name="Imported Full Class Student",
+                school=self.school_a,
+            ).exists()
         )
 
     def test_student_and_teacher_import_previews_return_sample_rows_without_writes(self):

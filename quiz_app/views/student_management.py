@@ -273,13 +273,6 @@ def student_export_view(request, format_type):
             | Q(parent_contact__icontains=search_query)
         )
     form_filter = request.GET.get("form", "")
-    if form_filter:
-        students = students.filter(
-            studentclass__assigned_class__form_id=form_filter,
-            studentclass__is_active=True,
-            studentclass__school=school,
-            studentclass__assigned_class__school=school,
-        )
     learning_area_filter = request.GET.get("learning_area", "")
     if learning_area_filter:
         students = students.filter(learning_area_id=learning_area_filter)
@@ -287,30 +280,32 @@ def student_export_view(request, format_type):
     if gender_filter:
         students = students.filter(gender=gender_filter)
     class_filter = request.GET.get("class", "")
-    if class_filter:
-        students = students.filter(
-            studentclass__assigned_class_id=class_filter,
-            studentclass__is_active=True,
-            studentclass__school=school,
-            studentclass__assigned_class__school=school,
-        )
     academic_year_filter = request.GET.get("academic_year", "")
     enrollment_query = StudentClass.objects.filter(
         school=school,
         student__school=school,
         assigned_class__school=school,
-        is_active=True,
-    ).select_related("assigned_class__form", "assigned_class__academic_year")
+        assigned_class__academic_year__school=school,
+    )
     if academic_year_filter:
-        students = students.filter(
-            studentclass__assigned_class__academic_year_id=academic_year_filter,
-            studentclass__is_active=True,
-            studentclass__school=school,
-            studentclass__assigned_class__school=school,
-        )
         enrollment_query = enrollment_query.filter(
             assigned_class__academic_year_id=academic_year_filter
         )
+    else:
+        enrollment_query = enrollment_query.filter(is_active=True)
+    if form_filter:
+        enrollment_query = enrollment_query.filter(
+            assigned_class__form_id=form_filter
+        )
+    if class_filter:
+        enrollment_query = enrollment_query.filter(
+            assigned_class_id=class_filter
+        )
+    enrollment_query = enrollment_query.select_related(
+        "assigned_class__form", "assigned_class__academic_year"
+    )
+    if form_filter or class_filter or academic_year_filter:
+        students = students.filter(studentclass__in=enrollment_query)
 
     students = students.distinct().select_related(
         "form", "learning_area"
@@ -1126,11 +1121,16 @@ def student_bulk_import_view(request):
         
         if assign_class_id:
             try:
-                assign_class = Class.objects.get(pk=assign_class_id, school=school)
+                assign_class = Class.objects.get(
+                    pk=assign_class_id,
+                    school=school,
+                    is_active=True,
+                    academic_year__school=school,
+                )
             except Class.DoesNotExist:
                 return JsonResponse({
                     'success': False,
-                    'error': 'Selected class not found.'
+                    'error': 'Select an active class belonging to the target school.'
                 }, status=400)
             
             # Automatically get current academic year for class assignment
@@ -1139,6 +1139,11 @@ def student_bulk_import_view(request):
                 return JsonResponse({
                     'success': False,
                     'error': 'No current academic year found. Please set a current academic year before importing students.'
+                }, status=400)
+            if assign_class.academic_year_id != academic_year.pk:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Student imports can only assign to a class in the current academic year.',
                 }, status=400)
         
         # Form and learning area removed - no longer part of import
@@ -1160,6 +1165,20 @@ def student_bulk_import_view(request):
         errors = []
         
         with transaction.atomic():
+            if assign_class_id:
+                try:
+                    assign_class = Class.objects.select_for_update().get(
+                        pk=assign_class_id,
+                        school=school,
+                        is_active=True,
+                        academic_year=academic_year,
+                    )
+                except Class.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'The selected class changed while the import was starting.',
+                    }, status=409)
+
             for row_num, row in enumerate(csv_reader, start=2):  # Start at 2 (row 1 is header)
                 try:
                     # Get data from row using column mappings
@@ -1290,6 +1309,7 @@ def student_bulk_import_view(request):
                                 assigned_by=request.user,
                                 school=school,
                             )
+                            student_class.full_clean()
                             student_class.save()
                             assigned_to_class += 1
 
