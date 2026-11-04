@@ -3,7 +3,9 @@
 This Compose configuration runs `docker.io/cise1/quiz-app:latest` from Docker
 Hub with a local PostgreSQL container. It does not build the application from
 the source checkout. Runtime settings are read by Compose from the project-root
-`.env` file and passed to the containers; secrets are not built into the image.
+`.env` file when present, or from explicitly supplied shell environment
+variables. Secrets are not built into the image and the `.env` file is not
+required.
 
 ## First run
 
@@ -27,6 +29,32 @@ password with a newly generated one. The Postgres image applies
 match the password already set for that volume's database user. Rotate that
 database password in PostgreSQL before changing `.env`.
 
+### Optional `.env` file
+
+Compose automatically reads a project-root `.env` for variable substitution
+when the file exists. It is optional. To use shell-provided values instead,
+set the required variables in PowerShell before starting Compose:
+
+```powershell
+$env:SECRET_KEY = '<your-generated-secret-key>'
+$env:DB_PASSWORD = '<the-password-for-this-database-volume>'
+docker compose up -d
+```
+
+Set `DB_NAME` and `DB_USER` too if the database volume was initialized with
+non-default values. These environment variables take precedence over values
+from `.env`.
+
+The host port defaults to `8000`. If another local service already uses it,
+set `APP_PORT` to an available port (for example `18080`) and update
+`CSRF_TRUSTED_ORIGINS` and `SITE_URL` to use that port:
+
+```powershell
+$env:APP_PORT = '18080'
+$env:CSRF_TRUSTED_ORIGINS = 'http://localhost:18080'
+$env:SITE_URL = 'http://localhost:18080'
+```
+
 ### Docker Desktop
 
 From the project directory:
@@ -37,7 +65,8 @@ docker compose up -d
 docker compose logs -f web
 ```
 
-Open <http://localhost:8000>. To stop the containers without deleting data:
+Open <http://localhost:8000> (or the configured `APP_PORT`). To stop the
+containers without deleting data:
 
 ```powershell
 docker compose down

@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-quiz_system_db}
       POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the project .env file}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment or an optional .env file}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,17 +16,17 @@ services:
   web:
     image: docker.io/cise1/quiz-app:latest
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
     environment:
       DEBUG: ${DEBUG_DOCKER:-False}
-      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in the project .env file}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in the environment or an optional .env file}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
       # Docker should use service DNS name "db" by default.
       DB_HOST: ${DB_HOST_DOCKER:-db}
       DB_NAME: ${DB_NAME:-quiz_system_db}
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the project .env file}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment or an optional .env file}
       DB_PORT: ${DB_PORT:-5432}
       SITE_URL: ${SITE_URL:-http://localhost:8000}
     depends_on:
