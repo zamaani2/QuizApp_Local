@@ -1,6 +1,8 @@
-{% extends 'base.html' %} {% load static %} {% block title %}Delete Question -
-{{ quiz.title }}{% endblock title %} {% block page_title %}Delete Question{%
-endblock page_title %} {% block breadcrumb %}
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Delete Question - {{ quiz.title }}{% endblock title %}
+{% block page_title %}Delete Question{% endblock page_title %}
+{% block breadcrumb %}
 <li class="breadcrumb-item">
   <a href="{% url 'quiz_app:dashboard' %}">Home</a>
 </li>
@@ -105,13 +107,12 @@ endblock page_title %} {% block breadcrumb %}
       <div class="card-body">
         <div class="mb-2">
           <i class="bi bi-question-circle text-danger me-2"></i>
-          <strong>Questions After:</strong> {{ quiz.get_question_count|add:"-1"
-          }}
+          <strong>Questions After:</strong> {{ quiz.get_question_count|add:"-1" }}
         </div>
         <div class="mb-2">
           <i class="bi bi-award text-warning me-2"></i>
-          <strong>Total Marks After:</strong> {{
-          quiz.total_marks|add:"-"|add:question.marks }}
+          {% widthratio question.marks 1 -1 as marks_to_remove %}
+          <strong>Total Marks After:</strong> {{ quiz.total_marks|add:marks_to_remove }}
         </div>
         <div class="mb-2">
           <i class="bi bi-clock text-info me-2"></i>

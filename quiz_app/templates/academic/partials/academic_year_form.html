@@ -91,14 +91,7 @@
                 type="checkbox"
                 id="is_current"
                 name="is_current"
-                {%
-                if
-                academic_year
-                and
-                academic_year.is_current
-                %}checked{%
-                endif
-                %}
+                {% if academic_year and academic_year.is_current %}checked{% endif %}
               />
               <label class="form-check-label" for="is_current">
                 Set as Current Academic Year

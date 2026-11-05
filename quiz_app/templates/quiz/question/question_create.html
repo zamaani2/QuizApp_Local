@@ -1,6 +1,8 @@
-{% extends 'base.html' %} {% load static %} {% block title %}Create Question -
-{{ quiz.title }}{% endblock title %} {% block page_title %}Create Question{%
-endblock page_title %} {% block breadcrumb %}
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Create Question - {{ quiz.title }}{% endblock title %}
+{% block page_title %}Create Question{% endblock page_title %}
+{% block breadcrumb %}
 <li class="breadcrumb-item">
   <a href="{% url 'quiz_app:dashboard' %}">Home</a>
 </li>

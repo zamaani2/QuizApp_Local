@@ -1,0 +1,35 @@
+name: Django checks and tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DEBUG: "True"
+      SECRET_KEY: "ci-only-not-a-production-secret"
+      DATABASE_URL: "sqlite:///ci.sqlite3"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
+      EMAIL_BACKEND: "django.core.mail.backends.locmem.EmailBackend"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django system check
+        run: python manage.py check
+
+      - name: Run application tests
+        run: python manage.py test

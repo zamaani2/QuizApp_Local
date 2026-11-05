@@ -1,4 +1,20 @@
     // Class Subject Dashboard Scripts
+    function showBootstrapModal(selector) {
+        const el = document.querySelector(selector);
+        if (!el || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+            return;
+        }
+        bootstrap.Modal.getOrCreateInstance(el).show();
+    }
+
+    function hideBootstrapModal(selector) {
+        const el = document.querySelector(selector);
+        if (!el || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+            return;
+        }
+        bootstrap.Modal.getOrCreateInstance(el).hide();
+    }
+
     $(document).ready(function() {
         // Initialize dataTables
         $('#classesTable').DataTable({
@@ -23,7 +39,7 @@
         $('#addClassBtn').click(function() {
             resetForm('#classForm');
             $('#classModalLabel').text('Add New Class');
-            $('#classModal').modal('show');
+            showBootstrapModal('#classModal');
             $('#classForm').attr('action', $('#classForm').data('add-url'));
         });
         
@@ -31,7 +47,7 @@
         $('#addSubjectBtn').click(function() {
             resetForm('#subjectForm');
             $('#subjectModalLabel').text('Add New Subject');
-            $('#subjectModal').modal('show');
+            showBootstrapModal('#subjectModal');
             $('#subjectForm').attr('action', $('#subjectForm').data('add-url'));
         });
         
@@ -39,7 +55,7 @@
         $('#addAssignmentBtn').click(function() {
             resetForm('#assignmentForm');
             $('#assignmentModalLabel').text('Assign Teacher to Subject');
-            $('#assignmentModal').modal('show');
+            showBootstrapModal('#assignmentModal');
             $('#assignmentForm').attr('action', $('#assignmentForm').data('add-url'));
         });
         
@@ -55,7 +71,7 @@
                     if (response.success) {
                         $('#classModalContent').html(response.html);
                         $('#classModalLabel').text('Edit Class');
-                        $('#classModal').modal('show');
+                        showBootstrapModal('#classModal');
                         $('#classForm').attr('action', $('#classForm').data('edit-url'));
                     }
                 },
@@ -77,7 +93,7 @@
                     if (response.success) {
                         $('#subjectModalContent').html(response.html);
                         $('#subjectModalLabel').text('Edit Subject');
-                        $('#subjectModal').modal('show');
+                        showBootstrapModal('#subjectModal');
                         $('#subjectForm').attr('action', $('#subjectForm').data('edit-url'));
                     }
                 },
@@ -99,7 +115,7 @@
                     if (response.success) {
                         $('#assignmentModalContent').html(response.html);
                         $('#assignmentModalLabel').text('Edit Teacher Assignment');
-                        $('#assignmentModal').modal('show');
+                        showBootstrapModal('#assignmentModal');
                         $('#assignmentForm').attr('action', $('#assignmentForm').data('edit-url'));
                     }
                 },
@@ -121,7 +137,7 @@
                 data: formData,
                 success: function(response) {
                     if (response.success) {
-                        $('#classModal').modal('hide');
+                        hideBootstrapModal('#classModal');
                         showSuccessAlert('Class saved successfully!');
                         setTimeout(function() {
                             window.location.href = response.redirect_url;
@@ -148,7 +164,7 @@
                 data: formData,
                 success: function(response) {
                     if (response.success) {
-                        $('#subjectModal').modal('hide');
+                        hideBootstrapModal('#subjectModal');
                         showSuccessAlert('Subject saved successfully!');
                         setTimeout(function() {
                             window.location.href = response.redirect_url;
@@ -175,7 +191,7 @@
                 data: formData,
                 success: function(response) {
                     if (response.success) {
-                        $('#assignmentModal').modal('hide');
+                        hideBootstrapModal('#assignmentModal');
                         showSuccessAlert('Teacher assignment saved successfully!');
                         setTimeout(function() {
                             window.location.href = response.redirect_url;
@@ -329,7 +345,7 @@
                         $('#viewClassSubjectsLink').attr('href', `/classes/${classData.id}/subjects/`);
                         $('#viewClassStudentsLink').attr('href', `/classes/${classData.id}/students/`);
                         
-                        $('#viewClassModal').modal('show');
+                        showBootstrapModal('#viewClassModal');
                     }
                 },
                 error: function(xhr) {
