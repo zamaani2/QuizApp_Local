@@ -1,7 +1,8 @@
-{% extends 'base.html' %} {% load static %} {% block title %}Superadmin -
-Administrator Details - {{ admin.full_name }}{% endblock title %} {% block
-page_title %}Administrator Details{% endblock page_title %} {% block breadcrumb
-%}
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Superadmin - Administrator Details - {{ admin.full_name }}{% endblock title %}
+{% block page_title %}Administrator Details{% endblock page_title %}
+{% block breadcrumb %}
 <li class="breadcrumb-item">
   <a href="{% url 'quiz_app:superadmin_dashboard' %}">Home</a>
 </li>
@@ -151,16 +152,24 @@ page_title %}Administrator Details{% endblock page_title %} {% block breadcrumb
 </style>
 {% endblock content %} {% block extra_js %}
 <script>
-  // Handle edit button
   $("#editAdminBtn").on("click", function () {
     const url = $(this).data("modal-url");
-    const title = $(this).data("modal-title");
 
     $.ajax({
       url: url,
       method: "GET",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
       success: function (response) {
         if (response.html) {
+          const existing = document.getElementById("adminFormModal");
+          if (existing && typeof bootstrap !== "undefined") {
+            const existingInstance = bootstrap.Modal.getInstance(existing);
+            if (existingInstance) {
+              existingInstance.dispose();
+            }
+          }
           const modalHtml = `
             <div class="modal fade" id="adminFormModal" tabindex="-1">
               <div class="modal-dialog modal-lg">
@@ -171,7 +180,31 @@ page_title %}Administrator Details{% endblock page_title %} {% block breadcrumb
             </div>
           `;
           $("#adminModalsContainer").html(modalHtml);
-          $("#adminFormModal").modal("show");
+          const modalElement = document.getElementById("adminFormModal");
+          if (modalElement && typeof bootstrap !== "undefined") {
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+          }
+        } else if (response.error) {
+          if (typeof Swal !== "undefined") {
+            Swal.fire({
+              icon: "error",
+              title: "Error",
+              text: response.error,
+            });
+          }
+        }
+      },
+      error: function (xhr) {
+        let errorMsg = "Error loading form";
+        if (xhr.responseJSON && xhr.responseJSON.error) {
+          errorMsg = xhr.responseJSON.error;
+        }
+        if (typeof Swal !== "undefined") {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: errorMsg,
+          });
         }
       },
     });

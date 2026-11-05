@@ -377,7 +377,10 @@ $(document).ready(function () {
 
   // Batch processing controls
   $("#batchProcess").on("click", function () {
-    $("#batchProcessModal").modal("show");
+    const batchProcessModal = document.getElementById("batchProcessModal");
+    if (batchProcessModal && typeof bootstrap !== "undefined" && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(batchProcessModal).show();
+    }
   });
 
   // Save changes button in fixed footer
