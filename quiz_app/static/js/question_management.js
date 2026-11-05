@@ -507,16 +507,20 @@
         });
     }
 
+    let questionDeleteInFlight = false;
+
     /**
      * Initialize event listeners
      */
     function initializeEventListeners() {
         // Delete question button
         $(document).on('click', '.delete-question-btn', function () {
-            const questionId = $(this).data('question-id');
-            const questionText = $(this).data('question-text') || 'this question';
-            const quizId = $(this).data('quiz-id');
-            deleteQuestion(quizId, questionId, questionText);
+            const $button = $(this);
+            const questionId = $button.data('question-id');
+            const questionText = $button.data('question-text') || 'this question';
+            const quizId = $button.data('quiz-id');
+            const deleteUrl = $button.data('delete-url') || `/quizzes/${quizId}/questions/${questionId}/delete/`;
+            deleteQuestion(deleteUrl, questionText, $button);
         });
 
         // Duplicate question button
@@ -535,9 +539,13 @@
     }
 
     /**
-     * Delete question
+     * Delete question after SweetAlert2 confirmation.
      */
-    function deleteQuestion(quizId, questionId, questionText) {
+    function deleteQuestion(deleteUrl, questionText, $button) {
+        if (questionDeleteInFlight) {
+            return;
+        }
+
         Swal.fire({
             title: 'Are you sure?',
             text: `Do you want to delete "${questionText}"? This action cannot be undone.`,
@@ -548,57 +556,72 @@
             confirmButtonText: 'Yes, delete it!',
             cancelButtonText: 'Cancel'
         }).then((result) => {
-            if (result.isConfirmed) {
-                Swal.fire({
-                    title: 'Deleting...',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
+            if (!result.isConfirmed) {
+                return;
+            }
+            if (questionDeleteInFlight) {
+                return;
+            }
 
-                $.ajax({
-                    url: `/quizzes/${quizId}/questions/${questionId}/delete/`,
-                    type: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    success: function (response) {
-                        Swal.close();
+            questionDeleteInFlight = true;
+            if ($button && $button.length) {
+                $button.prop('disabled', true);
+            }
 
-                        if (response.success) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Deleted!',
-                                text: response.message,
-                                confirmButtonColor: '#3085d6',
-                                timer: 2000,
-                                timerProgressBar: true
-                            }).then(() => {
-                                window.location.reload();
-                            });
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: response.error || 'Failed to delete question.',
-                                confirmButtonColor: '#3085d6'
-                            });
+            Swal.fire({
+                title: 'Deleting...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: deleteUrl,
+                type: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function (response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Deleted!',
+                            text: response.message,
+                            confirmButtonColor: '#3085d6',
+                            timer: 2000,
+                            timerProgressBar: true
+                        }).then(() => {
+                            window.location.reload();
+                        });
+                    } else {
+                        questionDeleteInFlight = false;
+                        if ($button && $button.length) {
+                            $button.prop('disabled', false);
                         }
-                    },
-                    error: function (xhr) {
-                        Swal.close();
-                        const errorMessage = xhr.responseJSON?.error || 'An error occurred while deleting.';
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: errorMessage,
+                            text: response.error || 'Failed to delete question.',
                             confirmButtonColor: '#3085d6'
                         });
                     }
-                });
-            }
+                },
+                error: function (xhr) {
+                    questionDeleteInFlight = false;
+                    if ($button && $button.length) {
+                        $button.prop('disabled', false);
+                    }
+                    const errorMessage = xhr.responseJSON?.error || 'An error occurred while deleting.';
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: errorMessage,
+                        confirmButtonColor: '#3085d6'
+                    });
+                }
+            });
         });
     }
 
@@ -655,6 +678,15 @@
                 });
             }
         });
+    }
+
+    function getCsrfToken() {
+        const cookieToken = getCookie('csrftoken');
+        if (cookieToken) {
+            return cookieToken;
+        }
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        return input ? input.value : '';
     }
 
     /**

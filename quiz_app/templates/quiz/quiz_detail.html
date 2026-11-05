@@ -135,6 +135,7 @@
                     class="btn btn-sm btn-outline-danger delete-question-btn"
                     data-quiz-id="{{ quiz.id }}"
                     data-question-id="{{ question.id }}"
+                    data-delete-url="{% url 'quiz_app:question_delete' quiz.id question.id %}"
                     data-question-text="{{ question.question_text|truncatewords:10 }}"
                   >
                     <i class="bi bi-trash me-1"></i>Delete

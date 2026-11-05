@@ -1,0 +1,52 @@
+name: Playwright browser tests
+
+on:
+  push:
+    branches:
+      - main
+      - ui-custom-shell-migration
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    env:
+      DEBUG: "True"
+      SECRET_KEY: "ci-only-not-a-production-secret"
+      DATABASE_URL: "sqlite:///ci.sqlite3"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
+      EMAIL_BACKEND: "django.core.mail.backends.locmem.EmailBackend"
+      PLAYWRIGHT_E2E: "1"
+      DJANGO_ALLOW_ASYNC_UNSAFE: "true"
+      PLAYWRIGHT_SCREENSHOT_DIR: artifacts/playwright
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install application dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright
+        run: pip install playwright
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: python manage.py test quiz_app.test_browser_stabilisation --verbosity=2
+
+      - name: Upload Playwright screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-screenshots
+          path: artifacts/playwright
+          if-no-files-found: ignore

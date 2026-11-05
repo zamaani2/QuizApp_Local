@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from django.template.loader import get_template
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from .models import (
@@ -23,7 +23,6 @@ from .models import (
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 PREVIOUSLY_REPORTED_TEMPLATES = (
     "quiz/question/question_create.html",
-    "quiz/question/question_delete.html",
     "quiz/question/question_import.html",
     "superadmin/admin_detail.html",
 )
@@ -171,7 +170,13 @@ class AuthenticatedWorkflowTests(TestCase):
         self.assertEqual(create_page.status_code, 200)
         self.assertContains(create_page, "js/question_management.js")
         self.assertContains(create_page, "vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js")
+        self.assertNotContains(create_page, "vendor/popperjs/2.11.8/umd/popper.min.js")
         self.assertContains(create_page, "sweetalert2.all.min.js")
+        quiz_detail = self.client.get(reverse("quiz_app:quiz_detail", args=[self.quiz.pk]))
+        self.assertEqual(quiz_detail.status_code, 200)
+        self.assertContains(quiz_detail, "js/question_management.js")
+        self.assertContains(quiz_detail, "delete-question-btn")
+        self.assertContains(quiz_detail, "data-delete-url")
         self.assertContains(create_page, 'id="questionForm"')
         self.assertEqual(import_page.status_code, 200)
         self.assertContains(import_page, 'id="importForm"')
@@ -366,11 +371,21 @@ class AuthenticatedWorkflowTests(TestCase):
             reverse("quiz_app:question_delete", args=[self.quiz.pk, question.pk])
         )
         self.assertEqual(delete_page.status_code, 405)
-        delete_response = self.client.post(
-            reverse("quiz_app:question_delete", args=[self.quiz.pk, question.pk])
+        ajax_delete = self.client.post(
+            reverse("quiz_app:question_delete", args=[self.quiz.pk, question.pk]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
-        self.assertEqual(delete_response.status_code, 302)
+        self.quiz.refresh_from_db()
+        self.assertEqual(ajax_delete.status_code, 200, ajax_delete.content)
+        self.assertTrue(ajax_delete.json()["success"])
         self.assertFalse(Question.objects.filter(pk=question.pk).exists())
+        self.assertEqual(self.quiz.total_marks, self.question.marks)
+
+        duplicate_delete = self.client.post(
+            reverse("quiz_app:question_delete", args=[self.quiz.pk, question.pk]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(duplicate_delete.status_code, 404)
 
         import_page = self.client.get(
             reverse("quiz_app:question_bulk_import", args=[self.quiz.pk])
@@ -460,6 +475,36 @@ class AuthenticatedWorkflowTests(TestCase):
 
         logout_response = self.client.get(reverse("quiz_app:logout"))
         self.assertEqual(logout_response.status_code, 302)
+
+    def test_question_delete_requires_csrf_and_blocks_attempt_history(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.teacher_user)
+        url = reverse(
+            "quiz_app:question_delete", args=[self.quiz.pk, self.question.pk]
+        )
+        missing_csrf = csrf_client.post(
+            url, HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(missing_csrf.status_code, 403)
+        self.assertTrue(Question.objects.filter(pk=self.question.pk).exists())
+
+        self.client.force_login(self.teacher_user)
+        QuizAttempt.objects.create(
+            quiz=self.quiz,
+            student=self.student,
+            school=self.school,
+            attempt_number=1,
+        )
+        blocked = self.client.post(url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(blocked.status_code, 400)
+        self.assertFalse(blocked.json()["success"])
+        self.assertIn("attempts", blocked.json()["error"].lower())
+        self.assertTrue(Question.objects.filter(pk=self.question.pk).exists())
+
+        student_client = Client()
+        student_client.force_login(self.student_user)
+        denied = student_client.post(url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(denied.status_code, 403)
 
 
 @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
