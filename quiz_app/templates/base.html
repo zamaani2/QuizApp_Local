@@ -1,614 +1,469 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
-  <!--begin::Head-->
+<html lang="en" data-bs-theme="light" data-app-theme="academic">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>
-      {% block title %}SIS{% endblock title %} | School Information System
-    </title>
-    <!--begin::Primary Meta Tags-->
+    <title>{% block title %}SIS{% endblock title %} | School Information System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="title" content="School Information System" />
     <meta name="author" content="SchoolApp" />
-    <meta
-      name="description"
-      content="School Information System - Complete management solution for schools."
-    />
-    <meta
-      name="keywords"
-      content="school, management, information system, student, teacher, admin, education"
-    />
-    <!-- Browser compatibility meta tags -->
+    <meta name="description" content="School Information System - Complete management solution for schools." />
+    <meta name="keywords" content="school, management, information system, student, teacher, admin, education" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="msapplication-TileColor" content="#27ddf5" />
+    <meta name="msapplication-TileColor" content="#1e40af" />
     <meta name="msapplication-config" content="none" />
-    <!-- Add theme color for mobile browsers -->
-    <meta name="theme-color" content="#27ddf5" />
+    <meta name="theme-color" content="#1e40af" />
     <link rel="icon" href="{% static 'favicon.ico' %}" />
     <link rel="apple-touch-icon" href="{% static 'favicon.ico' %}" />
-    <!--end::Primary Meta Tags-->
 
-    <!-- Early theme and appearance initialization to eliminate flash -->
     <script>
-      (function() {
+      (function () {
         try {
-          var mode = localStorage.getItem('preferredColorMode') || 'auto';
-          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          var resolved = mode === 'auto' ? (prefersDark ? 'dark' : 'light') : mode;
-          document.documentElement.setAttribute('data-bs-theme', resolved);
-          var theme = localStorage.getItem('preferredTheme') || 'academic';
-          document.documentElement.setAttribute('data-app-theme', theme);
-        } catch(e) {}
+          var savedTheme = localStorage.getItem('preferredTheme');
+          var validThemes = ['academic', 'green', 'purple', 'red'];
+          if (!savedTheme || validThemes.indexOf(savedTheme) === -1) {
+            savedTheme = 'academic';
+            localStorage.setItem('preferredTheme', savedTheme);
+          }
+          document.documentElement.setAttribute('data-app-theme', savedTheme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-app-theme', 'academic');
+        }
       })();
     </script>
 
-    <!-- Import the centralized styles -->
     {% include 'partials/_styles.html' %}
-
     {% block extra_css %}{% endblock %}
   </head>
-  <!--end::Head-->
-  <!--begin::Body-->
 
-  <body
-    class="layout-fixed sidebar-expand-lg sidebar-mini sidebar-collapse"
-  >
+  <body class="custom-app-shell">
     <a class="skip-link" href="#main-content">Skip to main content</a>
-    <!--begin::App Wrapper-->
+
     <div class="app-wrapper">
-      <!--begin::Header-->
-      <nav
-        class="app-header navbar navbar-expand"
-        aria-label="Main navigation"
-      >
-        <!--begin::Container-->
-        <div class="container-fluid">
-          <!--begin::Start Navbar Links-->
-          <ul class="navbar-nav align-items-center">
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                data-lte-toggle="sidebar"
-                href="#"
-                role="button"
-                aria-label="Toggle sidebar"
-                aria-controls="app-sidebar"
-              >
-                <i class="bi bi-list fs-5" aria-hidden="true"></i>
-                <span class="visually-hidden">Toggle sidebar</span>
-              </a>
-            </li>
-            <li class="nav-item d-none d-sm-block">
-              <a href="{% if request.user.role == 'superadmin' %}{% url 'quiz_app:superadmin_dashboard' %}{% else %}{% url 'quiz_app:dashboard' %}{% endif %}" class="nav-link fw-semibold">
-                <i class="bi bi-house-door me-1"></i>Home
-              </a>
-            </li>
-            <li class="nav-item d-none d-md-block ms-2">
-              <span class="badge {% if request.user.role == 'admin' %}bg-primary-subtle text-primary border border-primary-subtle{% elif request.user.role == 'teacher' %}bg-success-subtle text-success border border-success-subtle{% elif request.user.role == 'student' %}bg-info-subtle text-info border border-info-subtle{% else %}bg-secondary-subtle text-secondary border border-secondary-subtle{% endif %} px-2.5 py-1">
-                {% if request.user.role == 'admin' %}School Management{% elif request.user.role == 'teacher' %}Teaching Workspace{% elif request.user.role == 'student' %}Learning Portal{% elif request.user.role == 'superadmin' %}Superadmin Console{% else %}School System{% endif %}
-              </span>
-            </li>
-          </ul>
-          <!--end::Start Navbar Links-->
+      <header class="app-header" aria-label="Main navigation">
+        <div class="app-header-inner">
+          <div class="app-header-start">
+            <button class="app-sidebar-toggle" type="button" aria-label="Toggle sidebar" aria-controls="app-sidebar" aria-expanded="false">
+              <i class="bi bi-list" aria-hidden="true"></i>
+            </button>
 
-          <!--begin::End Navbar Links-->
-          <ul class="navbar-nav ms-auto align-items-center">
-            <!-- Consolidated Appearance & Theme Dropdown -->
-            <li class="nav-item dropdown">
-              <button
-                class="btn btn-link nav-link dropdown-toggle d-flex align-items-center"
-                id="bd-theme"
-                type="button"
-                aria-expanded="false"
-                data-bs-toggle="dropdown"
-                data-bs-display="static"
-                aria-label="Appearance and Theme Preferences"
-              >
-                <i class="bi bi-palette2 me-1"></i>
-                <span class="d-none d-lg-inline">Appearance</span>
+            <a href="{% if request.user.role == 'superadmin' %}{% url 'quiz_app:superadmin_dashboard' %}{% else %}{% url 'quiz_app:dashboard' %}{% endif %}" class="app-home-link">
+              <i class="bi bi-house-door"></i>
+              <span>Home</span>
+            </a>
+
+            <span class="app-role-badge {% if request.user.role == 'admin' %}admin{% elif request.user.role == 'teacher' %}teacher{% elif request.user.role == 'student' %}student{% elif request.user.role == 'superadmin' %}superadmin{% endif %}">
+              {% if request.user.role == 'admin' %}School Management{% elif request.user.role == 'teacher' %}Teaching Workspace{% elif request.user.role == 'student' %}Learning Portal{% elif request.user.role == 'superadmin' %}Superadmin Console{% else %}School System{% endif %}
+            </span>
+          </div>
+
+          <div class="app-header-end">
+            <div class="theme-dropdown-container">
+              <button class="app-theme-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Appearance and theme preferences">
+                <i class="bi bi-palette2"></i>
+                <span>Appearance</span>
               </button>
-              <div
-                class="dropdown-menu dropdown-menu-end shadow p-3"
-                style="min-width: 250px"
-                aria-labelledby="bd-theme"
-              >
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                  <span class="text-uppercase fw-bold text-muted small" style="font-size: 0.725rem; letter-spacing: 0.05em">Color Mode</span>
-                </div>
-                <div class="btn-group w-100 mb-3" role="group" aria-label="Color Mode Switcher">
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary btn-sm"
-                    data-bs-theme-value="light"
-                    aria-pressed="false"
-                    title="Light Mode"
-                  >
-                    <i class="bi bi-sun-fill me-1"></i>Light
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary btn-sm"
-                    data-bs-theme-value="dark"
-                    aria-pressed="false"
-                    title="Dark Mode"
-                  >
-                    <i class="bi bi-moon-fill me-1"></i>Dark
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary btn-sm"
-                    data-bs-theme-value="auto"
-                    aria-pressed="true"
-                    title="System Auto"
-                  >
-                    <i class="bi bi-circle-half me-1"></i>Auto
-                  </button>
-                </div>
 
-                <div class="d-flex align-items-center justify-content-between mb-2 pt-2 border-top">
-                  <span class="text-uppercase fw-bold text-muted small" style="font-size: 0.725rem; letter-spacing: 0.05em">Theme Accent</span>
-                </div>
-                <div class="list-group list-group-flush gap-1">
-                  <button
-                    type="button"
-                    class="list-group-item list-group-item-action d-flex align-items-center px-2 py-1.5 rounded border-0"
-                    data-theme="academic"
-                  >
-                    <span class="theme-color-dot me-2.5" style="background: #1e40af;"></span>
-                    <div class="flex-grow-1 text-start">
-                      <div class="fw-semibold small">Academic Pro</div>
-                      <small class="text-muted d-block" style="font-size: 0.725rem">Classic school navy</small>
-                    </div>
+              <div class="dropdown-menu dropdown-menu-end theme-menu">
+                <div class="theme-menu-header">Theme Accent</div>
+                <div class="theme-options">
+                  <button type="button" class="theme-option is-active" data-theme="academic" aria-pressed="true">
+                    <span class="theme-color-dot academic"></span>
+                    <span class="theme-option-copy">
+                      <span class="theme-option-name">Academic Pro</span>
+                      <span class="theme-option-subtitle">Classic school navy</span>
+                    </span>
                   </button>
-                  <button
-                    type="button"
-                    class="list-group-item list-group-item-action d-flex align-items-center px-2 py-1.5 rounded border-0"
-                    data-theme="green"
-                  >
-                    <span class="theme-color-dot me-2.5" style="background: #059669;"></span>
-                    <div class="flex-grow-1 text-start">
-                      <div class="fw-semibold small">Green Vibrant</div>
-                      <small class="text-muted d-block" style="font-size: 0.725rem">Fresh emerald energy</small>
-                    </div>
+                  <button type="button" class="theme-option" data-theme="green" aria-pressed="false">
+                    <span class="theme-color-dot green"></span>
+                    <span class="theme-option-copy">
+                      <span class="theme-option-name">Green Vibrant</span>
+                      <span class="theme-option-subtitle">Fresh emerald energy</span>
+                    </span>
                   </button>
-                  <button
-                    type="button"
-                    class="list-group-item list-group-item-action d-flex align-items-center px-2 py-1.5 rounded border-0"
-                    data-theme="purple"
-                  >
-                    <span class="theme-color-dot me-2.5" style="background: #7c3aed;"></span>
-                    <div class="flex-grow-1 text-start">
-                      <div class="fw-semibold small">Purple Vibrant</div>
-                      <small class="text-muted d-block" style="font-size: 0.725rem">Royal violet accent</small>
-                    </div>
+                  <button type="button" class="theme-option" data-theme="purple" aria-pressed="false">
+                    <span class="theme-color-dot purple"></span>
+                    <span class="theme-option-copy">
+                      <span class="theme-option-name">Purple Vibrant</span>
+                      <span class="theme-option-subtitle">Elegant royal violet</span>
+                    </span>
                   </button>
-                  <button
-                    type="button"
-                    class="list-group-item list-group-item-action d-flex align-items-center px-2 py-1.5 rounded border-0"
-                    data-theme="red"
-                  >
-                    <span class="theme-color-dot me-2.5" style="background: #dc2626;"></span>
-                    <div class="flex-grow-1 text-start">
-                      <div class="fw-semibold small">Red Vibrant</div>
-                      <small class="text-muted d-block" style="font-size: 0.725rem">Bold ruby energy</small>
-                    </div>
+                  <button type="button" class="theme-option" data-theme="red" aria-pressed="false">
+                    <span class="theme-color-dot red"></span>
+                    <span class="theme-option-copy">
+                      <span class="theme-option-name">Red Vibrant</span>
+                      <span class="theme-option-subtitle">Bold energetic red</span>
+                    </span>
                   </button>
                 </div>
               </div>
-            </li>
+            </div>
 
-            <!-- Session Timer -->
-            <li class="nav-item">
-              <a
-                class="nav-link"
-                href="#"
-                id="session-timer-display"
-                aria-label="Session time remaining"
-                title="Click to extend session"
-              >
-                <i class="bi bi-clock me-1"></i>
-                <span><span id="session-time-remaining">--:--:--</span></span>
-              </a>
-            </li>
+            <button class="app-fullscreen-toggle" type="button" aria-label="Toggle fullscreen" title="Toggle fullscreen">
+              <i class="bi bi-arrows-fullscreen"></i>
+            </button>
 
-            <!-- Fullscreen Toggle -->
-            <li class="nav-item d-none d-md-block">
-              <a
-                class="nav-link"
-                href="#"
-                data-lte-toggle="fullscreen"
-                aria-label="Toggle fullscreen"
-                title="Toggle fullscreen"
-              >
-                <i
-                  data-lte-icon="maximize"
-                  class="bi bi-arrows-fullscreen"
-                  aria-hidden="true"
-                ></i>
-                <i
-                  data-lte-icon="minimize"
-                  class="bi bi-fullscreen-exit"
-                  style="display: none"
-                  aria-hidden="true"
-                ></i>
-                <span class="visually-hidden">Toggle fullscreen</span>
-              </a>
-            </li>
+            <div class="app-session-timer" id="session-timer-display" aria-live="polite">
+              <i class="bi bi-clock-history"></i>
+              <span id="session-time-remaining">00:00:00</span>
+            </div>
 
-            <!-- User Menu Dropdown -->
-            <li class="nav-item dropdown user-menu">
-              <a
-                href="#"
-                class="nav-link dropdown-toggle d-flex align-items-center gap-2"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-                aria-label="User menu"
-              >
-                <img
-                  src="{% static 'admin/dist/assets/img/default-avatar.png' %}"
-                  class="user-image rounded-circle"
-                  alt="User profile picture"
-                  width="32"
-                  height="32"
-                />
-                <span class="d-none d-md-inline fw-semibold"
-                  >{{ request.user.full_name }}</span
-                >
-              </a>
-              <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-end shadow">
-                <!-- User Header -->
+            <div class="dropdown user-menu">
+              <button class="app-user-trigger dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="User menu">
+                <img src="{% static 'admin/dist/assets/img/default-avatar.png' %}" class="user-image" alt="User profile picture" width="32" height="32" />
+                <span class="user-name d-none d-md-inline">{{ request.user.full_name }}</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end user-menu-dropdown">
                 <li class="user-header">
-                  <img
-                    src="{% static 'admin/dist/assets/img/default-avatar.png' %}"
-                    class="rounded-circle shadow-sm mb-2"
-                    alt="User profile picture"
-                    width="72"
-                    height="72"
-                  />
-                  <p class="mb-0 fw-bold fs-6">
-                    {{ request.user.full_name }}
-                  </p>
-                  <small class="opacity-75">{{ request.user.get_role_display }}</small>
+                  <img src="{% static 'admin/dist/assets/img/default-avatar.png' %}" class="rounded-circle mb-2" alt="User profile picture" width="72" height="72" />
+                  <p>{{ request.user.full_name }}</p>
+                  <small>{{ request.user.get_role_display }}</small>
                 </li>
-                <!-- Menu Footer -->
                 <li class="user-footer">
                   {% if request.user.role == 'teacher' %}
                   <a href="{% url 'quiz_app:teacher_profile' %}" class="btn btn-outline-secondary btn-sm">Profile</a>
                   {% elif request.user.role == 'student' %}
                   <a href="{% url 'quiz_app:student_profile' %}" class="btn btn-outline-secondary btn-sm">Profile</a>
                   {% endif %}
-                  <a
-                    href="{% url 'quiz_app:logout' %}"
-                    class="btn btn-danger btn-sm"
-                    >Sign out</a
-                  >
+                  <a href="{% url 'quiz_app:logout' %}" class="btn btn-danger btn-sm">Sign out</a>
                 </li>
               </ul>
-            </li>
-          </ul>
-          <!--end::End Navbar Links-->
+            </div>
+          </div>
         </div>
-        <!--end::Container-->
-      </nav>
-      <!--end::Header-->
-      <!--begin::Sidebar-->
-      <aside
-        id="app-sidebar"
-        class="app-sidebar"
-        data-bs-theme="dark"
-        aria-label="Main sidebar"
-      >
-        <!--begin::Sidebar Brand-->
+      </header>
+
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Main sidebar">
         <div class="sidebar-brand">
-          <!--begin::Brand Link-->
-          <a
-            href="{% if request.user.role == 'superadmin' %}{% url 'quiz_app:superadmin_dashboard' %}{% else %}{% url 'quiz_app:dashboard' %}{% endif %}"
-            class="brand-link"
-            aria-label="Go to dashboard"
-          >
-            <!--begin::Brand Image-->
-            <img
-              src="{% static 'admin/dist/assets/img/AdminLTELogo.png' %}"
-              alt="System Logo"
-              class="brand-image opacity-75 shadow-sm rounded"
-              width="32"
-              height="32"
-            />
-            <!--end::Brand Image-->
-            <!--begin::Brand Text-->
-            <span class="brand-text">
-              {% if user.is_authenticated and user.is_superadmin %} SUPERADMIN
-              PORTAL {% else %} SCHOOL SYSTEM {% endif %}
-            </span>
-            <!--end::Brand Text-->
+          <a href="{% if request.user.role == 'superadmin' %}{% url 'quiz_app:superadmin_dashboard' %}{% else %}{% url 'quiz_app:dashboard' %}{% endif %}" class="brand-link" aria-label="Go to dashboard">
+            <img src="{% static 'admin/dist/assets/img/AdminLTELogo.png' %}" alt="System Logo" class="brand-image" width="32" height="32" />
+            <span class="brand-text">{% if user.is_authenticated and user.is_superadmin %}SUPERADMIN PORTAL{% else %}SCHOOL SYSTEM{% endif %}</span>
           </a>
-          <!--end::Brand Link-->
         </div>
-        <!--end::Sidebar Brand-->
-        <!--begin::Sidebar Wrapper-->
+
         <div class="sidebar-wrapper">
-          <nav class="mt-2" aria-label="Sidebar navigation">
-            <ul
-              class="nav sidebar-menu flex-column"
-              data-accordion="false"
-            >
+          <nav aria-label="Sidebar navigation">
+            <ul class="sidebar-menu" data-accordion="false">
               {% include 'partials/_menu_items.html' %}
             </ul>
           </nav>
         </div>
-        <!--end::Sidebar Wrapper-->
       </aside>
-      <!--end::Sidebar-->
-      <!--begin::App Main-->
-      <main class="app-main" id="main-content" tabindex="-1">
-        <!--begin::App Content Header-->
-        <div class="app-content-header">
-          <div class="container-fluid">
-            <div class="row">
-              <div class="col-sm-6">
-                <h1 class="mb-0">
-                  {% block page_title %}Dashboard{% endblock page_title %}
-                </h1>
-              </div>
-              <div class="col-sm-6">
-                <nav aria-label="breadcrumb">
-                  <ol class="breadcrumb float-sm-end">
-                    {% block breadcrumb %}
-                    <li class="breadcrumb-item active" aria-current="page">
-                      Dashboard
-                    </li>
-                    {% endblock breadcrumb %}
-                  </ol>
-                </nav>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!--end::App Content Header-->
 
-        <!--begin::App Content-->
+      <div class="app-sidebar-backdrop" aria-hidden="true"></div>
+
+      <main class="app-main" id="main-content" tabindex="-1">
+        <header class="app-content-header">
+          <div class="container-fluid app-content-header-inner">
+            <div class="app-page-title-block">
+              <h1>{% block page_title %}Dashboard{% endblock page_title %}</h1>
+            </div>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb">
+                {% block breadcrumb %}
+                <li class="breadcrumb-item active" aria-current="page">Dashboard</li>
+                {% endblock breadcrumb %}
+              </ol>
+            </nav>
+          </div>
+        </header>
+
         <div class="app-content">
           <div class="container-fluid">
-            <!-- Flash Messages -->
             {% if messages %}
             <div class="messages" aria-live="polite">
               {% for message in messages %}
-              <div
-                class="alert alert-{{ message.tags }} alert-dismissible fade show"
-                role="alert"
-              >
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
                 {{ message }}
-                <button
-                  type="button"
-                  class="btn-close"
-                  data-bs-dismiss="alert"
-                  aria-label="Close"
-                ></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
               </div>
               {% endfor %}
             </div>
 
-            <!-- Hidden messages for SweetAlert processing -->
             <div id="django-messages" style="display: none">
               {% for message in messages %}
-              <div
-                class="django-message"
-                data-message-type="{{ message.tags }}"
-              >
-                {{ message }}
-              </div>
+              <div class="django-message" data-message-type="{{ message.tags }}">{{ message }}</div>
               {% endfor %}
             </div>
-            {% endif %} {% block content %}
-            <!-- Content goes here -->
-            {% endblock content %}
+            {% endif %}
+
+            {% block content %}{% endblock content %}
           </div>
         </div>
-        <!--end::App Content-->
       </main>
-      <!--end::App Main-->
-      <!--begin::Footer-->
-      <footer class="app-footer">
-        <!--begin::To the end-->
-        <div class="float-end d-none d-sm-inline">School Management System</div>
-        <!--end::To the end-->
-        <!--begin::Copyright-->
-        <strong>
-          Copyright &copy; {% now "Y" %}&nbsp;
-          Cissey-Tech.
-        </strong>
-        All rights reserved.
-        <!--end::Copyright-->
-      </footer>
-      <!--end::Footer-->
-    </div>
-    <!--end::App Wrapper-->
-    <!--begin::Script-->
-    <!-- Browser compatibility polyfills -->
-    <script>
-      // Polyfill for older browsers (Edge compatibility)
-      if (!window.Promise) {
-        document.write(
-          '<script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"><\/script>'
-        );
-      }
 
-      // Polyfill for Object.assign
-      if (typeof Object.assign != "function") {
-        Object.assign = function (target) {
-          "use strict";
-          if (target == null) {
-            throw new TypeError("Cannot convert undefined or null to object");
+      <footer class="app-footer">
+        <div class="app-footer-meta">School Management System</div>
+        <div class="app-footer-copy">
+          <strong>Copyright &copy; {% now "Y" %} Cissey-Tech.</strong>
+          All rights reserved.
+        </div>
+      </footer>
+    </div>
+
+    <script src="{% static 'vendor/jquery/3.7.1/jquery-3.7.1.min.js' %}"></script>
+    <script src="{% static 'vendor/popperjs/2.11.8/umd/popper.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'vendor/datatables/1.13.7/js/jquery.dataTables.min.js' %}"></script>
+    <script src="{% static 'vendor/datatables/1.13.7/js/dataTables.bootstrap5.min.js' %}"></script>
+    <script src="{% static 'vendor/overlayscrollbars/2.10.1/browser/overlayscrollbars.browser.es6.min.js' %}"></script>
+    <script src="{% static 'vendor/sweetalert2/11.7.32/dist/sweetalert2.all.min.js' %}"></script>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const validThemes = ['academic', 'green', 'purple', 'red'];
+        const applyTheme = function (themeName) {
+          const safeTheme = validThemes.indexOf(themeName) !== -1 ? themeName : 'academic';
+          document.body.classList.remove('academic-pro-theme-page', 'green-theme-page', 'purple-theme-page', 'red-theme-page');
+          document.body.classList.add(safeTheme === 'academic' ? 'academic-pro-theme-page' : safeTheme + '-theme-page');
+          document.documentElement.setAttribute('data-app-theme', safeTheme);
+          try {
+            localStorage.setItem('preferredTheme', safeTheme);
+          } catch (e) {
+            // fallback if storage is unavailable
           }
-          var to = Object(target);
-          for (var index = 1; index < arguments.length; index++) {
-            var nextSource = arguments[index];
-            if (nextSource != null) {
-              for (var nextKey in nextSource) {
-                if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-                  to[nextKey] = nextSource[nextKey];
-                }
+
+          document.querySelectorAll('.theme-option').forEach(function (button) {
+            const isActive = button.getAttribute('data-theme') === safeTheme;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+          });
+        };
+
+        const savedTheme = (function () {
+          try {
+            const stored = localStorage.getItem('preferredTheme');
+            return validThemes.indexOf(stored) !== -1 ? stored : 'academic';
+          } catch (e) {
+            return 'academic';
+          }
+        })();
+        applyTheme(savedTheme);
+
+        document.querySelectorAll('.theme-option').forEach(function (button) {
+          button.addEventListener('click', function () {
+            applyTheme(button.getAttribute('data-theme'));
+          });
+        });
+
+        const fullscreenToggle = document.querySelector('.app-fullscreen-toggle');
+        if (fullscreenToggle && document.documentElement.requestFullscreen) {
+          fullscreenToggle.addEventListener('click', function () {
+            if (!document.fullscreenElement) {
+              document.documentElement.requestFullscreen();
+            } else {
+              document.exitFullscreen();
+            }
+          });
+        } else if (fullscreenToggle) {
+          fullscreenToggle.disabled = true;
+          fullscreenToggle.setAttribute('title', 'Fullscreen unavailable in this browser');
+        }
+
+        const sidebar = document.getElementById('app-sidebar');
+        const backdrop = document.querySelector('.app-sidebar-backdrop');
+        const toggleButton = document.querySelector('.app-sidebar-toggle');
+        const setSidebarState = function (isOpen) {
+          if (!sidebar) return;
+          sidebar.classList.toggle('is-open', isOpen);
+          document.body.classList.toggle('sidebar-open', isOpen);
+          if (toggleButton) {
+            toggleButton.setAttribute('aria-expanded', String(isOpen));
+          }
+        };
+
+        if (toggleButton) {
+          toggleButton.addEventListener('click', function () {
+            setSidebarState(!sidebar.classList.contains('is-open'));
+          });
+        }
+
+        if (backdrop) {
+          backdrop.addEventListener('click', function () {
+            setSidebarState(false);
+          });
+        }
+
+        const setActiveSidebarItem = function () {
+          const links = document.querySelectorAll('.sidebar-menu .nav-link');
+          const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
+
+          links.forEach(function (link) {
+            const href = link.getAttribute('href');
+            if (!href || href === '#') {
+              link.classList.remove('active');
+              if (link.getAttribute('aria-expanded')) {
+                link.setAttribute('aria-expanded', 'false');
+              }
+              return;
+            }
+
+            try {
+              const targetPath = new URL(href, window.location.origin).pathname.replace(/\/+$/, '') || '/';
+              const isActive = currentPath === targetPath || (targetPath !== '/' && currentPath.startsWith(targetPath + '/'));
+              link.classList.toggle('active', isActive);
+              link.setAttribute('aria-current', isActive ? 'page' : 'false');
+            } catch (e) {
+              link.classList.remove('active');
+            }
+          });
+
+          const activeItem = document.querySelector('.sidebar-menu .nav-link.active')?.closest('.nav-item');
+          if (activeItem) {
+            const submenu = activeItem.querySelector(':scope > .nav-treeview');
+            const parentLink = activeItem.querySelector(':scope > .nav-link');
+            if (submenu) {
+              activeItem.classList.add('is-open');
+              submenu.hidden = false;
+              if (parentLink) {
+                parentLink.setAttribute('aria-expanded', 'true');
               }
             }
           }
-          return to;
         };
-      }
 
-      // Polyfill for Array.from
-      if (!Array.from) {
-        Array.from = function (arrayLike) {
-          return Array.prototype.slice.call(arrayLike);
-        };
-      }
+        document.querySelectorAll('.sidebar-menu .nav-item > .nav-link').forEach(function (link) {
+          const parentItem = link.closest('.nav-item');
+          const submenu = parentItem ? parentItem.querySelector(':scope > .nav-treeview') : null;
+          if (!submenu) return;
 
-      // Polyfill for String.includes
-      if (!String.prototype.includes) {
-        String.prototype.includes = function (search, start) {
-          if (typeof start !== "number") {
-            start = 0;
-          }
-          if (start + search.length > this.length) {
-            return false;
-          } else {
-            return this.indexOf(search, start) !== -1;
-          }
-        };
-      }
-    </script>
+          link.setAttribute('aria-expanded', parentItem.classList.contains('is-open') ? 'true' : 'false');
+          submenu.hidden = !parentItem.classList.contains('is-open');
 
-    <!-- jQuery first (local) -->
-    <script src="{% static 'vendor/jquery/3.7.1/jquery-3.7.1.min.js' %}"></script>
+          link.addEventListener('click', function (event) {
+            if (link.getAttribute('href') !== '#') {
+              return;
+            }
+            event.preventDefault();
+            const shouldOpen = !parentItem.classList.contains('is-open');
+            parentItem.classList.toggle('is-open', shouldOpen);
+            submenu.hidden = !shouldOpen;
+            link.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
 
-    <!-- Bootstrap and its dependencies (local) -->
-    <script src="{% static 'vendor/popperjs/2.11.8/umd/popper.min.js' %}"></script>
-    <script src="{% static 'vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js' %}"></script>
-
-    <!-- DataTables (local) -->
-    <script src="{% static 'vendor/datatables/1.13.7/js/jquery.dataTables.min.js' %}"></script>
-    <script src="{% static 'vendor/datatables/1.13.7/js/dataTables.bootstrap5.min.js' %}"></script>
-
-    <!-- Other plugins (local) -->
-    <script src="{% static 'vendor/overlayscrollbars/2.10.1/browser/overlayscrollbars.browser.es6.min.js' %}"></script>
-    <script src="{% static 'admin/dist/js/adminlte.js' %}"></script>
-
-    <!-- Sweet Alert for better notifications (local) -->
-    <script src="{% static 'vendor/sweetalert2/11.7.32/dist/sweetalert2.all.min.js' %}"></script>
-
-    <!-- Active Menu State Handler -->
-    <script src="{% static 'js/active-menu.js' %}"></script>
-
-    <!-- Sidebar Menu Treeview Handler -->
-    <script src="{% static 'js/sidebar-menu.js' %}"></script>
-
-    <!-- Initialize SweetAlert notifications from session -->
-    <script>
-      {% if sweet_alert %}
-          document.addEventListener('DOMContentLoaded', function () {
-            Swal.fire({
-              title: "{% if sweet_alert.title %}{{ sweet_alert.title|escapejs }}{% else %}Notification{% endif %}",
-              text: "{% if sweet_alert.text %}{{ sweet_alert.text|escapejs }}{% else %}{% endif %}",
-              icon: "{% if sweet_alert.icon %}{{ sweet_alert.icon|escapejs }}{% else %}info{% endif %}",
-              confirmButtonText: 'OK'
+            document.querySelectorAll('.sidebar-menu .nav-item').forEach(function (item) {
+              if (item === parentItem) return;
+              const siblingSubmenu = item.querySelector(':scope > .nav-treeview');
+              const siblingLink = item.querySelector(':scope > .nav-link');
+              if (siblingSubmenu) {
+                item.classList.remove('is-open');
+                siblingSubmenu.hidden = true;
+              }
+              if (siblingLink) {
+                siblingLink.setAttribute('aria-expanded', 'false');
+              }
             });
           });
+        });
+
+        setActiveSidebarItem();
+
+        document.querySelectorAll('.sidebar-menu .nav-treeview .nav-link').forEach(function (link) {
+          link.addEventListener('click', function () {
+            setSidebarState(false);
+          });
+        });
+
+        const mediaQuery = window.matchMedia('(max-width: 991.98px)');
+        if (mediaQuery.addEventListener) {
+          mediaQuery.addEventListener('change', function (event) {
+            if (!event.matches) {
+              setSidebarState(false);
+            }
+          });
+        }
+      });
+    </script>
+
+    <script>
+      {% if sweet_alert %}
+        document.addEventListener('DOMContentLoaded', function () {
+          Swal.fire({
+            title: "{% if sweet_alert.title %}{{ sweet_alert.title|escapejs }}{% else %}Notification{% endif %}",
+            text: "{% if sweet_alert.text %}{{ sweet_alert.text|escapejs }}{% else %}{% endif %}",
+            icon: "{% if sweet_alert.icon %}{{ sweet_alert.icon|escapejs }}{% else %}info{% endif %}",
+            confirmButtonText: 'OK'
+          });
+        });
       {% endif %}
     </script>
 
-    <!-- Process Django Messages with SweetAlert -->
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        // Check if we have URL parameters for notifications (for promotion page)
-        const urlParamsContainer = document.getElementById("url-params");
+      document.addEventListener('DOMContentLoaded', function () {
+        const urlParamsContainer = document.getElementById('url-params');
         if (urlParamsContainer) {
-          const successParam = urlParamsContainer
-            .querySelector("[data-success]")
-            ?.getAttribute("data-success");
-          const warningParam = urlParamsContainer
-            .querySelector("[data-warning]")
-            ?.getAttribute("data-warning");
-          const actionParam = urlParamsContainer
-            .querySelector("[data-action]")
-            ?.getAttribute("data-action");
+          const successParam = urlParamsContainer.querySelector('[data-success]')?.getAttribute('data-success');
+          const warningParam = urlParamsContainer.querySelector('[data-warning]')?.getAttribute('data-warning');
+          const actionParam = urlParamsContainer.querySelector('[data-action]')?.getAttribute('data-action');
 
-          if (successParam === "true") {
-            const action = actionParam || "operation";
-            let message = "Operation completed successfully!";
+          if (successParam === 'true') {
+            const action = actionParam || 'operation';
+            let message = 'Operation completed successfully!';
 
-            if (action === "promote") {
-              message = "Students promoted successfully!";
-            } else if (action === "demote") {
-              message = "Students demoted successfully!";
-            } else if (action === "graduate") {
-              message = "Students graduated successfully!";
+            if (action === 'promote') {
+              message = 'Students promoted successfully!';
+            } else if (action === 'demote') {
+              message = 'Students demoted successfully!';
+            } else if (action === 'graduate') {
+              message = 'Students graduated successfully!';
             }
 
             Swal.fire({
-              title: "Success!",
+              title: 'Success!',
               text: message,
-              icon: "success",
-              confirmButtonText: "OK",
-              confirmButtonColor: "#28a745",
+              icon: 'success',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#28a745',
               timer: 3000,
               timerProgressBar: true,
               showConfirmButton: false,
             });
 
-            // Clean up URL parameters
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, newUrl);
-            return; // Don't process Django messages if we have URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
           }
 
-          if (warningParam === "true") {
+          if (warningParam === 'true') {
             Swal.fire({
-              title: "Notice",
-              text: "Operation completed with warnings. Please review the results.",
-              icon: "warning",
-              confirmButtonText: "OK",
-              confirmButtonColor: "#ffc107",
+              title: 'Notice',
+              text: 'Operation completed with warnings. Please review the results.',
+              icon: 'warning',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#ffc107',
               timer: 4000,
               timerProgressBar: true,
               showConfirmButton: true,
             });
 
-            // Clean up URL parameters
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, newUrl);
-            return; // Don't process Django messages if we have URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
           }
         }
 
-        // Process Django messages if no URL parameters
-        const messagesContainer = document.getElementById("django-messages");
+        const messagesContainer = document.getElementById('django-messages');
         if (messagesContainer) {
-          const messages =
-            messagesContainer.querySelectorAll(".django-message");
-
+          const messages = messagesContainer.querySelectorAll('.django-message');
           messages.forEach(function (messageDiv) {
             const message = messageDiv.textContent.trim();
-            const messageType = messageDiv.getAttribute("data-message-type");
+            const messageType = messageDiv.getAttribute('data-message-type');
 
-            let icon = "info";
-            let title = "Information";
-            let confirmButtonColor = "#3085d6";
+            let icon = 'info';
+            let title = 'Information';
+            let confirmButtonColor = '#3085d6';
             let timer = null;
             let showConfirmButton = true;
 
-            if (messageType === "success") {
-              icon = "success";
-              title = "Success!";
-              confirmButtonColor = "#28a745";
-            } else if (messageType === "error") {
-              icon = "error";
-              title = "Error";
-              confirmButtonColor = "#dc3545";
-            } else if (messageType === "warning") {
-              icon = "warning";
-              title = "Notice";
-              confirmButtonColor = "#ffc107";
-              // Make warnings less intrusive - auto-dismiss after 5 seconds
+            if (messageType === 'success') {
+              icon = 'success';
+              title = 'Success!';
+              confirmButtonColor = '#28a745';
+            } else if (messageType === 'error') {
+              icon = 'error';
+              title = 'Error';
+              confirmButtonColor = '#dc3545';
+            } else if (messageType === 'warning') {
+              icon = 'warning';
+              title = 'Notice';
+              confirmButtonColor = '#ffc107';
               timer = 5000;
               showConfirmButton = false;
             }
@@ -617,14 +472,13 @@
               title: title,
               text: message,
               icon: icon,
-              confirmButtonText: "OK",
+              confirmButtonText: 'OK',
               confirmButtonColor: confirmButtonColor,
               allowOutsideClick: false,
               allowEscapeKey: true,
               showCloseButton: true,
             };
 
-            // Add timer for warnings
             if (timer) {
               swalOptions.timer = timer;
               swalOptions.timerProgressBar = true;
@@ -637,13 +491,8 @@
       });
     </script>
 
-    <!-- Advanced Theme Manager -->
-    <script src="{% static 'js/theme-manager.js' %}"></script>
-
-    <!-- Session Timer Script -->
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        // Initialize session timer countdown
+      document.addEventListener('DOMContentLoaded', function () {
         let sessionExpirySeconds = {{ session_expiry_seconds }};
         const timerDisplay = document.getElementById('session-time-remaining');
         let sessionWarningShown = false;
@@ -653,29 +502,21 @@
           if (sessionExpirySeconds > 0) {
             sessionExpirySeconds -= 1;
 
-            // Calculate hours, minutes, and seconds
             const hours = Math.floor(sessionExpirySeconds / 3600);
             const minutes = Math.floor((sessionExpirySeconds % 3600) / 60);
             const seconds = sessionExpirySeconds % 60;
 
-            // Format the time display
-            timerDisplay.innerHTML =
-              (hours < 10 ? '0' + hours : hours) + ':' +
-              (minutes < 10 ? '0' + minutes : minutes) + ':' +
-              (seconds < 10 ? '0' + seconds : seconds);
+            timerDisplay.innerHTML = (hours < 10 ? '0' + hours : hours) + ':' + (minutes < 10 ? '0' + minutes : minutes) + ':' + (seconds < 10 ? '0' + seconds : seconds);
 
-            // Warning when 5 minutes or less remaining
             if (sessionExpirySeconds <= 300 && !sessionWarningShown) {
-              timerDisplay.style.color = '#ff9800'; // Orange warning color
+              timerDisplay.style.color = '#ff9800';
               sessionWarningShown = true;
             }
 
-            // Danger when 1 minute or less remaining
             if (sessionExpirySeconds <= 60 && !sessionDangerShown) {
-              timerDisplay.style.color = '#f44336'; // Red danger color
+              timerDisplay.style.color = '#f44336';
               sessionDangerShown = true;
 
-              // Show warning at 60 seconds
               Swal.fire({
                 title: 'Session Expiring',
                 text: 'Your session will expire in 1 minute. Do you want to extend it?',
@@ -685,96 +526,31 @@
                 cancelButtonText: 'Let it expire',
                 confirmButtonColor: '#27ddf5',
                 cancelButtonColor: '#dc3545'
-              }).then((result) => {
+              }).then(function (result) {
                 if (result.isConfirmed) {
                   extendSession();
                 }
               });
             }
           } else {
-            // Session expired
             timerDisplay.innerHTML = '00:00:00';
             clearInterval(timerInterval);
 
             Swal.fire({
               title: 'Session Expired',
-              text: 'Your session has expired. You will be redirected to the login page.',
-              icon: 'info',
-              confirmButtonText: 'OK',
-              confirmButtonColor: '#27ddf5'
-            }).then(() => {
-              window.location.href = "{% url 'quiz_app:login' %}";
+              text: 'Your session has expired. Please log in again.',
+              icon: 'error',
+              showConfirmButton: true,
+              confirmButtonText: 'OK'
+            }).then(function () {
+              window.location.href = '{% url "quiz_app:logout" %}';
             });
           }
         }
 
-        function extendSession() {
-          // Extend session by making a request to the server
-          fetch("{% url 'quiz_app:extend_session' %}", {
-            method: 'POST',
-            headers: {
-              'X-CSRFToken': getCsrfToken(),
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({})
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.success) {
-              // Reset timer to full duration
-              sessionExpirySeconds = {{ session_cookie_age }};
-              timerDisplay.style.color = ''; // Reset color
-              sessionWarningShown = false;
-              sessionDangerShown = false;
-
-              // Show success message
-              Swal.fire({
-                title: 'Session Extended',
-                text: 'Your session has been extended successfully.',
-                icon: 'success',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#27ddf5'
-              });
-            }
-          })
-          .catch(error => {
-            console.error('Error extending session:', error);
-            Swal.fire({
-              title: 'Error',
-              text: 'There was a problem extending your session. Please refresh the page.',
-              icon: 'error',
-              confirmButtonText: 'OK',
-              confirmButtonColor: '#27ddf5'
-            });
-          });
-        }
-
-        // Update timer immediately and then every second
-        updateSessionTimer();
         const timerInterval = setInterval(updateSessionTimer, 1000);
-
-        // Add click handler to session timer display to allow manual extension
-        document.getElementById('session-timer-display').addEventListener('click', function(e) {
-          e.preventDefault();
-          extendSession();
-        });
+        updateSessionTimer();
       });
     </script>
-
-    <!-- Function to get CSRF token -->
-    <script>
-      function getCsrfToken() {
-        return (
-          document.querySelector("[name=csrfmiddlewaretoken]")?.value ||
-          document.cookie
-            .split("; ")
-            .find((row) => row.startsWith("csrftoken="))
-            ?.split("=")[1]
-        );
-      }
-    </script>
-    {% block extra_js %}{% endblock %}
-    <!--end::Script-->
   </body>
-  <!--end::Body-->
 </html>
