@@ -103,7 +103,7 @@
               <i class="bi bi-arrows-fullscreen"></i>
             </button>
 
-            <div class="app-session-timer" id="session-timer-display" aria-live="polite">
+            <div class="app-session-timer" id="session-timer-display" aria-live="off">
               <i class="bi bi-clock-history"></i>
               <span id="session-time-remaining">00:00:00</span>
             </div>
@@ -125,7 +125,12 @@
                   {% elif request.user.role == 'student' %}
                   <a href="{% url 'quiz_app:student_profile' %}" class="btn btn-outline-secondary btn-sm">Profile</a>
                   {% endif %}
-                  <a href="{% url 'quiz_app:logout' %}" class="btn btn-danger btn-sm">Sign out</a>
+                  <a
+                    href="{% if request.user.role == 'superadmin' %}{% url 'quiz_app:superadmin_logout' %}{% else %}{% url 'quiz_app:logout' %}{% endif %}"
+                    class="btn btn-danger btn-sm"
+                  >
+                    Sign out
+                  </a>
                 </li>
               </ul>
             </div>
