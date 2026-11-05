@@ -1155,23 +1155,6 @@
   }
 }
 
-/* ===== DARK MODE SUPPORT ===== */
-@media (prefers-color-scheme: dark) {
-  html[data-bs-theme="dark"] .green-theme-page {
-    --green-light: #0d1f0d;
-    --green-lighter: #1a3d1a;
-  }
-
-  html[data-bs-theme="dark"] .green-theme-page .card {
-    background: var(--green-lighter);
-    color: white;
-  }
-
-  html[data-bs-theme="dark"] .green-theme-page .table {
-    color: white;
-  }
-}
-
 /* ===== PRINT STYLES ===== */
 @media print {
   .green-theme-page .app-header,

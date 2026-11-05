@@ -1683,23 +1683,6 @@
   }
 }
 
-/* ===== DARK MODE SUPPORT ===== */
-@media (prefers-color-scheme: dark) {
-  html[data-bs-theme="dark"] .academic-pro-theme-page {
-    --academic-light: #0f172a;
-    --academic-lighter: #1e293b;
-  }
-
-  html[data-bs-theme="dark"] .academic-pro-theme-page .card {
-    background: var(--academic-lighter);
-    color: white;
-  }
-
-  html[data-bs-theme="dark"] .academic-pro-theme-page .table {
-    color: white;
-  }
-}
-
 /* ===== PRINT STYLES ===== */
 @media print {
   .academic-pro-theme-page .app-header,

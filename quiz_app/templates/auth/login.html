@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -24,7 +24,7 @@
         overflow-x: hidden;
       }
 
-      .login-page {
+      .auth-page {
         min-height: 100vh;
         background: linear-gradient(
           135deg,
@@ -40,7 +40,7 @@
       }
 
       /* Animated Background */
-      .login-page::before {
+      .auth-page::before {
         content: "";
         position: absolute;
         top: 0;
@@ -366,7 +366,7 @@
 
       /* Responsive Design */
       @media (max-width: 768px) {
-        .login-page {
+        .auth-page {
           padding: 1rem;
         }
 
@@ -397,7 +397,7 @@
     </style>
   </head>
 
-  <body class="hold-transition login-page">
+  <body class="auth-page">
     <div class="login-container">
       <div class="login-card">
         <div class="login-header">
@@ -489,9 +489,6 @@
     <script src="{% static 'vendor/jquery/3.7.1/jquery-3.7.1.min.js' %}"></script>
     <!-- Bootstrap 5 -->
     <script src="{% static 'vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js' %}"></script>
-    <!-- AdminLTE App -->
-    <script src="{% static 'admin/dist/js/adminlte.min.js' %}"></script>
-
     <!-- Custom Login Script -->
     <script>
       $(function () {
