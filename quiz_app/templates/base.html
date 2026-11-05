@@ -59,9 +59,9 @@
 
           <div class="app-header-end">
             <div class="theme-dropdown-container">
-              <button class="app-theme-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Appearance and theme preferences">
+              <button class="app-theme-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Accent theme preferences">
                 <i class="bi bi-palette2"></i>
-                <span>Appearance</span>
+                <span>Theme</span>
               </button>
 
               <div class="dropdown-menu dropdown-menu-end theme-menu">
@@ -110,12 +110,12 @@
 
             <div class="dropdown user-menu">
               <button class="app-user-trigger dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="User menu">
-                <img src="{% static 'admin/dist/assets/img/default-avatar.png' %}" class="user-image" alt="User profile picture" width="32" height="32" />
+                <img src="{% static 'img/no_user_img.png' %}" class="user-image" alt="User profile picture" width="32" height="32" />
                 <span class="user-name d-none d-md-inline">{{ request.user.full_name }}</span>
               </button>
               <ul class="dropdown-menu dropdown-menu-end user-menu-dropdown">
                 <li class="user-header">
-                  <img src="{% static 'admin/dist/assets/img/default-avatar.png' %}" class="rounded-circle mb-2" alt="User profile picture" width="72" height="72" />
+                  <img src="{% static 'img/no_user_img.png' %}" class="rounded-circle mb-2" alt="User profile picture" width="72" height="72" />
                   <p>{{ request.user.full_name }}</p>
                   <small>{{ request.user.get_role_display }}</small>
                 </li>
@@ -136,7 +136,7 @@
       <aside id="app-sidebar" class="app-sidebar" aria-label="Main sidebar">
         <div class="sidebar-brand">
           <a href="{% if request.user.role == 'superadmin' %}{% url 'quiz_app:superadmin_dashboard' %}{% else %}{% url 'quiz_app:dashboard' %}{% endif %}" class="brand-link" aria-label="Go to dashboard">
-            <img src="{% static 'admin/dist/assets/img/AdminLTELogo.png' %}" alt="System Logo" class="brand-image" width="32" height="32" />
+            <img src="{% static 'favicon.ico' %}" alt="System Logo" class="brand-image" width="32" height="32" />
             <span class="brand-text">{% if user.is_authenticated and user.is_superadmin %}SUPERADMIN PORTAL{% else %}SCHOOL SYSTEM{% endif %}</span>
           </a>
         </div>
@@ -208,6 +208,7 @@
     <script src="{% static 'vendor/datatables/1.13.7/js/dataTables.bootstrap5.min.js' %}"></script>
     <script src="{% static 'vendor/overlayscrollbars/2.10.1/browser/overlayscrollbars.browser.es6.min.js' %}"></script>
     <script src="{% static 'vendor/sweetalert2/11.7.32/dist/sweetalert2.all.min.js' %}"></script>
+    <script src="{% static 'js/sidebar-menu.js' %}"></script>
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
@@ -260,117 +261,6 @@
           fullscreenToggle.setAttribute('title', 'Fullscreen unavailable in this browser');
         }
 
-        const sidebar = document.getElementById('app-sidebar');
-        const backdrop = document.querySelector('.app-sidebar-backdrop');
-        const toggleButton = document.querySelector('.app-sidebar-toggle');
-        const setSidebarState = function (isOpen) {
-          if (!sidebar) return;
-          sidebar.classList.toggle('is-open', isOpen);
-          document.body.classList.toggle('sidebar-open', isOpen);
-          if (toggleButton) {
-            toggleButton.setAttribute('aria-expanded', String(isOpen));
-          }
-        };
-
-        if (toggleButton) {
-          toggleButton.addEventListener('click', function () {
-            setSidebarState(!sidebar.classList.contains('is-open'));
-          });
-        }
-
-        if (backdrop) {
-          backdrop.addEventListener('click', function () {
-            setSidebarState(false);
-          });
-        }
-
-        const setActiveSidebarItem = function () {
-          const links = document.querySelectorAll('.sidebar-menu .nav-link');
-          const currentPath = window.location.pathname.replace(/\/+$/, '') || '/';
-
-          links.forEach(function (link) {
-            const href = link.getAttribute('href');
-            if (!href || href === '#') {
-              link.classList.remove('active');
-              if (link.getAttribute('aria-expanded')) {
-                link.setAttribute('aria-expanded', 'false');
-              }
-              return;
-            }
-
-            try {
-              const targetPath = new URL(href, window.location.origin).pathname.replace(/\/+$/, '') || '/';
-              const isActive = currentPath === targetPath || (targetPath !== '/' && currentPath.startsWith(targetPath + '/'));
-              link.classList.toggle('active', isActive);
-              link.setAttribute('aria-current', isActive ? 'page' : 'false');
-            } catch (e) {
-              link.classList.remove('active');
-            }
-          });
-
-          const activeItem = document.querySelector('.sidebar-menu .nav-link.active')?.closest('.nav-item');
-          if (activeItem) {
-            const submenu = activeItem.querySelector(':scope > .nav-treeview');
-            const parentLink = activeItem.querySelector(':scope > .nav-link');
-            if (submenu) {
-              activeItem.classList.add('is-open');
-              submenu.hidden = false;
-              if (parentLink) {
-                parentLink.setAttribute('aria-expanded', 'true');
-              }
-            }
-          }
-        };
-
-        document.querySelectorAll('.sidebar-menu .nav-item > .nav-link').forEach(function (link) {
-          const parentItem = link.closest('.nav-item');
-          const submenu = parentItem ? parentItem.querySelector(':scope > .nav-treeview') : null;
-          if (!submenu) return;
-
-          link.setAttribute('aria-expanded', parentItem.classList.contains('is-open') ? 'true' : 'false');
-          submenu.hidden = !parentItem.classList.contains('is-open');
-
-          link.addEventListener('click', function (event) {
-            if (link.getAttribute('href') !== '#') {
-              return;
-            }
-            event.preventDefault();
-            const shouldOpen = !parentItem.classList.contains('is-open');
-            parentItem.classList.toggle('is-open', shouldOpen);
-            submenu.hidden = !shouldOpen;
-            link.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
-
-            document.querySelectorAll('.sidebar-menu .nav-item').forEach(function (item) {
-              if (item === parentItem) return;
-              const siblingSubmenu = item.querySelector(':scope > .nav-treeview');
-              const siblingLink = item.querySelector(':scope > .nav-link');
-              if (siblingSubmenu) {
-                item.classList.remove('is-open');
-                siblingSubmenu.hidden = true;
-              }
-              if (siblingLink) {
-                siblingLink.setAttribute('aria-expanded', 'false');
-              }
-            });
-          });
-        });
-
-        setActiveSidebarItem();
-
-        document.querySelectorAll('.sidebar-menu .nav-treeview .nav-link').forEach(function (link) {
-          link.addEventListener('click', function () {
-            setSidebarState(false);
-          });
-        });
-
-        const mediaQuery = window.matchMedia('(max-width: 991.98px)');
-        if (mediaQuery.addEventListener) {
-          mediaQuery.addEventListener('change', function (event) {
-            if (!event.matches) {
-              setSidebarState(false);
-            }
-          });
-        }
       });
     </script>
 
