@@ -409,7 +409,10 @@
      */
     function showSubmitConfirmation() {
         updateProgress(); // Update answered count
-        $('#submitConfirmModal').modal('show');
+        const modalElement = document.getElementById('submitConfirmModal');
+        if (modalElement) {
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+        }
     }
 
     /**
@@ -432,7 +435,10 @@
 
         // Show loading
         if (!autoSubmit) {
-            $('#submitConfirmModal').modal('hide');
+            const modalElement = document.getElementById('submitConfirmModal');
+            if (modalElement) {
+                bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+            }
         }
 
         if (typeof Swal !== 'undefined') {

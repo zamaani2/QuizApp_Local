@@ -570,7 +570,10 @@ $(document).ready(function () {
 
                     // Show success after brief delay
                     setTimeout(() => {
-                        $('#bulkImportModal').modal('hide');
+                        const modalElement = document.getElementById('bulkImportModal');
+                        if (modalElement) {
+                            bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+                        }
                         Swal.fire({
                             title: 'Import Complete!',
                             html: `<strong>${response.imported_count}</strong> students imported successfully.<br>` +
@@ -975,7 +978,10 @@ $(document).ready(function () {
 
                 if (data.success) {
                     // Close the modal
-                    formElement.closest('.modal').modal('hide');
+                    const modalElement = formElement.closest('.modal')[0];
+                    if (modalElement) {
+                        bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+                    }
 
                     // Show success message
                     Swal.fire({
@@ -1067,11 +1073,16 @@ $(document).ready(function () {
                 $('#studentModalsContainer').html(response.html);
 
                 // Show the modal
-                $(modalId).modal('show');
+                const modalElement = document.querySelector(modalId);
+                if (!modalElement) {
+                    console.error(`The ${modalId} modal was not returned by the server.`);
+                    return;
+                }
+                bootstrap.Modal.getOrCreateInstance(modalElement).show();
 
                 // Reattach event handlers for buttons in the modal
                 $(modalId).find('.edit-student-btn').on('click', function () {
-                    $(modalId).modal('hide');
+                    bootstrap.Modal.getOrCreateInstance(modalElement).hide();
                     loadStudentModal('edit', $(this).data('id'));
                 });
 
@@ -1101,7 +1112,7 @@ $(document).ready(function () {
                         contentType: false,
                         success: function (response) {
                             Swal.close();
-                            $(modalId).modal('hide');
+                            bootstrap.Modal.getOrCreateInstance(modalElement).hide();
 
                             // Show success message
                             Swal.fire({
@@ -1563,7 +1574,10 @@ $(document).ready(function () {
                         icon: 'success',
                         timer: 2000
                     }).then(() => {
-                        $('#bulkImageUploadModal').modal('hide');
+                        const modalElement = document.getElementById('bulkImageUploadModal');
+                        if (modalElement) {
+                            bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+                        }
                         window.location.reload();
                     });
                 }, 1000);

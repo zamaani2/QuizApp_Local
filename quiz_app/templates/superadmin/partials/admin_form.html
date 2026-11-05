@@ -160,7 +160,10 @@
         },
         success: function(response) {
           if (response.success) {
-            $('#adminFormModal').modal('hide');
+            const modalElement = document.getElementById('adminFormModal');
+            if (modalElement) {
+              bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+            }
             if (typeof Swal !== 'undefined') {
               Swal.fire({
                 icon: 'success',
