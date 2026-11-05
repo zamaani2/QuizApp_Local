@@ -1,231 +1,280 @@
-{% extends 'base.html' %} {% load static %} {% block title %}Teacher Dashboard{% endblock title %} {% block page_title %}Teacher Dashboard{% endblock page_title %} {% block breadcrumb %}
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Teacher Dashboard — Teaching & Assessment Workspace{% endblock title %}
+
+{% block page_title %}Teacher Dashboard{% endblock page_title %}
+
+{% block breadcrumb %}
 <li class="breadcrumb-item">
   <a href="{% url 'quiz_app:dashboard' %}">Home</a>
 </li>
-<li class="breadcrumb-item active" aria-current="page">Dashboard</li>
-{% endblock breadcrumb %} {% block content %}
-<!-- Welcome Section -->
-<div class="row mb-4">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h3 class="mb-0">Welcome, {{ user.full_name }}!</h3>
-        <p class="text-muted mb-0">
-          <i class="bi bi-person-badge me-1"></i>{{ teacher.staff_id }} {% if teacher.department %}
-          <span class="ms-3"
-            ><i class="bi bi-building me-1"></i>{{ teacher.department.name }}</span
-          >
+<li class="breadcrumb-item active" aria-current="page">Teacher Dashboard</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+<!-- Teacher Context Header -->
+<div class="card mb-4 border-0 shadow-sm">
+  <div class="card-body p-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+      <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+            <i class="bi bi-mortarboard me-1"></i>Teacher Workspace
+          </span>
+          {% if user.school %}
+          <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
+            <i class="bi bi-building me-1"></i>{{ user.school.name }}
+          </span>
           {% endif %}
+        </div>
+        <h2 class="h4 mb-1 fw-bold text-body">Welcome back, {{ user.full_name|default:user.username }}!</h2>
+        <p class="text-muted mb-0 small">
+          {% if teacher.staff_id %}
+          <span class="me-3"><i class="bi bi-person-badge me-1"></i>Staff ID: <strong>{{ teacher.staff_id }}</strong></span>
+          {% endif %}
+          {% if teacher.department %}
+          <span class="me-3"><i class="bi bi-diagram-3 me-1"></i>Dept: <strong>{{ teacher.department.name }}</strong></span>
+          {% endif %}
+          <span><i class="bi bi-calendar3 me-1"></i>{% now "l, F j, Y" %}</span>
         </p>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'quiz_app:quiz_create' %}" class="btn btn-primary btn-sm px-3">
+          <i class="bi bi-plus-circle me-1"></i>Create Quiz
+        </a>
+        <a href="{% url 'quiz_app:quiz_list' %}" class="btn btn-outline-primary btn-sm px-3">
+          <i class="bi bi-collection me-1"></i>My Quizzes
+        </a>
+        <a href="{% url 'quiz_app:quiz_grading_list' %}" class="btn {% if quizzes_needing_grading_count > 0 %}btn-warning{% else %}btn-outline-secondary{% endif %} btn-sm px-3">
+          <i class="bi bi-pencil-square me-1"></i>Grading
+          {% if quizzes_needing_grading_count > 0 %}
+          <span class="badge bg-danger ms-1">{{ quizzes_needing_grading_count }}</span>
+          {% endif %}
+        </a>
+        <a href="{% url 'quiz_app:quiz_results_list' %}" class="btn btn-outline-secondary btn-sm px-3">
+          <i class="bi bi-bar-chart me-1"></i>Results
+        </a>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Statistics Cards -->
-<div class="row">
-  <div class="col-lg-3 col-md-6">
-    <div class="card card-primary card-outline">
+<!-- KPI Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100 kpi-card">
       <div class="card-body">
-        <div class="d-flex justify-content-between">
+        <div class="d-flex justify-content-between align-items-start">
           <div>
-            <h5 class="mb-0">Total Quizzes</h5>
-            <h2 class="mt-2 mb-0">{{ total_quizzes }}</h2>
-            <small class="text-muted">
-              {{ published_quizzes }} published, {{ draft_quizzes }} draft
-            </small>
+            <div class="kpi-label">Total Quizzes</div>
+            <div class="kpi-value">{{ total_quizzes }}</div>
+            <div class="kpi-helper">
+              <span class="text-success fw-medium">{{ published_quizzes }} published</span> &bull; {{ draft_quizzes }} draft
+            </div>
           </div>
-          <div class="align-self-center">
-            <i class="bi bi-question-circle fs-1 text-primary"></i>
+          <div class="kpi-icon bg-primary-subtle text-primary">
+            <i class="bi bi-patch-question"></i>
           </div>
         </div>
-        <a
-          href="{% url 'quiz_app:quiz_list' %}"
-          class="btn btn-sm btn-primary mt-2"
-        >
-          View All <i class="bi bi-arrow-right ms-1"></i>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+        <a href="{% url 'quiz_app:quiz_list' %}" class="btn btn-sm btn-link p-0 text-decoration-none">
+          Manage Quizzes <i class="bi bi-arrow-right ms-1"></i>
         </a>
       </div>
     </div>
   </div>
-  <div class="col-lg-3 col-md-6">
-    <div class="card card-success card-outline">
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100 kpi-card">
       <div class="card-body">
-        <div class="d-flex justify-content-between">
+        <div class="d-flex justify-content-between align-items-start">
           <div>
-            <h5 class="mb-0">Published</h5>
-            <h2 class="mt-2 mb-0">{{ published_quizzes }}</h2>
-            <small class="text-muted">{{ draft_quizzes }} in draft</small>
+            <div class="kpi-label">Published & Active</div>
+            <div class="kpi-value">{{ published_quizzes }}</div>
+            <div class="kpi-helper">
+              <span>{{ draft_quizzes }} drafts pending publish</span>
+            </div>
           </div>
-          <div class="align-self-center">
-            <i class="bi bi-check-circle fs-1 text-success"></i>
+          <div class="kpi-icon bg-success-subtle text-success">
+            <i class="bi bi-check2-circle"></i>
           </div>
         </div>
-        <a
-          href="{% url 'quiz_app:quiz_list' %}?status=published"
-          class="btn btn-sm btn-success mt-2"
-        >
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+        <a href="{% url 'quiz_app:quiz_list' %}?status=published" class="btn btn-sm btn-link p-0 text-decoration-none text-success">
           View Published <i class="bi bi-arrow-right ms-1"></i>
         </a>
       </div>
     </div>
   </div>
-  <div class="col-lg-3 col-md-6">
-    <div class="card card-info card-outline">
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100 kpi-card">
       <div class="card-body">
-        <div class="d-flex justify-content-between">
+        <div class="d-flex justify-content-between align-items-start">
           <div>
-            <h5 class="mb-0">Total Attempts</h5>
-            <h2 class="mt-2 mb-0">{{ total_attempts }}</h2>
-            <small class="text-muted"
-              >{{ completed_attempts_count }} completed</small
-            >
+            <div class="kpi-label">Student Attempts</div>
+            <div class="kpi-value">{{ total_attempts }}</div>
+            <div class="kpi-helper">
+              <span class="text-info fw-medium">{{ completed_attempts_count }} completed</span>
+              {% if avg_score %}&bull; {{ avg_score|floatformat:1 }}% avg{% endif %}
+            </div>
           </div>
-          <div class="align-self-center">
-            <i class="bi bi-clipboard-data fs-1 text-info"></i>
+          <div class="kpi-icon bg-info-subtle text-info">
+            <i class="bi bi-clipboard-data"></i>
           </div>
         </div>
-        <a
-          href="{% url 'quiz_app:quiz_results_list' %}"
-          class="btn btn-sm btn-info mt-2"
-        >
-          View Results <i class="bi bi-arrow-right ms-1"></i>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+        <a href="{% url 'quiz_app:quiz_results_list' %}" class="btn btn-sm btn-link p-0 text-decoration-none text-info">
+          Analyze Results <i class="bi bi-arrow-right ms-1"></i>
         </a>
       </div>
     </div>
   </div>
-  <div class="col-lg-3 col-md-6">
-    <div class="card card-warning card-outline">
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100 kpi-card {% if quizzes_needing_grading_count > 0 %}border-warning{% endif %}">
       <div class="card-body">
-        <div class="d-flex justify-content-between">
+        <div class="d-flex justify-content-between align-items-start">
           <div>
-            <h5 class="mb-0">Needs Grading</h5>
-            <h2 class="mt-2 mb-0">{{ quizzes_needing_grading_count }}</h2>
-            <small class="text-muted"
-              >{{ responses_needing_grading_count }} responses</small
-            >
+            <div class="kpi-label">Needs Grading</div>
+            <div class="kpi-value {% if quizzes_needing_grading_count > 0 %}text-warning{% endif %}">
+              {{ quizzes_needing_grading_count }}
+            </div>
+            <div class="kpi-helper">
+              {% if quizzes_needing_grading_count > 0 %}
+              <span class="text-warning fw-medium">{{ responses_needing_grading_count }} essay responses</span> awaiting review
+              {% else %}
+              <span class="text-success"><i class="bi bi-check2 me-1"></i>All caught up!</span>
+              {% endif %}
+            </div>
           </div>
-          <div class="align-self-center">
-            <i class="bi bi-exclamation-triangle fs-1 text-warning"></i>
+          <div class="kpi-icon {% if quizzes_needing_grading_count > 0 %}bg-warning-subtle text-warning{% else %}bg-secondary-subtle text-muted{% endif %}">
+            <i class="bi bi-pencil-square"></i>
           </div>
         </div>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0 pb-3">
         {% if quizzes_needing_grading_count > 0 %}
-        <a
-          href="{% url 'quiz_app:quiz_grading_list' %}"
-          class="btn btn-sm btn-warning mt-2"
-        >
-          Grade Now <i class="bi bi-arrow-right ms-1"></i>
+        <a href="{% url 'quiz_app:quiz_grading_list' %}" class="btn btn-sm btn-warning">
+          <i class="bi bi-pencil me-1"></i>Grade Now
         </a>
         {% else %}
-        <span class="text-muted small mt-2 d-block">All graded</span>
+        <span class="text-muted small">No pending submissions</span>
         {% endif %}
       </div>
     </div>
   </div>
 </div>
 
-<!-- Quizzes Needing Grading -->
+<!-- Operational Priority: Quizzes Needing Grading Queue -->
 {% if quizzes_needing_grading %}
-<div class="row mt-4">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-exclamation-triangle me-2"></i>Quizzes Needing Grading
-        </h3>
+<div class="card mb-4 border-warning shadow-sm">
+  <div class="card-header bg-warning-subtle text-warning-emphasis d-flex justify-content-between align-items-center py-3">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-exclamation-triangle-fill fs-5 text-warning"></i>
+      <div>
+        <h3 class="card-title h6 mb-0 fw-bold">Manual Grading Queue</h3>
+        <small class="text-muted">The following quizzes have student essay submissions awaiting your evaluation</small>
       </div>
-      <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-hover">
-            <thead>
-              <tr>
-                <th>Quiz</th>
-                <th>Subject</th>
-                <th>Pending Attempts</th>
-                <th>Responses</th>
-                <th width="150">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for quiz in quizzes_needing_grading %}
-              <tr>
-                <td>
-                  <strong>{{ quiz.title }}</strong>
-                </td>
-                <td>{{ quiz.subject.subject_name }}</td>
-                <td>
-                  <span class="badge bg-warning">
-                    {{ quiz.pending_attempts }} attempts
-                  </span>
-                </td>
-                <td>
-                  <span class="badge bg-info">
-                    {{ quiz.pending_responses }} responses
-                  </span>
-                </td>
-                <td>
-                  <a
-                    href="{% url 'quiz_app:quiz_grading_list' %}?quiz={{ quiz.id }}"
-                    class="btn btn-sm btn-warning"
-                  >
-                    <i class="bi bi-pencil me-1"></i>Grade
-                  </a>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <div class="mt-3 text-center">
-          <a
-            href="{% url 'quiz_app:quiz_grading_list' %}"
-            class="btn btn-outline-primary"
-          >
-            View All Grading Tasks <i class="bi bi-arrow-right ms-1"></i>
-          </a>
-        </div>
-      </div>
+    </div>
+    <a href="{% url 'quiz_app:quiz_grading_list' %}" class="btn btn-warning btn-sm">
+      View All Grading Tasks <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Quiz Title</th>
+            <th>Subject</th>
+            <th class="text-center">Pending Attempts</th>
+            <th class="text-center">Ungraded Responses</th>
+            <th class="text-end pe-3">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for quiz in quizzes_needing_grading %}
+          <tr>
+            <td>
+              <div class="fw-semibold text-body">{{ quiz.title }}</div>
+              <small class="text-muted">{{ quiz.questions.count }} total questions</small>
+            </td>
+            <td>
+              <span class="badge bg-secondary-subtle text-secondary border">
+                {{ quiz.subject.subject_name }}
+              </span>
+            </td>
+            <td class="text-center">
+              <span class="badge bg-warning text-dark px-2 py-1">
+                <i class="bi bi-hourglass-split me-1"></i>{{ quiz.pending_attempts }} attempt{{ quiz.pending_attempts|pluralize }}
+              </span>
+            </td>
+            <td class="text-center">
+              <span class="badge bg-info-subtle text-info border px-2 py-1">
+                {{ quiz.pending_responses }} response{{ quiz.pending_responses|pluralize }}
+              </span>
+            </td>
+            <td class="text-end pe-3">
+              <a href="{% url 'quiz_app:quiz_grading_list' %}?quiz={{ quiz.id }}" class="btn btn-sm btn-warning">
+                <i class="bi bi-pencil-square me-1"></i>Grade Now
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
 {% endif %}
 
-<!-- Recent Activity and Popular Quizzes -->
-<div class="row mt-4">
-  <!-- Recent Quizzes -->
+<!-- Main Content Grid -->
+<div class="row g-4 mb-4">
+  <!-- Left Column: Recent Quizzes & Popular Quizzes -->
   <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-clock-history me-2"></i>Recent Quizzes
+    <div class="card h-100 shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center py-3">
+        <h3 class="card-title h6 mb-0 fw-bold">
+          <i class="bi bi-collection me-2 text-primary"></i>My Recent Quizzes
         </h3>
+        <a href="{% url 'quiz_app:quiz_create' %}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus-lg me-1"></i>New
+        </a>
       </div>
-      <div class="card-body">
+      <div class="card-body p-0">
         {% if recent_quizzes %}
-        <div class="list-group">
+        <div class="list-group list-group-flush">
           {% for quiz in recent_quizzes %}
-          <div class="list-group-item">
-            <div class="d-flex justify-content-between align-items-start">
+          <div class="list-group-item p-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
               <div class="flex-grow-1">
-                <h6 class="mb-1">{{ quiz.title }}</h6>
-                <p class="mb-1 text-muted small">
-                  {{ quiz.subject.subject_name }} | Created: {{ quiz.created_at|date:"M d, Y" }}
-                </p>
-                <span
-                  class="badge {% if quiz.status == 'published' %}bg-success{% elif quiz.status == 'draft' %}bg-secondary{% else %}bg-dark{% endif %}"
-                >
-                  {{ quiz.get_status_display }}
-                </span>
-                <span class="badge bg-info ms-2">
-                  {{ quiz.questions.count }} questions
-                </span>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <h6 class="mb-0 fw-semibold">{{ quiz.title }}</h6>
+                  <span class="badge {% if quiz.status == 'published' %}bg-success-subtle text-success border border-success-subtle{% elif quiz.status == 'draft' %}bg-secondary-subtle text-secondary border{% else %}bg-dark-subtle text-dark border{% endif %}">
+                    {{ quiz.get_status_display }}
+                  </span>
+                </div>
+                <div class="small text-muted d-flex flex-wrap gap-2">
+                  <span><i class="bi bi-book me-1"></i>{{ quiz.subject.subject_name }}</span>
+                  <span>&bull;</span>
+                  <span><i class="bi bi-patch-question me-1"></i>{{ quiz.questions.count }} questions</span>
+                  <span>&bull;</span>
+                  <span><i class="bi bi-calendar3 me-1"></i>{{ quiz.created_at|date:"M d, Y" }}</span>
+                </div>
               </div>
-              <div>
-                <a
-                  href="{% url 'quiz_app:quiz_detail' quiz.id %}"
-                  class="btn btn-sm btn-info"
-                >
+              <div class="btn-group btn-group-sm">
+                <a href="{% url 'quiz_app:quiz_detail' quiz.id %}" class="btn btn-outline-secondary" title="View Quiz Details">
                   <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'quiz_app:quiz_edit' quiz.id %}" class="btn btn-outline-secondary" title="Edit Quiz">
+                  <i class="bi bi-pencil"></i>
                 </a>
               </div>
             </div>
@@ -233,60 +282,77 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="text-muted text-center py-4">No quizzes created yet</p>
-        {% endif %}
-        <div class="mt-3 text-center">
-          <a
-            href="{% url 'quiz_app:quiz_list' %}"
-            class="btn btn-sm btn-outline-primary"
-          >
-            View All Quizzes <i class="bi bi-arrow-right ms-1"></i>
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-journal-plus fs-2 d-block mb-2 text-secondary"></i>
+          <strong>No quizzes created yet</strong>
+          <p class="small text-muted mb-3">Start by creating your first quiz for your students.</p>
+          <a href="{% url 'quiz_app:quiz_create' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Create First Quiz
           </a>
         </div>
+        {% endif %}
+      </div>
+      <div class="card-footer bg-transparent text-center py-2">
+        <a href="{% url 'quiz_app:quiz_list' %}" class="btn btn-sm btn-link text-decoration-none">
+          View All My Quizzes <i class="bi bi-arrow-right ms-1"></i>
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- Recent Attempts -->
+  <!-- Right Column: Recent Student Attempts -->
   <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-clipboard-check me-2"></i>Recent Attempts
+    <div class="card h-100 shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center py-3">
+        <h3 class="card-title h6 mb-0 fw-bold">
+          <i class="bi bi-clipboard-check me-2 text-success"></i>Recent Student Submissions
         </h3>
+        <a href="{% url 'quiz_app:quiz_results_list' %}" class="btn btn-sm btn-outline-secondary">
+          All Results
+        </a>
       </div>
-      <div class="card-body">
+      <div class="card-body p-0">
         {% if recent_attempts %}
-        <div class="list-group">
+        <div class="list-group list-group-flush">
           {% for attempt in recent_attempts %}
-          <div class="list-group-item">
-            <div class="d-flex justify-content-between align-items-start">
+          <div class="list-group-item p-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
               <div class="flex-grow-1">
-                <h6 class="mb-1">{{ attempt.quiz.title }}</h6>
-                <p class="mb-1 text-muted small">
-                  {{ attempt.student.full_name }} ({{ attempt.student.admission_number }}) | {% if attempt.submitted_at %} Submitted: {{ attempt.submitted_at|date:"M d, Y h:i A" }} {% else %}
-                  Started: {{ attempt.started_at|date:"M d, Y h:i A" }} {% endif %}
-                </p>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <strong class="text-body">{{ attempt.student.full_name }}</strong>
+                  <span class="badge bg-secondary-subtle text-secondary small">{{ attempt.student.admission_number }}</span>
+                </div>
+                <div class="small text-body-secondary mb-1">
+                  <span class="fw-medium">{{ attempt.quiz.title }}</span>
+                  <span class="text-muted ms-1">({{ attempt.quiz.subject.subject_name }})</span>
+                </div>
+                <div class="small text-muted">
+                  {% if attempt.submitted_at %}
+                  <i class="bi bi-check-circle text-success me-1"></i>Submitted: {{ attempt.submitted_at|date:"M d, Y h:i A" }}
+                  {% else %}
+                  <i class="bi bi-hourglass-split text-warning me-1"></i>Started: {{ attempt.started_at|date:"M d, Y h:i A" }}
+                  {% endif %}
+                </div>
+              </div>
+              <div class="text-end">
                 {% if attempt.is_submitted and attempt.is_completed %}
-                <span
-                  class="badge {% if attempt.percentage >= 70 %}bg-success{% elif attempt.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
-                >
+                <span class="badge {% if attempt.percentage >= 70 %}bg-success-subtle text-success border border-success-subtle{% elif attempt.percentage >= 50 %}bg-warning-subtle text-warning border border-warning-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %} fs-6 mb-1 d-inline-block">
                   {{ attempt.percentage|floatformat:1 }}%
                 </span>
+                <div>
+                  <a href="{% url 'quiz_app:quiz_result_detail' attempt.id %}" class="btn btn-xs btn-outline-info btn-sm">
+                    <i class="bi bi-eye me-1"></i>Review
+                  </a>
+                </div>
                 {% elif attempt.needs_grading %}
-                <span class="badge bg-warning">Needs Grading</span>
+                <span class="badge bg-warning text-dark mb-1 d-inline-block">Needs Grading</span>
+                <div>
+                  <a href="{% url 'quiz_app:quiz_attempt_grading' attempt.id %}" class="btn btn-xs btn-warning btn-sm">
+                    <i class="bi bi-pencil me-1"></i>Grade
+                  </a>
+                </div>
                 {% else %}
-                <span class="badge bg-secondary">In Progress</span>
-                {% endif %}
-              </div>
-              <div>
-                {% if attempt.is_submitted %}
-                <a
-                  href="{% url 'quiz_app:quiz_result_detail' attempt.id %}"
-                  class="btn btn-sm btn-info"
-                >
-                  <i class="bi bi-eye"></i>
-                </a>
+                <span class="badge bg-secondary-subtle text-secondary">In Progress</span>
                 {% endif %}
               </div>
             </div>
@@ -294,79 +360,87 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="text-muted text-center py-4">No recent attempts</p>
-        {% endif %}
-        <div class="mt-3 text-center">
-          <a
-            href="{% url 'quiz_app:quiz_results_list' %}"
-            class="btn btn-sm btn-outline-primary"
-          >
-            View All Results <i class="bi bi-arrow-right ms-1"></i>
-          </a>
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-clipboard-x fs-2 d-block mb-2 text-secondary"></i>
+          <strong>No submissions yet</strong>
+          <p class="small text-muted mb-0">Student quiz attempts will appear here in real time as they complete them.</p>
         </div>
+        {% endif %}
+      </div>
+      <div class="card-footer bg-transparent text-center py-2">
+        <a href="{% url 'quiz_app:quiz_results_list' %}" class="btn btn-sm btn-link text-decoration-none">
+          View All Results <i class="bi bi-arrow-right ms-1"></i>
+        </a>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Popular Quizzes -->
+<!-- Popular Quizzes Table Section -->
 {% if popular_quizzes %}
-<div class="row mt-4">
+<div class="row mb-4">
   <div class="col-12">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-trophy me-2"></i>Most Popular Quizzes
+    <div class="card shadow-sm">
+      <div class="card-header py-3">
+        <h3 class="card-title h6 mb-0 fw-bold">
+          <i class="bi bi-graph-up-arrow me-2 text-info"></i>Most Engaged Quizzes
         </h3>
       </div>
-      <div class="card-body">
+      <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-hover">
-            <thead>
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
               <tr>
                 <th>Quiz</th>
                 <th>Subject</th>
-                <th>Attempts</th>
-                <th>Status</th>
-                <th>Average Score</th>
-                <th width="150">Action</th>
+                <th class="text-center">Total Attempts</th>
+                <th class="text-center">Status</th>
+                <th class="text-center">Average Score</th>
+                <th class="text-end pe-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {% for quiz in popular_quizzes %}
               <tr>
                 <td>
-                  <strong>{{ quiz.title }}</strong>
-                </td>
-                <td>{{ quiz.subject.subject_name }}</td>
-                <td>
-                  <span class="badge bg-primary">{{ quiz.attempt_count }}</span>
+                  <div class="fw-semibold text-body">{{ quiz.title }}</div>
+                  <small class="text-muted">{{ quiz.questions.count }} questions &bull; {{ quiz.total_marks }} marks</small>
                 </td>
                 <td>
-                  <span
-                    class="badge {% if quiz.status == 'published' %}bg-success{% elif quiz.status == 'draft' %}bg-secondary{% else %}bg-dark{% endif %}"
-                  >
+                  <span class="badge bg-secondary-subtle text-secondary border">
+                    {{ quiz.subject.subject_name }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-primary-subtle text-primary border px-2 py-1">
+                    {{ quiz.attempt_count }} attempt{{ quiz.attempt_count|pluralize }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <span class="badge {% if quiz.status == 'published' %}bg-success-subtle text-success border border-success-subtle{% elif quiz.status == 'draft' %}bg-secondary-subtle text-secondary border{% else %}bg-dark-subtle text-dark border{% endif %}">
                     {{ quiz.get_status_display }}
                   </span>
                 </td>
-                <td>
-                  {% with avg=quiz.get_average_score %} {% if avg > 0 %}
-                  <span
-                    class="badge {% if avg >= 70 %}bg-success{% elif avg >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
-                  >
-                    {{ avg|floatformat:1 }}
+                <td class="text-center">
+                  {% with avg=quiz.get_average_score %}
+                  {% if avg > 0 %}
+                  <span class="badge {% if avg >= 70 %}bg-success-subtle text-success border border-success-subtle{% elif avg >= 50 %}bg-warning-subtle text-warning border border-warning-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %}">
+                    {{ avg|floatformat:1 }}%
                   </span>
                   {% else %}
-                  <span class="text-muted">-</span>
-                  {% endif %} {% endwith %}
+                  <span class="text-muted small">-</span>
+                  {% endif %}
+                  {% endwith %}
                 </td>
-                <td>
-                  <a
-                    href="{% url 'quiz_app:quiz_detail' quiz.id %}"
-                    class="btn btn-sm btn-info"
-                  >
-                    <i class="bi bi-eye me-1"></i>View
-                  </a>
+                <td class="text-end pe-3">
+                  <div class="btn-group btn-group-sm">
+                    <a href="{% url 'quiz_app:quiz_detail' quiz.id %}" class="btn btn-outline-secondary" title="View Quiz">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    <a href="{% url 'quiz_app:quiz_results_list' %}?quiz={{ quiz.id }}" class="btn btn-outline-info" title="View Results">
+                      <i class="bi bi-bar-chart"></i>
+                    </a>
+                  </div>
                 </td>
               </tr>
               {% endfor %}
@@ -378,59 +452,4 @@
   </div>
 </div>
 {% endif %}
-
-<!-- Quick Actions -->
-<div class="row mt-4">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-lightning-charge me-2"></i>Quick Actions
-        </h3>
-      </div>
-      <div class="card-body">
-        <div class="row">
-          <div class="col-md-3">
-            <a
-              href="{% url 'quiz_app:quiz_create' %}"
-              class="btn btn-primary btn-lg w-100 mb-2"
-            >
-              <i class="bi bi-plus-circle me-2"></i>Create Quiz
-            </a>
-          </div>
-          <div class="col-md-3">
-            <a
-              href="{% url 'quiz_app:quiz_list' %}"
-              class="btn btn-success btn-lg w-100 mb-2"
-            >
-              <i class="bi bi-list-ul me-2"></i>My Quizzes
-            </a>
-          </div>
-          <div class="col-md-3">
-            {% if quizzes_needing_grading_count > 0 %}
-            <a
-              href="{% url 'quiz_app:quiz_grading_list' %}"
-              class="btn btn-warning btn-lg w-100 mb-2"
-            >
-              <i class="bi bi-pencil me-2"></i>Grade Quizzes
-            </a>
-            {% else %}
-            <button class="btn btn-secondary btn-lg w-100 mb-2" disabled>
-              <i class="bi bi-pencil me-2"></i>No Grading Needed
-            </button>
-            {% endif %}
-          </div>
-          <div class="col-md-3">
-            <a
-              href="{% url 'quiz_app:quiz_results_list' %}"
-              class="btn btn-info btn-lg w-100 mb-2"
-            >
-              <i class="bi bi-clipboard-data me-2"></i>View Results
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock content %}

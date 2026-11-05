@@ -58,20 +58,16 @@
 
 /* ===== CONTENT SECTION STYLING ===== */
 .purple-theme-page .app-content {
-  background: linear-gradient(
-    135deg,
-    #f3e8ff 0%,
-    #e9d5ff 50%,
-    #ddd6fe 100%
-  ) !important;
+  background: var(--app-bg, #f8fafc) !important;
   min-height: calc(100vh - 4rem);
-  color: #2d1b3d !important;
+  color: var(--app-text, #1e293b) !important;
 }
 
 .purple-theme-page .app-content-header {
-  background: linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 100%) !important;
-  border-bottom: 2px solid rgba(111, 66, 193, 0.3) !important;
-  color: #2d1b3d !important;
+  background: var(--app-surface, #ffffff) !important;
+  border-bottom: 1px solid var(--app-border, #e2e8f0) !important;
+  color: var(--app-text, #1e293b) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .purple-theme-page .app-content .container-fluid {
@@ -83,44 +79,16 @@
 }
 
 /* ===== MAIN CONTENT AREAS ===== */
-.purple-theme-page .main-content {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%) !important;
-  color: #2d1b3d !important;
-}
-
-.purple-theme-page .content-wrapper {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%) !important;
-  color: #2d1b3d !important;
-}
-
-.purple-theme-page .wrapper {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%) !important;
-}
-
-/* ===== DASHBOARD CONTENT ===== */
-.purple-theme-page .dashboard-content {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%) !important;
-  color: #2d1b3d !important;
-}
-
-.purple-theme-page .page-content {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%) !important;
-  color: #2d1b3d !important;
-}
-
-.purple-theme-page .dashboard {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%) !important;
-  color: #2d1b3d !important;
-}
-
-.purple-theme-page .admin-dashboard {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%) !important;
-  color: #2d1b3d !important;
-}
-
+.purple-theme-page .main-content,
+.purple-theme-page .content-wrapper,
+.purple-theme-page .wrapper,
+.purple-theme-page .dashboard-content,
+.purple-theme-page .page-content,
+.purple-theme-page .dashboard,
+.purple-theme-page .admin-dashboard,
 .purple-theme-page .student-dashboard {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%) !important;
-  color: #2d1b3d !important;
+  background: var(--app-bg, #f8fafc) !important;
+  color: var(--app-text, #1e293b) !important;
 }
 
 /* ===== CONTENT TEXT STYLING ===== */
@@ -246,31 +214,27 @@
 
 /* ===== CARDS ===== */
 .purple-theme-page .card {
-  border: 3px solid var(--purple-primary);
-  box-shadow: 0 8px 24px rgba(111, 66, 193, 0.15);
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%) !important;
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
+  border: 1px solid var(--app-border, #e2e8f0);
+  box-shadow: var(--app-shadow-xs, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+  transition: all 0.2s ease;
+  background: var(--app-surface, #ffffff);
+  border-radius: var(--app-radius-lg, 0.75rem);
   overflow: hidden;
 }
 
 .purple-theme-page .card:hover {
-  box-shadow: 0 12px 32px rgba(111, 66, 193, 0.2);
-  transform: translateY(-6px);
-  background: linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 100%) !important;
-  border-color: var(--purple-primary-dark);
+  box-shadow: var(--app-shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+  transform: translateY(-2px);
+  border-color: var(--app-border-strong, #cbd5e1);
 }
 
 .purple-theme-page .card-header {
-  background: linear-gradient(135deg, #6f42c1 0%, #8b5cf6 100%);
-  border-bottom: 3px solid var(--purple-primary-dark);
-  color: white !important;
+  background: var(--app-surface, #ffffff);
+  border-bottom: 1px solid var(--app-border, #e2e8f0);
+  color: var(--app-text, #1e293b) !important;
   font-weight: 600;
-  padding: 1rem 1.25rem;
+  padding: 0.9rem 1.25rem;
   font-size: 1rem;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  border-radius: 12px 12px 0 0;
 }
 
 .purple-theme-page .card-header * {

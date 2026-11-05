@@ -114,6 +114,7 @@ class ThemeManager {
 
         // Add current theme class
         this.bodyElement.classList.add(theme.class);
+        this.htmlElement.setAttribute('data-app-theme', themeName);
 
         // Theme CSS is loaded statically, no dynamic loading needed
 

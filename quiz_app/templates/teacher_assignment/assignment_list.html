@@ -116,6 +116,7 @@
         </div>
 
         <!-- Assignments Table -->
+        <div class="table-responsive">
         <table id="assignmentsTable" class="table table-bordered table-striped table-hover">
           <thead>
             <tr>
@@ -174,9 +175,14 @@
                 </div>
               </td>
             </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4"><i class="bi bi-inbox me-2"></i>No assignments found.</td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>

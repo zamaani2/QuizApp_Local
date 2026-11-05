@@ -1,248 +1,314 @@
-{% extends 'base.html' %} {% load static %} {% block title %}Student Dashboard{% endblock title %} {% block page_title %}Student Dashboard{% endblock page_title %} {% block breadcrumb %}
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Student Dashboard — Learning & Examination Portal{% endblock title %}
+
+{% block page_title %}Student Portal{% endblock page_title %}
+
+{% block breadcrumb %}
 <li class="breadcrumb-item">
   <a href="{% url 'quiz_app:dashboard' %}">Home</a>
 </li>
-<li class="breadcrumb-item active" aria-current="page">Dashboard</li>
-{% endblock breadcrumb %} {% block content %} {% if no_class_assignment %}
+<li class="breadcrumb-item active" aria-current="page">Student Dashboard</li>
+{% endblock breadcrumb %}
+
+{% block content %}
+{% if no_class_assignment %}
 <div class="row">
   <div class="col-12">
-    <div class="alert alert-warning">
-      <h4 class="alert-heading">
-        <i class="bi bi-exclamation-triangle me-2"></i>No Class Assignment
-      </h4>
-      <p>
-        You are not currently assigned to any class. Please contact your
-        administrator.
-      </p>
+    <div class="card border-warning shadow-sm">
+      <div class="card-body p-4 text-center">
+        <div class="mb-3 text-warning">
+          <i class="bi bi-exclamation-triangle display-4"></i>
+        </div>
+        <h4 class="fw-bold">No Class Assignment</h4>
+        <p class="text-muted mb-3">You are not currently enrolled in an active class for this academic term. Please contact your school administrator or teacher to be assigned to your class.</p>
+        <a href="{% url 'quiz_app:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-clockwise me-1"></i>Refresh Portal
+        </a>
+      </div>
     </div>
   </div>
 </div>
 {% else %}
-<!-- Welcome Section -->
-<div class="row mb-4">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h3 class="mb-0">Welcome, {{ user.full_name }}!</h3>
-        <p class="text-muted mb-0">
+
+<!-- Student Greeting & Portal Context Banner -->
+<div class="card mb-4 border-0 shadow-sm">
+  <div class="card-body p-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+      <div>
+        <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+            <i class="bi bi-mortarboard me-1"></i>Student Portal
+          </span>
           {% if assigned_class %}
-          <i class="bi bi-building me-1"></i>{{ assigned_class.name }} {% endif %} {% if academic_year %}
-          <span class="ms-3"
-            ><i class="bi bi-calendar me-1"></i>{{ academic_year.name }}</span
-          >
-          {% endif %} {% if term %}
-          <span class="ms-3"
-            ><i class="bi bi-calendar-week me-1"></i>{{ term.name }}</span
-          >
+          <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1">
+            <i class="bi bi-building me-1"></i>Class: {{ assigned_class.name }}
+          </span>
           {% endif %}
+          {% if academic_year %}
+          <span class="badge bg-secondary-subtle text-secondary border px-2 py-1">
+            <i class="bi bi-calendar-check me-1"></i>{{ academic_year.name }}
+          </span>
+          {% endif %}
+          {% if term %}
+          <span class="badge bg-secondary-subtle text-secondary border px-2 py-1">
+            <i class="bi bi-calendar3 me-1"></i>{{ term.name }}
+          </span>
+          {% endif %}
+        </div>
+        <h2 class="h4 mb-1 fw-bold text-body">Welcome, {{ user.full_name|default:user.username }}!</h2>
+        <p class="text-muted mb-0 small">
+          {% if student.admission_number %}
+          <span class="me-3"><i class="bi bi-person-badge me-1"></i>Admission No: <strong>{{ student.admission_number }}</strong></span>
+          {% endif %}
+          <span><i class="bi bi-clock me-1"></i>{% now "l, F j, Y" %}</span>
         </p>
       </div>
+
+      <!-- Quick Shortcuts -->
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'quiz_app:student_quiz_list' %}" class="btn btn-primary btn-sm px-3">
+          <i class="bi bi-journal-check me-1"></i>Available Quizzes
+        </a>
+        <a href="{% url 'quiz_app:student_quiz_attempts' %}" class="btn btn-outline-secondary btn-sm px-3">
+          <i class="bi bi-clipboard-check me-1"></i>My Results
+        </a>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Statistics Cards -->
-<div class="row">
-  <div class="col-lg-3 col-md-6">
-    <div class="card card-primary card-outline">
-      <div class="card-body">
-        <div class="d-flex justify-content-between">
-          <div>
-            <h5 class="mb-0">Available Quizzes</h5>
-            <h2 class="mt-2 mb-0">{{ total_available }}</h2>
-          </div>
-          <div class="align-self-center">
-            <i class="bi bi-question-circle fs-1 text-primary"></i>
-          </div>
+<!-- Active Quiz Direct Resumption Hero (Shown when an attempt is in-progress) -->
+{% if in_progress_attempts %}
+<div class="card mb-4 border-warning shadow-sm">
+  <div class="card-body p-3 p-md-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-warning-subtle text-warning p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+          <i class="bi bi-stopwatch-fill fs-3"></i>
         </div>
-        <a
-          href="{% url 'quiz_app:student_quiz_list' %}"
-          class="btn btn-sm btn-primary mt-2"
-        >
-          View All <i class="bi bi-arrow-right ms-1"></i>
-        </a>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-3 col-md-6">
-    <div class="card card-success card-outline">
-      <div class="card-body">
-        <div class="d-flex justify-content-between">
-          <div>
-            <h5 class="mb-0">Completed</h5>
-            <h2 class="mt-2 mb-0">{{ total_completed }}</h2>
-          </div>
-          <div class="align-self-center">
-            <i class="bi bi-check-circle fs-1 text-success"></i>
-          </div>
-        </div>
-        <a
-          href="{% url 'quiz_app:student_quiz_attempts' %}"
-          class="btn btn-sm btn-success mt-2"
-        >
-          View Results <i class="bi bi-arrow-right ms-1"></i>
-        </a>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-3 col-md-6">
-    <div class="card card-warning card-outline">
-      <div class="card-body">
-        <div class="d-flex justify-content-between">
-          <div>
-            <h5 class="mb-0">In Progress</h5>
-            <h2 class="mt-2 mb-0">{{ total_in_progress }}</h2>
-          </div>
-          <div class="align-self-center">
-            <i class="bi bi-clock-history fs-1 text-warning"></i>
-          </div>
-        </div>
-        {% if total_in_progress > 0 %}
-        <a
-          href="{% url 'quiz_app:student_quiz_list' %}"
-          class="btn btn-sm btn-warning mt-2"
-        >
-          Continue <i class="bi bi-arrow-right ms-1"></i>
-        </a>
-        {% else %}
-        <span class="text-muted small mt-2 d-block"
-          >No quizzes in progress</span
-        >
-        {% endif %}
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-3 col-md-6">
-    <div class="card card-info card-outline">
-      <div class="card-body">
-        <div class="d-flex justify-content-between">
-          <div>
-            <h5 class="mb-0">Average Score</h5>
-            <h2 class="mt-2 mb-0">{{ avg_score|floatformat:1 }}%</h2>
-            {% if best_score > 0 %}
-            <small class="text-muted"
-              >Best: {{ best_score|floatformat:1 }}%</small
-            >
+        <div>
+          <div class="badge bg-warning text-dark mb-1">In Progress — Action Required</div>
+          <h5 class="mb-1 fw-bold text-body">{{ in_progress_attempts.0.quiz.title }}</h5>
+          <div class="small text-muted d-flex flex-wrap gap-2 align-items-center">
+            <span><i class="bi bi-book me-1"></i>{{ in_progress_attempts.0.quiz.subject.subject_name }}</span>
+            <span>&bull;</span>
+            <span>Started {{ in_progress_attempts.0.started_at|date:"M d, h:i A" }}</span>
+            {% if in_progress_attempts.0.quiz.time_limit_minutes %}
+            <span>&bull;</span>
+            <span class="text-danger fw-medium"><i class="bi bi-hourglass-split me-1"></i>Timed Quiz</span>
             {% endif %}
           </div>
-          <div class="align-self-center">
-            <i class="bi bi-graph-up fs-1 text-info"></i>
-          </div>
         </div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- In-Progress Quizzes -->
-{% if in_progress_attempts %}
-<div class="row mt-4">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-clock-history me-2"></i>Continue Your Quizzes
-        </h3>
-      </div>
-      <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-hover">
-            <thead>
-              <tr>
-                <th>Quiz</th>
-                <th>Subject</th>
-                <th>Started</th>
-                <th>Time Remaining</th>
-                <th width="150">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for attempt in in_progress_attempts %}
-              <tr>
-                <td>
-                  <strong>{{ attempt.quiz.title }}</strong>
-                </td>
-                <td>{{ attempt.quiz.subject.subject_name }}</td>
-                <td>{{ attempt.started_at|date:"M d, Y h:i A" }}</td>
-                <td>
-                  {% if attempt.quiz.time_limit_minutes %} {% with time_remaining=attempt.get_time_remaining %} {% if time_remaining %}
-                  <span
-                    class="badge {% if time_remaining.total_seconds < 300 %}bg-danger{% elif time_remaining.total_seconds < 900 %}bg-warning{% else %}bg-info{% endif %}"
-                  >
-                    {{ time_remaining }}
-                  </span>
-                  {% else %}
-                  <span class="badge bg-danger">Time Expired</span>
-                  {% endif %} {% endwith %} {% else %}
-                  <span class="text-muted">No time limit</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <a
-                    href="{% url 'quiz_app:student_quiz_take' attempt.id %}"
-                    class="btn btn-sm btn-warning"
-                  >
-                    <i class="bi bi-arrow-clockwise me-1"></i>Continue
-                  </a>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+      <div class="w-100 w-md-auto text-end">
+        <a href="{% url 'quiz_app:student_quiz_take' in_progress_attempts.0.id %}" class="btn btn-warning btn-lg px-4 w-100 w-md-auto fw-bold shadow-sm">
+          <i class="bi bi-play-circle-fill me-2"></i>Resume Quiz Now
+        </a>
       </div>
     </div>
   </div>
 </div>
 {% endif %}
 
-<!-- Recent Activity and Upcoming Quizzes -->
-<div class="row mt-4">
-  <!-- Recent Attempts -->
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-clock-history me-2"></i>Recent Activity
-        </h3>
-      </div>
+<!-- Learning KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100 kpi-card">
       <div class="card-body">
-        {% if recent_attempts %}
-        <div class="list-group">
-          {% for attempt in recent_attempts %}
-          <div class="list-group-item">
-            <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-label">Available Quizzes</div>
+            <div class="kpi-value text-primary">{{ total_available }}</div>
+            <div class="kpi-helper">Ready for your class</div>
+          </div>
+          <div class="kpi-icon bg-primary-subtle text-primary">
+            <i class="bi bi-journal-bookmark"></i>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+        <a href="{% url 'quiz_app:student_quiz_list' %}" class="btn btn-sm btn-link p-0 text-decoration-none">
+          Explore Quizzes <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100 kpi-card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-label">Completed</div>
+            <div class="kpi-value text-success">{{ total_completed }}</div>
+            <div class="kpi-helper">Submitted assessments</div>
+          </div>
+          <div class="kpi-icon bg-success-subtle text-success">
+            <i class="bi bi-check2-circle"></i>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+        <a href="{% url 'quiz_app:student_quiz_attempts' %}" class="btn btn-sm btn-link p-0 text-decoration-none text-success">
+          View Past Grades <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100 kpi-card {% if total_in_progress > 0 %}border-warning{% endif %}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-label">In Progress</div>
+            <div class="kpi-value {% if total_in_progress > 0 %}text-warning{% endif %}">{{ total_in_progress }}</div>
+            <div class="kpi-helper">
+              {% if total_in_progress > 0 %}Active attempt waiting{% else %}No active attempts{% endif %}
+            </div>
+          </div>
+          <div class="kpi-icon {% if total_in_progress > 0 %}bg-warning-subtle text-warning{% else %}bg-secondary-subtle text-muted{% endif %}">
+            <i class="bi bi-clock-history"></i>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+        {% if in_progress_attempts %}
+        <a href="{% url 'quiz_app:student_quiz_take' in_progress_attempts.0.id %}" class="btn btn-sm btn-warning text-dark fw-medium">
+          Resume Now <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+        {% else %}
+        <span class="text-muted small">All quizzes finished</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100 kpi-card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-label">Average Performance</div>
+            <div class="kpi-value text-info">{{ avg_score|floatformat:1 }}%</div>
+            <div class="kpi-helper">
+              {% if best_score > 0 %}
+              <span class="text-success fw-medium">Best: {{ best_score|floatformat:1 }}%</span>
+              {% else %}
+              Across completed quizzes
+              {% endif %}
+            </div>
+          </div>
+          <div class="kpi-icon bg-info-subtle text-info">
+            <i class="bi bi-trophy"></i>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer bg-transparent border-0 pt-0 pb-3">
+        <a href="{% url 'quiz_app:student_quiz_attempts' %}" class="btn btn-sm btn-link p-0 text-decoration-none text-info">
+          Performance Analytics <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="row g-4 mb-4">
+  <!-- Left Column: Continue Quizzes & Recent Attempts -->
+  <div class="col-lg-6">
+    {% if in_progress_attempts %}
+    <div class="card mb-4 shadow-sm border-warning">
+      <div class="card-header bg-warning-subtle text-warning-emphasis d-flex justify-content-between align-items-center py-3">
+        <h3 class="card-title h6 mb-0 fw-bold">
+          <i class="bi bi-clock-history me-2"></i>Active Quiz Sessions
+        </h3>
+        <span class="badge bg-warning text-dark">{{ in_progress_attempts|length }} In-Progress</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="list-group list-group-flush">
+          {% for attempt in in_progress_attempts %}
+          <div class="list-group-item p-3">
+            <div class="d-flex justify-content-between align-items-center gap-2">
               <div class="flex-grow-1">
-                <h6 class="mb-1">{{ attempt.quiz.title }}</h6>
-                <p class="mb-1 text-muted small">
-                  {{ attempt.quiz.subject.subject_name }} | {% if attempt.submitted_at %} Submitted: {{ attempt.submitted_at|date:"M d, Y h:i A" }} {% else %}
-                  Started: {{ attempt.started_at|date:"M d, Y h:i A" }} {% endif %}
-                </p>
-                {% if attempt.is_submitted and attempt.is_completed %}
-                <span
-                  class="badge {% if attempt.percentage >= 70 %}bg-success{% elif attempt.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
-                >
-                  {{ attempt.percentage|floatformat:1 }}%
+                <h6 class="mb-1 fw-bold text-body">{{ attempt.quiz.title }}</h6>
+                <div class="small text-muted mb-1">
+                  <i class="bi bi-book me-1"></i>{{ attempt.quiz.subject.subject_name }} &bull; Started {{ attempt.started_at|date:"M d, h:i A" }}
+                </div>
+                {% if attempt.quiz.time_limit_minutes %}
+                {% with time_remaining=attempt.get_time_remaining %}
+                {% if time_remaining %}
+                <span class="badge {% if time_remaining.total_seconds < 300 %}bg-danger{% elif time_remaining.total_seconds < 900 %}bg-warning text-dark{% else %}bg-info-subtle text-info border{% endif %}">
+                  <i class="bi bi-hourglass-split me-1"></i>Time Left: {{ time_remaining }}
                 </span>
                 {% else %}
-                <span class="badge bg-secondary">In Progress</span>
+                <span class="badge bg-danger">Time Expired</span>
+                {% endif %}
+                {% endwith %}
                 {% endif %}
               </div>
               <div>
-                {% if attempt.is_submitted %}
-                <a
-                  href="{% url 'quiz_app:student_quiz_result_detail' attempt.id %}"
-                  class="btn btn-sm btn-info"
-                >
-                  <i class="bi bi-eye"></i>
+                <a href="{% url 'quiz_app:student_quiz_take' attempt.id %}" class="btn btn-warning btn-sm">
+                  <i class="bi bi-play-fill me-1"></i>Resume
                 </a>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Activity Card -->
+    <div class="card h-100 shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center py-3">
+        <h3 class="card-title h6 mb-0 fw-bold">
+          <i class="bi bi-clock-history me-2 text-primary"></i>Recent Quiz Attempts
+        </h3>
+        <a href="{% url 'quiz_app:student_quiz_attempts' %}" class="btn btn-sm btn-outline-secondary">
+          All History
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_attempts %}
+        <div class="list-group list-group-flush">
+          {% for attempt in recent_attempts %}
+          <div class="list-group-item p-3">
+            <div class="d-flex justify-content-between align-items-center gap-2">
+              <div class="flex-grow-1">
+                <h6 class="mb-1 fw-semibold text-body">{{ attempt.quiz.title }}</h6>
+                <div class="small text-muted d-flex flex-wrap gap-2">
+                  <span><i class="bi bi-book me-1"></i>{{ attempt.quiz.subject.subject_name }}</span>
+                  <span>&bull;</span>
+                  {% if attempt.submitted_at %}
+                  <span><i class="bi bi-check-circle text-success me-1"></i>{{ attempt.submitted_at|date:"M d, Y h:i A" }}</span>
+                  {% else %}
+                  <span><i class="bi bi-hourglass text-warning me-1"></i>{{ attempt.started_at|date:"M d, Y h:i A" }}</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="text-end">
+                {% if attempt.is_submitted and attempt.is_completed %}
+                <span class="badge {% if attempt.percentage >= 70 %}bg-success-subtle text-success border border-success-subtle{% elif attempt.percentage >= 50 %}bg-warning-subtle text-warning border border-warning-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %} fs-6 mb-1 d-inline-block">
+                  {{ attempt.percentage|floatformat:1 }}%
+                </span>
+                <div>
+                  <a href="{% url 'quiz_app:student_quiz_result_detail' attempt.id %}" class="btn btn-xs btn-outline-info btn-sm">
+                    <i class="bi bi-eye me-1"></i>Review
+                  </a>
+                </div>
+                {% elif attempt.needs_grading %}
+                <span class="badge bg-warning-subtle text-warning border mb-1 d-inline-block">Grading Pending</span>
                 {% else %}
-                <a
-                  href="{% url 'quiz_app:student_quiz_take' attempt.id %}"
-                  class="btn btn-sm btn-warning"
-                >
-                  <i class="bi bi-arrow-clockwise"></i>
-                </a>
+                <span class="badge bg-secondary-subtle text-secondary mb-1 d-inline-block">In Progress</span>
+                <div>
+                  <a href="{% url 'quiz_app:student_quiz_take' attempt.id %}" class="btn btn-xs btn-warning btn-sm">
+                    <i class="bi bi-play-fill me-1"></i>Resume
+                  </a>
+                </div>
                 {% endif %}
               </div>
             </div>
@@ -250,67 +316,75 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="text-muted text-center py-4">No recent activity</p>
-        {% endif %}
-        <div class="mt-3 text-center">
-          <a
-            href="{% url 'quiz_app:student_quiz_attempts' %}"
-            class="btn btn-sm btn-outline-primary"
-          >
-            View All Results <i class="bi bi-arrow-right ms-1"></i>
-          </a>
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-journal-x fs-2 d-block mb-2 text-secondary"></i>
+          <strong>No quiz attempts recorded yet</strong>
+          <p class="small text-muted mb-0">Select an available quiz to start testing your knowledge.</p>
         </div>
+        {% endif %}
+      </div>
+      <div class="card-footer bg-transparent text-center py-2">
+        <a href="{% url 'quiz_app:student_quiz_attempts' %}" class="btn btn-sm btn-link text-decoration-none">
+          View Complete Assessment History <i class="bi bi-arrow-right ms-1"></i>
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- Upcoming & Due Soon Quizzes -->
+  <!-- Right Column: Upcoming & Due Soon Quizzes -->
   <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-calendar-event me-2"></i>Upcoming & Due Soon
+    <div class="card h-100 shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center py-3">
+        <h3 class="card-title h6 mb-0 fw-bold">
+          <i class="bi bi-calendar-event me-2 text-warning"></i>Upcoming & Due Soon
         </h3>
+        <a href="{% url 'quiz_app:student_quiz_list' %}" class="btn btn-sm btn-outline-primary">
+          All Quizzes
+        </a>
       </div>
-      <div class="card-body">
+      <div class="card-body p-0">
         {% if upcoming_quizzes or due_soon_quizzes %}
-        <div class="list-group">
-          {% for quiz in upcoming_quizzes %}
-          <div class="list-group-item">
-            <div class="d-flex justify-content-between align-items-start">
+        <div class="list-group list-group-flush">
+          <!-- Due Soon -->
+          {% for quiz in due_soon_quizzes %}
+          <div class="list-group-item p-3 border-start border-warning border-3">
+            <div class="d-flex justify-content-between align-items-center gap-2">
               <div class="flex-grow-1">
-                <h6 class="mb-1">{{ quiz.title }}</h6>
-                <p class="mb-1 text-muted small">
-                  {{ quiz.subject.subject_name }} | Available: {{ quiz.available_from|date:"M d, Y h:i A" }}
-                </p>
-                <span class="badge bg-info">Upcoming</span>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <h6 class="mb-0 fw-semibold text-body">{{ quiz.title }}</h6>
+                  <span class="badge bg-warning text-dark"><i class="bi bi-alarm me-1"></i>Due Soon</span>
+                </div>
+                <div class="small text-muted">
+                  <i class="bi bi-book me-1"></i>{{ quiz.subject.subject_name }} &bull;
+                  <span class="text-danger fw-medium"><i class="bi bi-clock me-1"></i>Due: {{ quiz.available_until|date:"M d, Y h:i A" }}</span>
+                </div>
               </div>
               <div>
-                <a
-                  href="{% url 'quiz_app:student_quiz_detail' quiz.id %}"
-                  class="btn btn-sm btn-outline-primary"
-                >
-                  <i class="bi bi-eye"></i>
+                <a href="{% url 'quiz_app:student_quiz_detail' quiz.id %}" class="btn btn-sm btn-warning">
+                  <i class="bi bi-arrow-right-circle me-1"></i>Start
                 </a>
               </div>
             </div>
           </div>
-          {% endfor %} {% for quiz in due_soon_quizzes %}
-          <div class="list-group-item border-warning">
-            <div class="d-flex justify-content-between align-items-start">
+          {% endfor %}
+
+          <!-- Upcoming -->
+          {% for quiz in upcoming_quizzes %}
+          <div class="list-group-item p-3">
+            <div class="d-flex justify-content-between align-items-center gap-2">
               <div class="flex-grow-1">
-                <h6 class="mb-1">{{ quiz.title }}</h6>
-                <p class="mb-1 text-muted small">
-                  {{ quiz.subject.subject_name }} | Due: {{ quiz.available_until|date:"M d, Y h:i A" }}
-                </p>
-                <span class="badge bg-warning">Due Soon</span>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <h6 class="mb-0 fw-semibold text-body">{{ quiz.title }}</h6>
+                  <span class="badge bg-info-subtle text-info border border-info-subtle">Upcoming</span>
+                </div>
+                <div class="small text-muted">
+                  <i class="bi bi-book me-1"></i>{{ quiz.subject.subject_name }} &bull;
+                  <span>Opens: {{ quiz.available_from|date:"M d, Y h:i A" }}</span>
+                </div>
               </div>
               <div>
-                <a
-                  href="{% url 'quiz_app:student_quiz_detail' quiz.id %}"
-                  class="btn btn-sm btn-warning"
-                >
-                  <i class="bi bi-arrow-right"></i>Start
+                <a href="{% url 'quiz_app:student_quiz_detail' quiz.id %}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-info-circle me-1"></i>Details
                 </a>
               </div>
             </div>
@@ -318,73 +392,44 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="text-muted text-center py-4">No upcoming quizzes</p>
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-calendar-check fs-2 d-block mb-2 text-secondary"></i>
+          <strong>No impending deadlines</strong>
+          <p class="small text-muted mb-0">Check your available quizzes to study ahead or review completed tests.</p>
+        </div>
         {% endif %}
-        <div class="mt-3 text-center">
-          <a
-            href="{% url 'quiz_app:student_quiz_list' %}"
-            class="btn btn-sm btn-outline-primary"
-          >
-            View All Quizzes <i class="bi bi-arrow-right ms-1"></i>
-          </a>
+      </div>
+      <div class="card-footer bg-transparent text-center py-2">
+        <a href="{% url 'quiz_app:student_quiz_list' %}" class="btn btn-sm btn-link text-decoration-none">
+          Browse All Available Quizzes <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Helpful Student Tips -->
+<div class="row">
+  <div class="col-12">
+    <div class="card bg-body-tertiary border-0 shadow-sm">
+      <div class="card-body p-3 p-md-4">
+        <div class="row g-3 align-items-center">
+          <div class="col-md-8">
+            <h6 class="fw-bold mb-1"><i class="bi bi-lightbulb text-warning me-2"></i>Tip for Taking Online Quizzes</h6>
+            <p class="small text-muted mb-0">
+              Your answers are automatically saved as you select them or type in text questions. If your connection drops, you can safely refresh the page or return to this dashboard to resume your attempt.
+            </p>
+          </div>
+          <div class="col-md-4 text-md-end">
+            <a href="{% url 'quiz_app:student_quiz_list' %}" class="btn btn-primary btn-sm px-3">
+              <i class="bi bi-journal-text me-1"></i>Go to Available Quizzes
+            </a>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Quick Actions -->
-<div class="row mt-4">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-lightning-charge me-2"></i>Quick Actions
-        </h3>
-      </div>
-      <div class="card-body">
-        <div class="row">
-          <div class="col-md-3">
-            <a
-              href="{% url 'quiz_app:student_quiz_list' %}"
-              class="btn btn-primary btn-lg w-100 mb-2"
-            >
-              <i class="bi bi-question-circle me-2"></i>Available Quizzes
-            </a>
-          </div>
-          <div class="col-md-3">
-            <a
-              href="{% url 'quiz_app:student_quiz_attempts' %}"
-              class="btn btn-success btn-lg w-100 mb-2"
-            >
-              <i class="bi bi-clipboard-check me-2"></i>My Results
-            </a>
-          </div>
-          <div class="col-md-3">
-            {% if total_in_progress > 0 %}
-            <a
-              href="{% url 'quiz_app:student_quiz_list' %}"
-              class="btn btn-warning btn-lg w-100 mb-2"
-            >
-              <i class="bi bi-clock-history me-2"></i>Continue Quiz
-            </a>
-            {% else %}
-            <button class="btn btn-secondary btn-lg w-100 mb-2" disabled>
-              <i class="bi bi-clock-history me-2"></i>No In-Progress
-            </button>
-            {% endif %}
-          </div>
-          <div class="col-md-3">
-            <a
-              href="{% url 'quiz_app:dashboard' %}"
-              class="btn btn-info btn-lg w-100 mb-2"
-            >
-              <i class="bi bi-house me-2"></i>Home
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %} {% endblock content %}
+{% endif %}
+{% endblock content %}

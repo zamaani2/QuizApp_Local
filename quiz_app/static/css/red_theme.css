@@ -58,20 +58,16 @@
 
 /* ===== CONTENT SECTION STYLING ===== */
 .red-theme-page .app-content {
-  background: linear-gradient(
-    135deg,
-    #ffe6e6 0%,
-    #ffd6d6 50%,
-    #ffcccc 100%
-  ) !important;
+  background: var(--app-bg, #f8fafc) !important;
   min-height: calc(100vh - 4rem);
-  color: #2d1b1b !important;
+  color: var(--app-text, #1e293b) !important;
 }
 
 .red-theme-page .app-content-header {
-  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%) !important;
-  border-bottom: 2px solid rgba(220, 53, 69, 0.3) !important;
-  color: #2d1b1b !important;
+  background: var(--app-surface, #ffffff) !important;
+  border-bottom: 1px solid var(--app-border, #e2e8f0) !important;
+  color: var(--app-text, #1e293b) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .red-theme-page .app-content .container-fluid {
@@ -83,44 +79,16 @@
 }
 
 /* ===== MAIN CONTENT AREAS ===== */
-.red-theme-page .main-content {
-  background: linear-gradient(135deg, #ffe6e6 0%, #ffd6d6 100%) !important;
-  color: #2d1b1b !important;
-}
-
-.red-theme-page .content-wrapper {
-  background: linear-gradient(135deg, #ffe6e6 0%, #ffd6d6 100%) !important;
-  color: #2d1b1b !important;
-}
-
-.red-theme-page .wrapper {
-  background: linear-gradient(135deg, #ffe6e6 0%, #ffd6d6 100%) !important;
-}
-
-/* ===== DASHBOARD CONTENT ===== */
-.red-theme-page .dashboard-content {
-  background: linear-gradient(135deg, #ffe6e6 0%, #ffd6d6 100%) !important;
-  color: #2d1b1b !important;
-}
-
-.red-theme-page .page-content {
-  background: linear-gradient(135deg, #ffe6e6 0%, #ffd6d6 100%) !important;
-  color: #2d1b1b !important;
-}
-
-.red-theme-page .dashboard {
-  background: linear-gradient(135deg, #ffe6e6 0%, #ffd6d6 100%) !important;
-  color: #2d1b1b !important;
-}
-
-.red-theme-page .admin-dashboard {
-  background: linear-gradient(135deg, #ffe6e6 0%, #ffd6d6 100%) !important;
-  color: #2d1b1b !important;
-}
-
+.red-theme-page .main-content,
+.red-theme-page .content-wrapper,
+.red-theme-page .wrapper,
+.red-theme-page .dashboard-content,
+.red-theme-page .page-content,
+.red-theme-page .dashboard,
+.red-theme-page .admin-dashboard,
 .red-theme-page .student-dashboard {
-  background: linear-gradient(135deg, #ffe6e6 0%, #ffd6d6 100%) !important;
-  color: #2d1b1b !important;
+  background: var(--app-bg, #f8fafc) !important;
+  color: var(--app-text, #1e293b) !important;
 }
 
 /* ===== CONTENT TEXT STYLING ===== */
@@ -336,31 +304,27 @@
 
 /* ===== CARDS ===== */
 .red-theme-page .card {
-  border: 3px solid var(--red-primary);
-  box-shadow: 0 8px 24px rgba(220, 53, 69, 0.15);
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%) !important;
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
+  border: 1px solid var(--app-border, #e2e8f0);
+  box-shadow: var(--app-shadow-xs, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+  transition: all 0.2s ease;
+  background: var(--app-surface, #ffffff);
+  border-radius: var(--app-radius-lg, 0.75rem);
   overflow: hidden;
 }
 
 .red-theme-page .card:hover {
-  box-shadow: 0 12px 32px rgba(220, 53, 69, 0.2);
-  transform: translateY(-6px);
-  background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%) !important;
-  border-color: var(--red-primary-dark);
+  box-shadow: var(--app-shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+  transform: translateY(-2px);
+  border-color: var(--app-border-strong, #cbd5e1);
 }
 
 .red-theme-page .card-header {
-  background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
-  border-bottom: 2px solid var(--red-primary-dark);
-  color: white !important;
+  background: var(--app-surface, #ffffff);
+  border-bottom: 1px solid var(--app-border, #e2e8f0);
+  color: var(--app-text, #1e293b) !important;
   font-weight: 600;
-  padding: 1rem 1.25rem;
+  padding: 0.9rem 1.25rem;
   font-size: 1rem;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  border-radius: 12px 12px 0 0;
 }
 
 .red-theme-page .card-header * {
