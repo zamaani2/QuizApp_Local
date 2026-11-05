@@ -18,12 +18,17 @@ from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import override_settings
 from django.urls import reverse
 
+from pathlib import Path
+
 from .models import (
     AcademicYear,
     Class,
+    Question,
+    Quiz,
     SchoolInformation,
     Student,
     StudentClass,
+    Subject,
     Teacher,
     User,
 )
@@ -137,6 +142,29 @@ class AuthenticatedBrowserShellTests(StaticLiveServerTestCase):
             assigned_class=class_obj,
             school=self.school,
         )
+        self.subject = Subject.objects.create(
+            subject_name="Browser Subject",
+            school=self.school,
+        )
+        self.quiz = Quiz.objects.create(
+            title="Browser Quiz",
+            slug="browser-quiz",
+            subject=self.subject,
+            teacher=self.teacher,
+            school=self.school,
+            status="published",
+        )
+        self.question = Question.objects.create(
+            quiz=self.quiz,
+            question_text="Browser deletion question",
+            question_type="short_answer",
+            marks=1,
+            school=self.school,
+        )
+        self.screenshot_dir = Path(
+            os.environ.get("PLAYWRIGHT_SCREENSHOT_DIR", "artifacts/playwright")
+        )
+        self.screenshot_dir.mkdir(parents=True, exist_ok=True)
 
     def _login(self, page, username, login_url, dashboard_url):
         page.goto(f"{self.live_server_url}{login_url}")
@@ -283,3 +311,86 @@ class AuthenticatedBrowserShellTests(StaticLiveServerTestCase):
                 context.close()
 
         self.assertFalse(failures, "\n".join(failures))
+
+    def _save_screenshot(self, page, name):
+        try:
+            page.screenshot(
+                path=str(self.screenshot_dir / f"{name}.png"),
+                full_page=True,
+            )
+        except Exception:
+            pass
+
+    def test_admin_student_management_modal(self):
+        from playwright.sync_api import expect
+
+        context = self.browser.new_context()
+        page = context.new_page()
+        console_errors, failed_assets = self._collect_page_errors(page)
+        try:
+            self._login(
+                page,
+                self.admin.username,
+                reverse("quiz_app:login"),
+                reverse("quiz_app:admin_dashboard"),
+            )
+            self._dismiss_sweetalert(page)
+            page.goto(f"{self.live_server_url}{reverse('quiz_app:student_list')}")
+            self._dismiss_sweetalert(page)
+            page.locator("#addStudentBtn").click()
+            modal = page.locator("#studentFormModal")
+            expect(modal).to_be_visible(timeout=15000)
+            expect(modal).to_have_class(re.compile(r"\bshow\b"))
+            expect(page.locator("#studentForm")).to_be_visible()
+            page.locator("#studentFormModal [data-bs-dismiss='modal']").first.click()
+            expect(modal).to_be_hidden(timeout=10000)
+            self.assertFalse(console_errors, "; ".join(console_errors))
+            self.assertFalse(failed_assets, "; ".join(failed_assets))
+        except Exception:
+            self._save_screenshot(page, "admin-student-modal-failure")
+            raise
+        finally:
+            context.close()
+
+    def test_teacher_question_delete_confirmation(self):
+        from playwright.sync_api import expect
+
+        context = self.browser.new_context()
+        page = context.new_page()
+        console_errors, failed_assets = self._collect_page_errors(page)
+        try:
+            self._login(
+                page,
+                self.teacher_user.username,
+                reverse("quiz_app:login"),
+                reverse("quiz_app:teacher_dashboard"),
+            )
+            self._dismiss_sweetalert(page)
+            page.goto(
+                f"{self.live_server_url}{reverse('quiz_app:quiz_detail', args=[self.quiz.pk])}"
+            )
+            self._dismiss_sweetalert(page)
+            expect(page.locator(".delete-question-btn")).to_be_visible()
+            page.locator(".delete-question-btn").click()
+            confirm = page.locator(".swal2-popup.swal2-modal")
+            expect(confirm).to_be_visible(timeout=10000)
+            expect(confirm).to_contain_text("Are you sure?")
+            page.locator(".swal2-cancel").click()
+            expect(confirm).to_be_hidden(timeout=10000)
+            self.assertTrue(Question.objects.filter(pk=self.question.pk).exists())
+
+            page.locator(".delete-question-btn").click()
+            expect(page.locator(".swal2-popup.swal2-modal")).to_be_visible()
+            page.locator(".swal2-confirm").click()
+            page.wait_for_function(
+                "() => !document.querySelector('.delete-question-btn')",
+                timeout=15000,
+            )
+            self.assertFalse(Question.objects.filter(pk=self.question.pk).exists())
+            self.assertFalse(console_errors, "; ".join(console_errors))
+            self.assertFalse(failed_assets, "; ".join(failed_assets))
+        except Exception:
+            self._save_screenshot(page, "teacher-question-delete-failure")
+            raise
+        finally:
+            context.close()

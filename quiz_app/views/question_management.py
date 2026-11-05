@@ -12,7 +12,7 @@ This module provides views for managing questions within quizzes including:
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, Http404
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q, Max, Prefetch
 from django.db import transaction
@@ -612,52 +612,69 @@ def question_edit_view(request, quiz_id, question_id):
 @require_http_methods(["POST"])
 def question_delete_view(request, quiz_id, question_id):
     """
-    Delete a question.
+    Delete a question after client-side SweetAlert2 confirmation.
+
+    GET is intentionally rejected. Confirmation lives in question_management.js.
     """
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def error_response(message, status, redirect_name="quiz_app:quiz_detail"):
+        if is_ajax:
+            return JsonResponse({"success": False, "error": message}, status=status)
+        messages.error(request, message)
+        if redirect_name == "quiz_app:quiz_list":
+            return redirect(redirect_name)
+        return redirect(redirect_name, quiz_id=quiz_id)
+
     if request.user.role not in ["teacher", "admin"]:
-        return JsonResponse({'error': 'Permission denied'}, status=403)
-    
+        return error_response("Permission denied", 403, "quiz_app:quiz_list")
+
     if request.user.role == "teacher" and not request.user.teacher_profile:
-        return JsonResponse({'error': 'Teacher profile not found'}, status=404)
+        return error_response("Teacher profile not found", 404, "quiz_app:quiz_list")
 
     school = request.user.school
-    quiz_filters = {'pk': quiz_id, 'school': school}
+    quiz_filters = {"pk": quiz_id, "school": school}
     if request.user.role == "teacher":
-        quiz_filters['teacher'] = request.user.teacher_profile
-    quiz = get_object_or_404(Quiz, **quiz_filters)
-    question = get_object_or_404(Question, pk=question_id, quiz=quiz, school=school)
+        quiz_filters["teacher"] = request.user.teacher_profile
 
-    if quiz.attempts.exists():
-        message = "Questions in a quiz with attempts cannot be deleted."
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'error': message}, status=400)
-        messages.error(request, message)
-        return redirect("quiz_app:quiz_detail", quiz_id=quiz_id)
-    
     try:
-        question_text = question.question_text[:50]
-        question.delete()
-        
-        # Recalculate quiz total marks
-        quiz.calculate_total_marks()
-        
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': True,
-                'message': f'Question deleted successfully.'
-            })
-        
-        messages.success(request, 'Question deleted successfully.')
-        return redirect("quiz_app:quiz_detail", quiz_id=quiz_id)
-    
-    except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': False,
-                'error': f'Error deleting question: {str(e)}'
-            }, status=500)
-        messages.error(request, f'Error deleting question: {str(e)}')
-        return redirect("quiz_app:quiz_detail", quiz_id=quiz_id)
+        with transaction.atomic():
+            quiz = get_object_or_404(Quiz.objects.select_for_update(), **quiz_filters)
+            question = get_object_or_404(
+                Question.objects.select_for_update(),
+                pk=question_id,
+                quiz=quiz,
+                school=school,
+            )
+
+            if quiz.attempts.exists():
+                return error_response(
+                    "Questions in a quiz with attempts cannot be deleted.",
+                    400,
+                )
+
+            question.delete()
+            quiz.calculate_total_marks()
+    except Http404:
+        raise
+    except ProtectedError:
+        return error_response(
+            "This question cannot be deleted because it is referenced by existing records.",
+            400,
+        )
+    except Exception as exc:
+        return error_response(f"Error deleting question: {exc}", 500)
+
+    if is_ajax:
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Question deleted successfully.",
+            }
+        )
+
+    messages.success(request, "Question deleted successfully.")
+    return redirect("quiz_app:quiz_detail", quiz_id=quiz_id)
 
 
 @login_required
