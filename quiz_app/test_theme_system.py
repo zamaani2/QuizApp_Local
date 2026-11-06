@@ -32,7 +32,9 @@ THEME_COLORS = {
 
 class AccentThemeAssetTests(SimpleTestCase):
     def test_design_system_defines_only_the_four_accent_themes(self):
-        css = (APP_DIR / "static" / "css" / "app-ui.css").read_text(encoding="utf-8")
+        css = (APP_DIR / "static" / "css" / "academic_pro_theme.css").read_text(
+            encoding="utf-8"
+        )
         js_boot = (APP_DIR / "templates" / "partials" / "_theme_boot.html").read_text(
             encoding="utf-8"
         )
@@ -64,7 +66,9 @@ class AccentThemeAssetTests(SimpleTestCase):
         self.assertNotIn("prefers-color-scheme", css)
 
     def test_legacy_theme_selectors_remain_available(self):
-        css = (APP_DIR / "static" / "css" / "app-ui.css").read_text(encoding="utf-8")
+        css = (APP_DIR / "static" / "css" / "academic_pro_theme.css").read_text(
+            encoding="utf-8"
+        )
         for selector in (
             ".theme-option",
             ".theme-color-dot.academic",
@@ -221,7 +225,7 @@ class AccentThemePageTests(TestCase):
         for response in (login, superadmin_login, reset):
             self.assertContains(response, "preferredTheme")
             self.assertContains(response, 'data-app-theme="academic"')
-            self.assertContains(response, "css/app-ui.css")
+            self.assertNotContains(response, "css/app-ui.css")
             for stylesheet in theme_stylesheets:
                 self.assertContains(response, f"css/{stylesheet}")
 
