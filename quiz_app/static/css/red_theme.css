@@ -1399,3 +1399,84 @@
   transform: translateX(6px) !important;
   box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5) !important;
 }
+
+/* Keep the selected theme visible across the shared application content. */
+.red-theme-page .app-main,
+.red-theme-page .app-content {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe6e6 100%) !important;
+  color: var(--red-dark) !important;
+}
+
+.red-theme-page .app-content-header,
+.red-theme-page .app-content-header-inner {
+  background: var(--red-gradient-subtle) !important;
+  border-color: rgba(220, 53, 69, 0.24) !important;
+  border-left: 4px solid var(--red-primary) !important;
+}
+
+.red-theme-page .app-content .card,
+.red-theme-page .app-content .content-section,
+.red-theme-page .app-content .kpi-card,
+.red-theme-page .app-content .welcome-banner {
+  background: #ffffff !important;
+  border-color: rgba(220, 53, 69, 0.26) !important;
+  box-shadow: 0 4px 14px rgba(220, 53, 69, 0.12) !important;
+}
+
+.red-theme-page .app-content .card-header {
+  background: linear-gradient(135deg, #b02a37 0%, #c82333 100%) !important;
+  border-color: var(--red-primary-dark) !important;
+  color: #ffffff !important;
+}
+
+.red-theme-page .app-content .card-header *,
+.red-theme-page .app-content .card-header .card-title {
+  color: #ffffff !important;
+}
+
+.red-theme-page .app-content .card-body {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe6e6 100%) !important;
+  color: var(--red-dark) !important;
+}
+
+.red-theme-page .app-content .card-footer {
+  background: var(--red-gradient-subtle) !important;
+  border-color: rgba(220, 53, 69, 0.26) !important;
+  color: var(--red-dark) !important;
+}
+
+.red-theme-page .app-content .btn-primary {
+  background: linear-gradient(135deg, #b02a37 0%, #c82333 100%) !important;
+  border-color: var(--red-primary-dark) !important;
+  color: #ffffff !important;
+}
+
+.red-theme-page .app-content .table > thead > tr > th {
+  background: linear-gradient(135deg, #b02a37 0%, #c82333 100%) !important;
+  border-color: var(--red-primary-dark) !important;
+  color: #ffffff !important;
+}
+
+.red-theme-page .app-content .form-control,
+.red-theme-page .app-content .form-select {
+  border-color: rgba(220, 53, 69, 0.45) !important;
+}
+
+.red-theme-page .app-content .form-control:focus,
+.red-theme-page .app-content .form-select:focus {
+  border-color: var(--red-primary) !important;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.2) !important;
+}
+
+.red-theme-page .modal-content {
+  border-color: rgba(220, 53, 69, 0.35) !important;
+}
+
+.red-theme-page .modal-header {
+  background: linear-gradient(135deg, #b02a37 0%, #c82333 100%) !important;
+  color: #ffffff !important;
+}
+
+.red-theme-page .modal-header .modal-title {
+  color: #ffffff !important;
+}

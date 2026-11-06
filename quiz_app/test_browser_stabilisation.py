@@ -216,14 +216,67 @@ class AuthenticatedBrowserShellTests(StaticLiveServerTestCase):
         expect(page.locator(".user-menu-dropdown")).to_be_visible()
         page.keyboard.press("Escape")
 
+        expected_primary = {
+            "academic": "#1e40af",
+            "green": "#047857",
+            "purple": "#7c3aed",
+            "red": "#dc2626",
+        }
         for theme in THEMES:
             page.locator(".app-theme-trigger").click()
             page.locator(f'.theme-option[data-theme="{theme}"]').click()
             actual = page.evaluate(
                 "() => document.documentElement.getAttribute('data-app-theme')"
             )
+            stored = page.evaluate("() => localStorage.getItem('preferredTheme')")
+            body_class = page.evaluate("() => document.body.className")
+            root_class = page.evaluate("() => document.documentElement.className")
+            primary = page.evaluate(
+                "() => getComputedStyle(document.documentElement).getPropertyValue('--app-primary').trim()"
+            )
+            header_background = page.evaluate(
+                "() => getComputedStyle(document.querySelector('.app-header')).backgroundColor"
+            )
+            header_image = page.evaluate(
+                "() => getComputedStyle(document.querySelector('.app-header')).backgroundImage"
+            )
+            expected_body = (
+                "academic-pro-theme-page" if theme == "academic" else f"{theme}-theme-page"
+            )
             if actual != theme:
                 failures.append(f"{role_name}: theme {theme} was not applied, got {actual}")
+            if stored != theme:
+                failures.append(
+                    f"{role_name}: preferredTheme was {stored!r}, expected {theme!r}"
+                )
+            if expected_body not in body_class:
+                failures.append(
+                    f"{role_name}: missing body class {expected_body} after selecting {theme}"
+                )
+            if expected_body not in root_class:
+                failures.append(
+                    f"{role_name}: missing root theme class {expected_body} after selecting {theme}"
+                )
+            if primary.lower() != expected_primary[theme]:
+                failures.append(
+                    f"{role_name}: --app-primary for {theme} was {primary!r}"
+                )
+            if header_background == "rgb(255, 255, 255)" and header_image == "none":
+                failures.append(
+                    f"{role_name}: app header did not show the {theme} theme accent"
+                )
+            if page.locator("[data-bs-theme-value]").count():
+                failures.append(f"{role_name}: appearance switcher control is present")
+
+        page.reload()
+        if page.evaluate(
+            "() => document.documentElement.getAttribute('data-app-theme')"
+        ) != "red":
+            failures.append(f"{role_name}: selected accent did not persist after refresh")
+        if page.evaluate(
+            "() => ![...document.styleSheets].some(sheet => sheet.href && sheet.href.endsWith('/red_theme.css'))"
+        ):
+            failures.append(f"{role_name}: red theme stylesheet did not load after refresh")
 
         for viewport in VIEWPORTS:
             page.set_viewport_size(viewport)

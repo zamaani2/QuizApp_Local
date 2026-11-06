@@ -16,21 +16,7 @@
     <link rel="icon" href="{% static 'favicon.ico' %}" />
     <link rel="apple-touch-icon" href="{% static 'favicon.ico' %}" />
 
-    <script>
-      (function () {
-        try {
-          var savedTheme = localStorage.getItem('preferredTheme');
-          var validThemes = ['academic', 'green', 'purple', 'red'];
-          if (!savedTheme || validThemes.indexOf(savedTheme) === -1) {
-            savedTheme = 'academic';
-            localStorage.setItem('preferredTheme', savedTheme);
-          }
-          document.documentElement.setAttribute('data-app-theme', savedTheme);
-        } catch (e) {
-          document.documentElement.setAttribute('data-app-theme', 'academic');
-        }
-      })();
-    </script>
+    {% include 'partials/_theme_boot.html' %}
 
     {% include 'partials/_styles.html' %}
     {% block extra_css %}{% endblock %}
@@ -217,15 +203,32 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         const validThemes = ['academic', 'green', 'purple', 'red'];
+        const themeMetaColors = {
+          academic: '#1e40af',
+          green: '#047857',
+          purple: '#7c3aed',
+          red: '#dc2626',
+        };
         const applyTheme = function (themeName) {
           const safeTheme = validThemes.indexOf(themeName) !== -1 ? themeName : 'academic';
-          document.body.classList.remove('academic-pro-theme-page', 'green-theme-page', 'purple-theme-page', 'red-theme-page');
-          document.body.classList.add(safeTheme === 'academic' ? 'academic-pro-theme-page' : safeTheme + '-theme-page');
+          const themeClasses = ['academic-pro-theme-page', 'green-theme-page', 'purple-theme-page', 'red-theme-page'];
+          const activeThemeClass = safeTheme === 'academic' ? themeClasses[0] : safeTheme + '-theme-page';
+          themeClasses.forEach(function (themeClass) {
+            document.documentElement.classList.remove(themeClass);
+            document.body.classList.remove(themeClass);
+          });
+          document.documentElement.classList.add(activeThemeClass);
+          document.body.classList.add(activeThemeClass);
           document.documentElement.setAttribute('data-app-theme', safeTheme);
           try {
             localStorage.setItem('preferredTheme', safeTheme);
           } catch (e) {
             // fallback if storage is unavailable
+          }
+
+          const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+          if (themeColorMeta) {
+            themeColorMeta.setAttribute('content', themeMetaColors[safeTheme]);
           }
 
           document.querySelectorAll('.theme-option').forEach(function (button) {

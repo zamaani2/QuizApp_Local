@@ -1,11 +1,12 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
+<html lang="en" data-bs-theme="light" data-app-theme="academic">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="{% static 'favicon.ico' %}" />
     <title>Login - SchoolApp</title>
+    {% include 'partials/_theme_boot.html' %}
 
     <!-- Include the centralized styles -->
     {% include 'partials/_styles.html' %}
@@ -26,12 +27,7 @@
 
       .auth-page {
         min-height: 100vh;
-        background: linear-gradient(
-          135deg,
-          #1e40af 0%,
-          #3b82f6 50%,
-          #0ea5e9 100%
-        );
+        background: var(--app-accent-gradient);
         position: relative;
         display: flex;
         align-items: center;
@@ -49,17 +45,17 @@
         bottom: 0;
         background: radial-gradient(
             circle at 20% 80%,
-            rgba(30, 64, 175, 0.3) 0%,
+            rgba(var(--bs-primary-rgb), 0.3) 0%,
             transparent 50%
           ),
           radial-gradient(
             circle at 80% 20%,
-            rgba(59, 130, 246, 0.3) 0%,
+            rgba(var(--bs-primary-rgb), 0.22) 0%,
             transparent 50%
           ),
           radial-gradient(
             circle at 40% 40%,
-            rgba(14, 165, 233, 0.3) 0%,
+            rgba(var(--bs-primary-rgb), 0.18) 0%,
             transparent 50%
           );
         animation: float 6s ease-in-out infinite;
@@ -106,7 +102,7 @@
       }
 
       .login-header {
-        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        background: var(--app-header-gradient);
         padding: 2rem;
         text-align: center;
         position: relative;
@@ -193,8 +189,8 @@
       }
 
       .form-control:focus {
-        border-color: #1e40af;
-        box-shadow: 0 0 0 4px rgba(30, 64, 175, 0.1);
+        border-color: var(--app-primary);
+        box-shadow: 0 0 0 4px var(--app-primary-subtle);
         background: #fff;
         transform: translateY(-2px);
       }
@@ -212,11 +208,11 @@
       }
 
       .form-control:focus + .input-group-text {
-        color: #1e40af;
+        color: var(--app-primary);
       }
 
       .btn-primary {
-        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        background: var(--app-header-gradient);
         border: none;
         border-radius: 16px;
         height: 56px;
@@ -249,7 +245,7 @@
 
       .btn-primary:hover {
         transform: translateY(-3px);
-        box-shadow: 0 10px 25px rgba(30, 64, 175, 0.4);
+        box-shadow: 0 10px 25px rgba(var(--bs-primary-rgb), 0.4);
       }
 
       .btn-primary:active {
@@ -305,7 +301,7 @@
         width: 20px;
         height: 20px;
         margin-right: 0.75rem;
-        accent-color: #1e40af;
+        accent-color: var(--app-primary);
       }
 
       .remember-me label {
@@ -320,14 +316,14 @@
       }
 
       .forgot-password a {
-        color: #1e40af;
+        color: var(--app-primary);
         text-decoration: none;
         font-weight: 500;
         transition: color 0.3s ease;
       }
 
       .forgot-password a:hover {
-        color: #3b82f6;
+        color: var(--app-primary-hover);
         text-decoration: underline;
       }
 

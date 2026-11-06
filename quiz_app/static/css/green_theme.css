@@ -1470,3 +1470,84 @@
   transform: translateX(6px) !important;
   box-shadow: 0 6px 16px rgba(34, 197, 94, 0.5) !important;
 }
+
+/* Keep the selected theme visible across the shared application content. */
+.green-theme-page .app-main,
+.green-theme-page .app-content {
+  background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%) !important;
+  color: #1a3d1a !important;
+}
+
+.green-theme-page .app-content-header,
+.green-theme-page .app-content-header-inner {
+  background: var(--green-gradient-subtle) !important;
+  border-color: rgba(40, 167, 69, 0.24) !important;
+  border-left: 4px solid #28a745 !important;
+}
+
+.green-theme-page .app-content .card,
+.green-theme-page .app-content .content-section,
+.green-theme-page .app-content .kpi-card,
+.green-theme-page .app-content .welcome-banner {
+  background: #ffffff !important;
+  border-color: rgba(40, 167, 69, 0.26) !important;
+  box-shadow: 0 4px 14px rgba(40, 167, 69, 0.12) !important;
+}
+
+.green-theme-page .app-content .card-header {
+  background: linear-gradient(135deg, #146c43 0%, #198754 100%) !important;
+  border-color: #198754 !important;
+  color: #ffffff !important;
+}
+
+.green-theme-page .app-content .card-header *,
+.green-theme-page .app-content .card-header .card-title {
+  color: #ffffff !important;
+}
+
+.green-theme-page .app-content .card-body {
+  background: linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%) !important;
+  color: #1a3d1a !important;
+}
+
+.green-theme-page .app-content .card-footer {
+  background: var(--green-gradient-subtle) !important;
+  border-color: rgba(40, 167, 69, 0.26) !important;
+  color: #1a3d1a !important;
+}
+
+.green-theme-page .app-content .btn-primary {
+  background: linear-gradient(135deg, #146c43 0%, #198754 100%) !important;
+  border-color: #198754 !important;
+  color: #ffffff !important;
+}
+
+.green-theme-page .app-content .table > thead > tr > th {
+  background: linear-gradient(135deg, #146c43 0%, #198754 100%) !important;
+  border-color: #198754 !important;
+  color: #ffffff !important;
+}
+
+.green-theme-page .app-content .form-control,
+.green-theme-page .app-content .form-select {
+  border-color: rgba(40, 167, 69, 0.45) !important;
+}
+
+.green-theme-page .app-content .form-control:focus,
+.green-theme-page .app-content .form-select:focus {
+  border-color: #198754 !important;
+  box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.2) !important;
+}
+
+.green-theme-page .modal-content {
+  border-color: rgba(40, 167, 69, 0.35) !important;
+}
+
+.green-theme-page .modal-header {
+  background: linear-gradient(135deg, #146c43 0%, #198754 100%) !important;
+  color: #ffffff !important;
+}
+
+.green-theme-page .modal-header .modal-title {
+  color: #ffffff !important;
+}

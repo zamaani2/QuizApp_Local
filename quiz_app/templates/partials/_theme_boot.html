@@ -1,0 +1,23 @@
+<script>
+  (function () {
+    try {
+      var savedTheme = localStorage.getItem('preferredTheme');
+      var validThemes = ['academic', 'green', 'purple', 'red'];
+      var themeClasses = {
+        academic: 'academic-pro-theme-page',
+        green: 'green-theme-page',
+        purple: 'purple-theme-page',
+        red: 'red-theme-page'
+      };
+      if (!savedTheme || validThemes.indexOf(savedTheme) === -1) {
+        savedTheme = 'academic';
+        localStorage.setItem('preferredTheme', savedTheme);
+      }
+      document.documentElement.setAttribute('data-app-theme', savedTheme);
+      document.documentElement.classList.add(themeClasses[savedTheme]);
+    } catch (e) {
+      document.documentElement.setAttribute('data-app-theme', 'academic');
+      document.documentElement.classList.add('academic-pro-theme-page');
+    }
+  })();
+</script>
