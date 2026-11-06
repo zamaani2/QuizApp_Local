@@ -56,7 +56,7 @@ body.green-theme-page {
 
 .green-theme-page .app-header {
   background: linear-gradient(135deg, #047857 0%, #10b981 100%) !important;
-  border-bottom: 3px solid #064e3b !important;
+  border-bottom: 0 !important;
   box-shadow: 0 4px 16px rgba(4, 120, 87, 0.2) !important;
 }
 
