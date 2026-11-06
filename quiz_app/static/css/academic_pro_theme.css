@@ -1836,3 +1836,84 @@
   transform: translateX(6px) !important;
   box-shadow: 0 6px 16px rgba(30, 64, 175, 0.5) !important;
 }
+
+/* Keep the selected theme visible across the shared application content. */
+.academic-pro-theme-page .app-main,
+.academic-pro-theme-page .app-content {
+  background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%) !important;
+  color: var(--academic-dark) !important;
+}
+
+.academic-pro-theme-page .app-content-header,
+.academic-pro-theme-page .app-content-header-inner {
+  background: var(--academic-gradient-secondary) !important;
+  border-color: rgba(30, 64, 175, 0.22) !important;
+  border-left: 4px solid var(--academic-primary) !important;
+}
+
+.academic-pro-theme-page .app-content .card,
+.academic-pro-theme-page .app-content .content-section,
+.academic-pro-theme-page .app-content .kpi-card,
+.academic-pro-theme-page .app-content .welcome-banner {
+  background: #ffffff !important;
+  border-color: rgba(30, 64, 175, 0.24) !important;
+  box-shadow: 0 4px 14px rgba(30, 64, 175, 0.1) !important;
+}
+
+.academic-pro-theme-page .app-content .card-header {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+  border-color: var(--academic-primary-dark) !important;
+  color: #ffffff !important;
+}
+
+.academic-pro-theme-page .app-content .card-header *,
+.academic-pro-theme-page .app-content .card-header .card-title {
+  color: #ffffff !important;
+}
+
+.academic-pro-theme-page .app-content .card-body {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  color: var(--academic-dark) !important;
+}
+
+.academic-pro-theme-page .app-content .card-footer {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%) !important;
+  border-color: rgba(30, 64, 175, 0.24) !important;
+  color: var(--academic-dark) !important;
+}
+
+.academic-pro-theme-page .app-content .btn-primary {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+  border-color: var(--academic-primary-dark) !important;
+  color: #ffffff !important;
+}
+
+.academic-pro-theme-page .app-content .table > thead > tr > th {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+  border-color: var(--academic-primary-dark) !important;
+  color: #ffffff !important;
+}
+
+.academic-pro-theme-page .app-content .form-control,
+.academic-pro-theme-page .app-content .form-select {
+  border-color: rgba(30, 64, 175, 0.4) !important;
+}
+
+.academic-pro-theme-page .app-content .form-control:focus,
+.academic-pro-theme-page .app-content .form-select:focus {
+  border-color: var(--academic-primary) !important;
+  box-shadow: 0 0 0 0.2rem rgba(30, 64, 175, 0.2) !important;
+}
+
+.academic-pro-theme-page .modal-content {
+  border-color: rgba(30, 64, 175, 0.3) !important;
+}
+
+.academic-pro-theme-page .modal-header {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+  color: #ffffff !important;
+}
+
+.academic-pro-theme-page .modal-header .modal-title {
+  color: #ffffff !important;
+}

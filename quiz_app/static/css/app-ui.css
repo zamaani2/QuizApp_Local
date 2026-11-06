@@ -48,7 +48,7 @@
   --app-font-sans: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --app-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Surfaces & Backgrounds - Light Mode */
+  /* Surfaces & Backgrounds */
   --app-bg: #f8fafc;
   --app-surface: #ffffff;
   --app-surface-subtle: #f1f5f9;
@@ -72,12 +72,38 @@
   --app-primary-dark: #1e3a8a;
   --app-primary-subtle: #dbeafe;
   --app-primary-text: #1e40af;
+  --app-primary-rgb: 30, 64, 175;
   --bs-primary: #1e40af;
   --bs-primary-rgb: 30, 64, 175;
   --bs-link-color: #1e40af;
   --bs-link-color-rgb: 30, 64, 175;
   --bs-link-hover-color: #1d4ed8;
   --bs-link-hover-color-rgb: 29, 78, 216;
+  --bs-focus-ring-color: rgba(30, 64, 175, 0.25);
+
+  /* Accent shell tokens */
+  --app-accent-gradient: linear-gradient(135deg, #1e3a8a 0%, #1e40af 48%, #3b82f6 100%);
+  --app-header-gradient: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  --app-sidebar-bg: #0f172a;
+  --app-sidebar-bg-end: #111827;
+  --app-sidebar-border: rgba(148, 163, 184, 0.18);
+  --app-sidebar-text: #dbe4f0;
+  --app-sidebar-muted: #94a3b8;
+  --app-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --app-sidebar-active: #1e40af;
+  --app-chart-1: #1e40af;
+  --app-chart-2: #0ea5e9;
+  --app-chart-3: #10b981;
+  --app-chart-4: #f59e0b;
+  --app-chart-5: #ef4444;
+
+  /* Compatibility aliases used by existing templates */
+  --app-card-bg: var(--app-surface);
+  --app-border-color: var(--app-border);
+  --app-hover-bg: var(--app-surface-hover);
+  --app-active-bg: var(--app-primary-subtle);
+  --primary-color: var(--app-primary);
+  --primary-dark: var(--app-primary-dark);
 
   /* Semantic Status Colors */
   --app-success: #10b981;
@@ -123,66 +149,156 @@
   --app-focus-ring: #2563eb;
   --app-header-height: 3.75rem;
   --app-sidebar-width: 260px;
+  --app-content-wash: radial-gradient(1200px 420px at 100% 0%, rgba(30, 64, 175, 0.08), transparent 62%);
 }
 
 /* --------------------------------------------------------------------------
-   3. Theme Accent Variations
+   3. Theme Accent Variations (academic | green | purple | red only)
+   Appearance modes are not used. These selectors and colour identities
+   must remain stable for the existing theme picker and preferredTheme key.
    -------------------------------------------------------------------------- */
-/* Academic Pro Theme (Default) */
-html[data-app-theme="academic"] {
+html[data-app-theme="academic"],
+body.academic-pro-theme-page {
   --app-primary: #1e40af;
   --app-primary-hover: #1d4ed8;
   --app-primary-dark: #1e3a8a;
   --app-primary-subtle: #dbeafe;
   --app-primary-text: #1e40af;
+  --app-primary-rgb: 30, 64, 175;
   --bs-primary: #1e40af;
   --bs-primary-rgb: 30, 64, 175;
   --bs-link-color: #1e40af;
   --bs-link-color-rgb: 30, 64, 175;
   --bs-link-hover-color: #1d4ed8;
   --bs-link-hover-color-rgb: 29, 78, 216;
+  --bs-focus-ring-color: rgba(30, 64, 175, 0.25);
+  --app-focus-ring: #2563eb;
+  --app-accent-gradient: linear-gradient(135deg, #1e3a8a 0%, #1e40af 48%, #3b82f6 100%);
+  --app-header-gradient: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  --app-sidebar-bg: #0f172a;
+  --app-sidebar-bg-end: #111827;
+  --app-sidebar-active: #1e3a8a;
+  --app-chart-1: #1e40af;
+  --app-chart-2: #0ea5e9;
+  --primary-color: #1e40af;
+  --primary-dark: #1e3a8a;
+  --app-bg: #f1f5fb;
+  --app-surface: #ffffff;
+  --app-surface-subtle: #e8eefc;
+  --app-surface-hover: #e1e9fa;
+  --app-surface-active: #d5e0f6;
+  --app-border: #d5deee;
+  --app-border-subtle: #e8eef8;
+  --app-border-strong: #b7c5df;
+  --app-content-wash: radial-gradient(1200px 420px at 100% 0%, rgba(30, 64, 175, 0.1), transparent 62%);
 }
-/* Green Vibrant Theme */
-html[data-app-theme="green"] {
+
+html[data-app-theme="green"],
+body.green-theme-page {
   --app-primary: #047857;
   --app-primary-hover: #065f46;
   --app-primary-dark: #064e3b;
   --app-primary-subtle: #d1fae5;
   --app-primary-text: #047857;
+  --app-primary-rgb: 4, 120, 87;
   --bs-primary: #047857;
   --bs-primary-rgb: 4, 120, 87;
   --bs-link-color: #047857;
   --bs-link-color-rgb: 4, 120, 87;
   --bs-link-hover-color: #065f46;
   --bs-link-hover-color-rgb: 6, 95, 70;
+  --bs-focus-ring-color: rgba(4, 120, 87, 0.25);
+  --app-focus-ring: #059669;
+  --app-accent-gradient: linear-gradient(135deg, #064e3b 0%, #047857 48%, #10b981 100%);
+  --app-header-gradient: linear-gradient(135deg, #047857 0%, #10b981 100%);
+  --app-sidebar-bg: #052e16;
+  --app-sidebar-bg-end: #064e3b;
+  --app-sidebar-active: #047857;
+  --app-chart-1: #047857;
+  --app-chart-2: #34d399;
+  --primary-color: #047857;
+  --primary-dark: #064e3b;
+  --app-bg: #f1faf4;
+  --app-surface: #ffffff;
+  --app-surface-subtle: #e7f6ed;
+  --app-surface-hover: #dcf3e6;
+  --app-surface-active: #ccebd8;
+  --app-border: #c9e6d4;
+  --app-border-subtle: #e3f4ea;
+  --app-border-strong: #a5d4b8;
+  --app-content-wash: radial-gradient(1200px 420px at 100% 0%, rgba(4, 120, 87, 0.12), transparent 62%);
 }
-/* Purple Vibrant Theme */
-html[data-app-theme="purple"] {
+
+html[data-app-theme="purple"],
+body.purple-theme-page {
   --app-primary: #7c3aed;
   --app-primary-hover: #6d28d9;
   --app-primary-dark: #5b21b6;
   --app-primary-subtle: #ede9fe;
   --app-primary-text: #7c3aed;
+  --app-primary-rgb: 124, 58, 237;
   --bs-primary: #7c3aed;
   --bs-primary-rgb: 124, 58, 237;
   --bs-link-color: #7c3aed;
   --bs-link-color-rgb: 124, 58, 237;
   --bs-link-hover-color: #6d28d9;
   --bs-link-hover-color-rgb: 109, 40, 217;
+  --bs-focus-ring-color: rgba(124, 58, 237, 0.25);
+  --app-focus-ring: #8b5cf6;
+  --app-accent-gradient: linear-gradient(135deg, #5b21b6 0%, #7c3aed 48%, #c084fc 100%);
+  --app-header-gradient: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  --app-sidebar-bg: #1e1033;
+  --app-sidebar-bg-end: #2e1064;
+  --app-sidebar-active: #6d28d9;
+  --app-chart-1: #7c3aed;
+  --app-chart-2: #c084fc;
+  --primary-color: #7c3aed;
+  --primary-dark: #5b21b6;
+  --app-bg: #f7f4fe;
+  --app-surface: #ffffff;
+  --app-surface-subtle: #efe9fc;
+  --app-surface-hover: #e8dffb;
+  --app-surface-active: #ddd1f7;
+  --app-border: #ddd2f3;
+  --app-border-subtle: #efe8fa;
+  --app-border-strong: #c4b2ea;
+  --app-content-wash: radial-gradient(1200px 420px at 100% 0%, rgba(124, 58, 237, 0.12), transparent 62%);
 }
-/* Red Vibrant Theme */
-html[data-app-theme="red"] {
+
+html[data-app-theme="red"],
+body.red-theme-page {
   --app-primary: #dc2626;
   --app-primary-hover: #b91c1c;
   --app-primary-dark: #991b1b;
   --app-primary-subtle: #fee2e2;
   --app-primary-text: #dc2626;
+  --app-primary-rgb: 220, 38, 38;
   --bs-primary: #dc2626;
   --bs-primary-rgb: 220, 38, 38;
   --bs-link-color: #dc2626;
   --bs-link-color-rgb: 220, 38, 38;
   --bs-link-hover-color: #b91c1c;
   --bs-link-hover-color-rgb: 185, 28, 28;
+  --bs-focus-ring-color: rgba(220, 38, 38, 0.25);
+  --app-focus-ring: #ef4444;
+  --app-accent-gradient: linear-gradient(135deg, #991b1b 0%, #dc2626 48%, #f87171 100%);
+  --app-header-gradient: linear-gradient(135deg, #dc2626 0%, #f87171 100%);
+  --app-sidebar-bg: #1c0a0a;
+  --app-sidebar-bg-end: #450a0a;
+  --app-sidebar-active: #b91c1c;
+  --app-chart-1: #dc2626;
+  --app-chart-2: #fb7185;
+  --primary-color: #dc2626;
+  --primary-dark: #991b1b;
+  --app-bg: #fff5f5;
+  --app-surface: #ffffff;
+  --app-surface-subtle: #ffecec;
+  --app-surface-hover: #ffe2e2;
+  --app-surface-active: #fdd6d6;
+  --app-border: #f5d0d0;
+  --app-border-subtle: #fce8e8;
+  --app-border-strong: #e9b4b4;
+  --app-content-wash: radial-gradient(1200px 420px at 100% 0%, rgba(220, 38, 38, 0.1), transparent 62%);
 }
 /* --------------------------------------------------------------------------
    4. Global Reset & Layout Foundation
@@ -224,8 +340,16 @@ body {
 
 .app-content {
   background-color: var(--app-bg) !important;
+  background-image: var(--app-content-wash);
+  background-repeat: no-repeat;
+  background-size: 100% 28rem;
   padding-bottom: 2.5rem;
   min-height: calc(100vh - 8rem);
+}
+
+.app-content .container-fluid,
+.app-content .row {
+  background-color: transparent !important;
 }
 
 .app-content .container-fluid {
@@ -284,6 +408,7 @@ body.custom-app-shell {
   top: 0;
   z-index: 1040;
   background: var(--app-surface);
+  border-top: 3px solid var(--app-primary);
   border-bottom: 1px solid var(--app-border);
   box-shadow: var(--app-shadow-xs);
 }
@@ -353,9 +478,9 @@ body.custom-app-shell {
 }
 
 .app-role-badge.admin {
-  background: rgba(30, 64, 175, 0.08);
+  background: color-mix(in srgb, var(--app-primary) 10%, #ffffff);
   color: var(--app-primary);
-  border-color: rgba(30, 64, 175, 0.2);
+  border-color: color-mix(in srgb, var(--app-primary) 24%, #ffffff);
 }
 
 .app-role-badge.teacher {
@@ -436,8 +561,8 @@ body.custom-app-shell {
 }
 
 .theme-option.is-active {
-  background: var(--app-surface-subtle);
-  border-color: var(--app-border);
+  background: var(--app-primary-subtle);
+  border-color: var(--app-primary);
 }
 
 .theme-option-copy {
@@ -521,11 +646,11 @@ body.custom-app-shell {
   left: 0;
   bottom: 0;
   width: var(--app-sidebar-width);
-  background: linear-gradient(180deg, #0f172a, #111827);
-  border-right: 1px solid rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, var(--app-sidebar-bg), var(--app-sidebar-bg-end));
+  border-right: 1px solid var(--app-sidebar-border);
   box-shadow: var(--app-shadow-md);
   transform: translateX(-100%);
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, background 0.2s ease;
   z-index: 1030;
 }
 
@@ -607,7 +732,7 @@ body.sidebar-open .app-sidebar-backdrop {
   min-height: 2.5rem;
   padding: 0.6rem 0.8rem;
   border-radius: var(--app-radius);
-  color: #dfe7f3;
+  color: var(--app-sidebar-text);
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
@@ -615,7 +740,7 @@ body.sidebar-open .app-sidebar-backdrop {
 
 .sidebar-menu .nav-link:hover,
 .sidebar-menu .nav-link.active {
-  background: rgba(255,255,255,0.08);
+  background: var(--app-sidebar-hover);
   color: #fff;
 }
 
@@ -642,7 +767,7 @@ body.sidebar-open .app-sidebar-backdrop {
 }
 
 .sidebar-menu .nav-treeview .nav-link.active {
-  background: rgba(255,255,255,0.1);
+  background: var(--app-sidebar-active);
   color: #fff;
 }
 
@@ -675,6 +800,7 @@ body.sidebar-open .app-sidebar-backdrop {
   padding: 1.1rem 1.25rem;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
+  border-left: 4px solid var(--app-primary);
   border-radius: var(--app-radius-lg);
   box-shadow: var(--app-shadow-xs);
 }
@@ -703,7 +829,7 @@ body.sidebar-open .app-sidebar-backdrop {
   gap: 1rem;
   padding: 0.9rem 1.5rem;
   border-top: 1px solid var(--app-border);
-  background: var(--app-surface);
+  background: color-mix(in srgb, var(--app-primary-subtle) 55%, var(--app-surface));
   color: var(--app-text-muted);
   font-size: 0.82rem;
 }
@@ -859,8 +985,9 @@ body.sidebar-open .app-sidebar-backdrop {
    6. Sidebar Design & Navigation
    -------------------------------------------------------------------------- */
 .app-sidebar {
-  background-color: #0f172a !important;
-  border-right: 1px solid #1e293b !important;
+  background-color: var(--app-sidebar-bg) !important;
+  background-image: linear-gradient(180deg, var(--app-sidebar-bg), var(--app-sidebar-bg-end)) !important;
+  border-right: 1px solid var(--app-sidebar-border) !important;
   box-shadow: var(--app-shadow-md);
   z-index: 1030;
 }
@@ -911,7 +1038,7 @@ body.sidebar-open .app-sidebar-backdrop {
 }
 
 .sidebar-menu .nav-link {
-  color: #cbd5e1 !important;
+  color: var(--app-sidebar-text) !important;
   font-size: 0.875rem;
   font-weight: 500;
   padding: 0.55rem 0.85rem;
@@ -927,12 +1054,12 @@ body.sidebar-open .app-sidebar-backdrop {
   font-size: 1.1rem;
   width: 1.25rem;
   text-align: center;
-  color: #94a3b8;
+  color: var(--app-sidebar-muted);
   transition: color 0.15s ease;
 }
 
 .sidebar-menu .nav-link:hover {
-  background-color: rgba(255, 255, 255, 0.07);
+  background-color: var(--app-sidebar-hover);
   color: #ffffff !important;
 }
 
@@ -942,7 +1069,7 @@ body.sidebar-open .app-sidebar-backdrop {
 
 /* Active Nav Link */
 .sidebar-menu .nav-link.active {
-  background-color: var(--app-primary-dark) !important;
+  background-color: var(--app-sidebar-active) !important;
   color: #ffffff !important;
   font-weight: 600;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
@@ -963,7 +1090,7 @@ body.sidebar-open .app-sidebar-backdrop {
 .sidebar-menu .nav-treeview .nav-link {
   font-size: 0.825rem;
   padding: 0.45rem 0.75rem;
-  color: #94a3b8 !important;
+  color: var(--app-sidebar-muted) !important;
 }
 
 .sidebar-menu .nav-treeview .nav-link i.nav-icon {
@@ -977,7 +1104,7 @@ body.sidebar-open .app-sidebar-backdrop {
 }
 
 .sidebar-menu .nav-treeview .nav-link.active {
-  background-color: var(--app-primary-dark) !important;
+  background-color: var(--app-sidebar-active) !important;
   color: #ffffff !important;
   font-weight: 600;
   box-shadow: none;
@@ -1000,7 +1127,7 @@ body.sidebar-open .app-sidebar-backdrop {
    7. Page Content Header & Breadcrumbs
    -------------------------------------------------------------------------- */
 .app-content-header {
-  background-color: var(--app-surface) !important;
+  background-color: color-mix(in srgb, var(--app-primary-subtle) 70%, var(--app-surface)) !important;
   border-bottom: 1px solid var(--app-border) !important;
   padding: 1.15rem 1.5rem;
   margin-bottom: 1.5rem;
@@ -1075,7 +1202,7 @@ body.sidebar-open .app-sidebar-backdrop {
 }
 
 .card-header {
-  background-color: var(--app-surface) !important;
+  background-color: color-mix(in srgb, var(--app-primary-subtle) 45%, var(--app-surface)) !important;
   border-bottom: 1px solid var(--app-border) !important;
   padding: 0.9rem 1.25rem;
   display: flex;
@@ -1116,6 +1243,7 @@ body.sidebar-open .app-sidebar-backdrop {
 .welcome-banner {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
+  border-left: 4px solid var(--app-primary);
   border-radius: var(--app-radius-lg);
   padding: 1.35rem 1.5rem;
   margin-bottom: 1.5rem;
@@ -1274,7 +1402,7 @@ body.sidebar-open .app-sidebar-backdrop {
 }
 
 .table > thead {
-  background-color: var(--app-surface-subtle);
+  background-color: var(--app-primary-subtle);
   border-bottom: 1px solid var(--app-border);
 }
 
@@ -1751,6 +1879,239 @@ body.sidebar-open .app-sidebar-backdrop {
   .user-menu .dropdown-menu {
     max-width: calc(100vw - 1rem);
   }
+}
+
+/* --------------------------------------------------------------------------
+   14. Shared themed components (modals, tabs, tables, forms, alerts, charts)
+   -------------------------------------------------------------------------- */
+.bg-primary,
+.text-bg-primary {
+  background-color: var(--app-primary) !important;
+}
+
+.text-primary {
+  color: var(--app-primary) !important;
+}
+
+.border-primary {
+  border-color: var(--app-primary) !important;
+}
+
+.bg-primary-subtle {
+  background-color: var(--app-primary-subtle) !important;
+}
+
+.custom-app-shell .bg-light,
+.custom-app-shell .bg-body-secondary,
+.custom-app-shell .bg-body-tertiary,
+.custom-app-shell .text-bg-light {
+  background-color: var(--app-surface-subtle) !important;
+}
+
+.custom-app-shell .bg-body {
+  background-color: var(--app-bg) !important;
+}
+
+.text-bg-primary,
+.card.bg-primary,
+.card-header.bg-primary,
+.modal-header.bg-primary {
+  background-color: var(--app-primary) !important;
+  color: #ffffff !important;
+}
+
+.bg-gradient-purple {
+  background: var(--app-accent-gradient) !important;
+  color: #ffffff !important;
+}
+
+.link-primary,
+a.btn-link,
+.card-footer a.btn-link {
+  color: var(--app-primary);
+}
+
+.form-check-input:checked {
+  background-color: var(--app-primary);
+  border-color: var(--app-primary);
+}
+
+.form-check-input:focus {
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 0.25rem var(--bs-focus-ring-color);
+}
+
+.form-range::-webkit-slider-thumb {
+  background-color: var(--app-primary);
+}
+
+.form-range::-moz-range-thumb {
+  background-color: var(--app-primary);
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+  background-color: var(--app-primary);
+  border-color: var(--app-primary);
+  color: #ffffff;
+}
+
+.nav-tabs .nav-link {
+  color: var(--app-text-muted);
+}
+
+.nav-tabs .nav-link:hover {
+  color: var(--app-primary);
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--app-primary);
+  background-color: var(--app-surface);
+  border-color: var(--app-border) var(--app-border) var(--app-surface);
+}
+
+.nav-pills .nav-link {
+  color: var(--app-primary);
+}
+
+.dropdown-menu {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-lg);
+}
+
+.list-group-item {
+  background-color: var(--app-surface);
+  color: var(--app-text);
+  border-color: var(--app-border);
+}
+
+.list-group-item.active {
+  background-color: var(--app-primary);
+  border-color: var(--app-primary);
+}
+
+.list-group-item-action:hover,
+.list-group-item-action:focus {
+  background-color: var(--app-primary-subtle);
+  color: var(--app-primary-dark);
+}
+
+.modal-content {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  color: var(--app-text);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--app-border);
+}
+
+.modal-footer {
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface-subtle);
+}
+
+.modal-title {
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.offcanvas {
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.alert-primary {
+  color: var(--app-primary-dark);
+  background-color: var(--app-primary-subtle);
+  border-color: color-mix(in srgb, var(--app-primary) 28%, #ffffff);
+}
+
+.progress {
+  background-color: var(--app-surface-subtle);
+}
+
+.progress-bar:not([class*="bg-"]) {
+  background-color: var(--app-primary);
+}
+
+.pagination .page-link {
+  color: var(--app-primary);
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+  background: var(--app-primary) !important;
+  border-color: var(--app-primary) !important;
+  color: #ffffff !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+  background: var(--app-primary-subtle) !important;
+  border-color: var(--app-primary) !important;
+  color: var(--app-primary-dark) !important;
+}
+
+.table thead.table-primary th,
+.table-primary {
+  background-color: var(--app-primary-subtle) !important;
+  color: var(--app-primary-dark);
+}
+
+.swal2-popup {
+  border-radius: var(--app-radius-lg) !important;
+  font-family: var(--app-font-sans);
+}
+
+.kpi-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--app-text-muted);
+}
+
+.kpi-value {
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: var(--app-text);
+  line-height: 1.15;
+}
+
+.kpi-helper {
+  font-size: 0.8rem;
+  color: var(--app-text-muted);
+}
+
+.kpi-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--app-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.chart-accent,
+.chart-bar,
+[data-chart-accent] {
+  color: var(--app-chart-1);
+}
+
+.chart-track {
+  background: var(--app-surface-subtle);
+  border-radius: var(--app-radius-full);
+  overflow: hidden;
+}
+
+.chart-track-fill {
+  background: var(--app-accent-gradient);
+  height: 100%;
 }
 
 /* Reduced Motion Preference */

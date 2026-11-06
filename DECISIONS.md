@@ -1,5 +1,21 @@
 # Decision log
 
+## 2026-11-05 — Accent themes only
+
+**Decision:** QuizApp_Local uses only the four existing accent themes
+(`academic`, `green`, `purple`, `red`). Do not add dark, light, or system
+appearance modes, extra themes, or a second appearance switcher.
+
+**Reason:** The product already has a working accent picker, `data-theme`
+identifiers, body theme classes, and the `preferredTheme` localStorage key.
+Appearance switching would duplicate that control, break saved preferences,
+and split styling across two independent axes.
+
+**Defaults and compatibility:** Academic Pro remains the default for new users.
+Existing users keep a valid saved accent. Theme identifiers, colour identities,
+selectors, and theme-dependent behaviour stay in place; shared and
+role-specific surfaces are restyled through the existing accent tokens.
+
 ## 2026-11-02 — Preserve the existing Django application
 
 **Decision:** Improve the current Django application in place. Keep its models,
