@@ -56,7 +56,7 @@ body.red-theme-page {
 
 .red-theme-page .app-header {
   background: linear-gradient(135deg, #dc2626 0%, #f87171 100%) !important;
-  border-bottom: 3px solid #991b1b !important;
+  border-bottom: 0 !important;
   box-shadow: 0 4px 16px rgba(220, 38, 38, 0.2) !important;
 }
 

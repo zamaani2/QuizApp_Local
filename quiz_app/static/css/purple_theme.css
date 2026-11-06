@@ -56,7 +56,7 @@ body.purple-theme-page {
 
 .purple-theme-page .app-header {
   background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%) !important;
-  border-bottom: 3px solid #5b21b6 !important;
+  border-bottom: 0 !important;
   box-shadow: 0 4px 16px rgba(124, 58, 237, 0.2) !important;
 }
 
